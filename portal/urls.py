@@ -25,5 +25,6 @@ urlpatterns = [
     path("administrare/experti/<int:pk>/editare/", views.admin_expert_edit, name="admin_expert_edit"),
 
     path("administrare/referinte/", views.admin_referinte, name="admin_referinte"),
+    path("administrare/capitole/<int:pk>/", views.admin_capitol_dashboard, name="admin_capitol_dashboard"),
     path("administrare/export/", views.admin_export, name="admin_export"),
 ]

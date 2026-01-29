@@ -40,6 +40,14 @@ class Chapter(models.Model):
         help_text="Clasa Bootstrap Icons, de ex. 'bi-journal-text'.",
     )
 
+    culoare = models.CharField(
+        max_length=7,
+        blank=True,
+        default="#0b3d91",
+        help_text="Cod culoare HEX, de ex. #0B3D91 (folosit în interfață).",
+    )
+
+
     class Meta:
         verbose_name = "Capitol"
         verbose_name_plural = "Capitole"
@@ -49,10 +57,22 @@ class Chapter(models.Model):
         return f"Cap. {self.numar} – {self.denumire}"
 
 
+    @property
+    def culoare_ui(self) -> str:
+        return (self.culoare or "#0b3d91").lower()
+
+
 class Criterion(models.Model):
     cod = models.CharField(max_length=10, unique=True)
     denumire = models.CharField(max_length=255)
     pictograma = models.CharField(max_length=100, blank=True)
+
+    culoare = models.CharField(
+        max_length=7,
+        blank=True,
+        default="#0b3d91",
+        help_text="Cod culoare HEX, de ex. #0B3D91 (folosit în interfață).",
+    )
 
     class Meta:
         verbose_name = "Criteriu"
@@ -61,6 +81,11 @@ class Criterion(models.Model):
 
     def __str__(self) -> str:
         return self.denumire
+
+
+    @property
+    def culoare_ui(self) -> str:
+        return (self.culoare or "#0b3d91").lower()
 
 
 class ExpertProfile(models.Model):

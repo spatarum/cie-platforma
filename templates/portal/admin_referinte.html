@@ -4,56 +4,57 @@
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <h1 class="h5 mb-0">Capitole & criterii</h1>
+  <div>
+    <h1 class="h5 mb-1">Capitole & criterii</h1>
+    <div class="text-muted small">Apasă pe un capitol pentru dashboard (experți, chestionare, răspunsuri).</div>
+  </div>
   <a class="btn btn-light btn-sm" href="/django-admin/portal/"><i class="bi bi-gear me-1"></i>Administrare avansată</a>
 </div>
 
-<div class="row g-3">
-  <div class="col-lg-8">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-diagram-3 me-1"></i>Capitole grupate pe clustere</strong></div>
-      <div class="card-body">
-        {% for cl, chapters in grouped %}
-          {% if cl %}
-            <div class="mb-3">
-              <div class="fw-semibold mb-2"><i class="bi {{ cl.pictograma|default:'bi-grid' }} me-1"></i>{{ cl.cod }}. {{ cl.denumire }}</div>
-              <div class="d-flex flex-wrap gap-2">
-                {% for ch in chapters %}
-                  <span class="badge text-bg-light"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }} me-1"></i>Cap. {{ ch.numar }} – {{ ch.denumire }}</span>
-                {% endfor %}
-              </div>
-            </div>
-          {% else %}
-            <div class="mb-3">
-              <div class="fw-semibold mb-2">Capitole în afara clusterelor</div>
-              <div class="d-flex flex-wrap gap-2">
-                {% for ch in chapters %}
-                  <span class="badge text-bg-light"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }} me-1"></i>Cap. {{ ch.numar }} – {{ ch.denumire }}</span>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
-        {% endfor %}
-
-        <div class="small text-muted mt-3">
-          Pentru modificări (denumiri, alocare la cluster, pictograme) folosește „Administrare avansată”.
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-header bg-white"><strong><i class="bi bi-flag me-1"></i>Criterii</strong></div>
+  <div class="card-body">
+    <div class="ref-tiles">
+      {% for cr in criterii %}
+        <div class="ref-tile" style="--tile-bg: {{ cr.culoare_ui }};">
+          <div class="ref-tile-icon"><i class="bi {{ cr.pictograma|default:'bi-flag' }}"></i></div>
+          <div class="ref-tile-footer">
+            <div class="ref-tile-code">{{ cr.cod }}</div>
+            <div class="ref-tile-title">{{ cr.denumire }}</div>
+          </div>
         </div>
-      </div>
+      {% endfor %}
     </div>
   </div>
+</div>
 
-  <div class="col-lg-4">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-flag me-1"></i>Criterii</strong></div>
-      <div class="card-body">
-        {% for cr in criterii %}
-          <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
-            <div><i class="bi {{ cr.pictograma|default:'bi-flag' }} me-2"></i>{{ cr.denumire }}</div>
-            <span class="badge text-bg-light">{{ cr.cod }}</span>
-          </div>
-        {% endfor %}
-        <div class="small text-muted mt-3">Criteriile sunt folosite pentru alocarea chestionarelor și a competențelor experților.</div>
+<div class="card shadow-sm gov-card">
+  <div class="card-header bg-white"><strong><i class="bi bi-diagram-3 me-1"></i>Capitole grupate pe clustere</strong></div>
+  <div class="card-body">
+    {% for cl, chapters in grouped %}
+      <div class="mb-4">
+        {% if cl %}
+          <div class="fw-semibold mb-2"><i class="bi {{ cl.pictograma|default:'bi-grid' }} me-1"></i>{{ cl.cod }}. {{ cl.denumire }}</div>
+        {% else %}
+          <div class="fw-semibold mb-2">Capitole în afara clusterelor</div>
+        {% endif %}
+
+        <div class="ref-tiles">
+          {% for ch in chapters %}
+            <a class="ref-tile" href="{% url 'admin_capitol_dashboard' ch.pk %}" style="--tile-bg: {{ ch.culoare_ui }};">
+              <div class="ref-tile-icon"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }}"></i></div>
+              <div class="ref-tile-footer">
+                <div class="ref-tile-code">Cap. {{ ch.numar }}</div>
+                <div class="ref-tile-title">{{ ch.denumire }}</div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
       </div>
+    {% endfor %}
+
+    <div class="small text-muted">
+      Pentru modificări (denumiri, alocare la cluster, pictograme, culori) folosește „Administrare avansată”.
     </div>
   </div>
 </div>

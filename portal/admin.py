@@ -21,14 +21,14 @@ class ClusterAdmin(admin.ModelAdmin):
 
 @admin.register(Chapter)
 class ChapterAdmin(admin.ModelAdmin):
-    list_display = ("numar", "denumire", "cluster")
+    list_display = ("numar", "denumire", "cluster", "pictograma", "culoare")
     list_filter = ("cluster",)
     search_fields = ("denumire",)
 
 
 @admin.register(Criterion)
 class CriterionAdmin(admin.ModelAdmin):
-    list_display = ("cod", "denumire")
+    list_display = ("cod", "denumire", "pictograma", "culoare")
     search_fields = ("denumire",)
 
 

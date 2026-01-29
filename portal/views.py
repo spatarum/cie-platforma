@@ -274,6 +274,67 @@ def admin_referinte(request):
     )
 
 
+
+
+@user_passes_test(is_admin)
+def admin_capitol_dashboard(request, pk: int):
+    capitol = get_object_or_404(Chapter, pk=pk)
+
+    expert_ids_qs = (
+        User.objects.filter(is_staff=False, profil_expert__capitole=capitol)
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    expert_ids = list(expert_ids_qs)
+    nr_experti = len(expert_ids)
+
+    chestionare_qs = Questionnaire.objects.filter(capitole=capitol).distinct().order_by("-creat_la")
+    chestionare = list(chestionare_qs)
+    nr_chestionare = len(chestionare)
+
+    # Per chestionar: câți experți (din cei alocați capitolului) au răspuns (trimis sau cel puțin un răspuns completat)
+    for q in chestionare:
+        if nr_experti == 0:
+            q.nr_respondenti = 0
+            q.proc_respondenti = 0
+            continue
+
+        nr_resp = (
+            Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
+            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .values("expert_id")
+            .distinct()
+            .count()
+        )
+        q.nr_respondenti = nr_resp
+        q.proc_respondenti = round((nr_resp / nr_experti) * 100, 1)
+
+    # La nivel de capitol: experți unici care au răspuns la cel puțin un chestionar din acest capitol
+    if nr_experti and nr_chestionare:
+        nr_experti_care_au_raspuns = (
+            Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
+            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .values("expert_id")
+            .distinct()
+            .count()
+        )
+    else:
+        nr_experti_care_au_raspuns = 0
+
+    rata_raspuns = round((nr_experti_care_au_raspuns / nr_experti) * 100, 1) if nr_experti else 0
+
+    return render(
+        request,
+        "portal/admin_capitol_dashboard.html",
+        {
+            "capitol": capitol,
+            "nr_experti": nr_experti,
+            "nr_chestionare": nr_chestionare,
+            "nr_experti_care_au_raspuns": nr_experti_care_au_raspuns,
+            "rata_raspuns": rata_raspuns,
+            "chestionare": chestionare,
+        },
+    )
 @user_passes_test(is_admin)
 def admin_export(request):
     chestionare_all = Questionnaire.objects.all().order_by("-creat_la")

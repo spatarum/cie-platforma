@@ -1,0 +1,119 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Cap. {{ capitol.numar }} | Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div class="d-flex align-items-center gap-3">
+    <a class="btn btn-light btn-sm" href="{% url 'admin_referinte' %}">
+      <i class="bi bi-arrow-left me-1"></i>Înapoi
+    </a>
+    <div>
+      <div class="small text-muted">
+        {% if capitol.cluster %}{{ capitol.cluster.cod }}. {{ capitol.cluster.denumire }}{% else %}Capitol în afara clusterelor{% endif %}
+      </div>
+      <h1 class="h5 mb-0">Cap. {{ capitol.numar }} – {{ capitol.denumire }}</h1>
+    </div>
+  </div>
+
+  <a class="btn btn-outline-secondary btn-sm" href="/django-admin/portal/chapter/{{ capitol.pk }}/change/">
+    <i class="bi bi-pencil-square me-1"></i>Editează capitol
+  </a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: {{ capitol.culoare_ui }};">
+      <div class="card-body">
+        <div class="stat-label">Experți alocați</div>
+        <div class="stat-value">{{ nr_experti }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: {{ capitol.culoare_ui }};">
+      <div class="card-body">
+        <div class="stat-label">Chestionare</div>
+        <div class="stat-value">{{ nr_chestionare }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: {{ capitol.culoare_ui }};">
+      <div class="card-body">
+        <div class="stat-label">Răspunsuri primite</div>
+        <div class="stat-value">{{ nr_experti_care_au_raspuns }}</div>
+        <div class="small text-muted">experți unici</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: {{ capitol.culoare_ui }};">
+      <div class="card-body">
+        <div class="stat-label">Rată de răspuns</div>
+        <div class="stat-value">{{ rata_raspuns }}%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <strong><i class="bi bi-ui-checks-grid me-1"></i>Chestionare în acest capitol</strong>
+    <span class="text-muted small">Include chestionare deschise și închise</span>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Chestionar</th>
+          <th class="text-nowrap">Termen limită</th>
+          <th>Status</th>
+          <th class="text-end">Au răspuns</th>
+          <th class="text-end">%</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in chestionare %}
+          <tr>
+            <td>
+              <a class="fw-semibold text-decoration-none" href="{% url 'admin_chestionar_edit' q.pk %}">{{ q.titlu }}</a>
+              {% if q.descriere %}
+                <div class="text-muted small">{{ q.descriere|truncatechars:120 }}</div>
+              {% endif %}
+            </td>
+
+            <td class="text-nowrap">{{ q.termen_limita|date:"d.m.Y H:i" }}</td>
+
+            <td>
+              {% if q.este_deschis %}
+                <span class="badge text-bg-success"><i class="bi bi-unlock me-1"></i>Deschis</span>
+              {% else %}
+                <span class="badge text-bg-secondary"><i class="bi bi-lock me-1"></i>Închis</span>
+              {% endif %}
+            </td>
+
+            <td class="text-end">{{ q.nr_respondenti }}</td>
+            <td class="text-end">{{ q.proc_respondenti }}%</td>
+
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_chestionar_edit' q.pk %}">
+                <i class="bi bi-pencil me-1"></i>Editează
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="text-muted p-3">Nu există chestionare alocate acestui capitol încă.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
