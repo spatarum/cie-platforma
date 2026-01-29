@@ -50,13 +50,19 @@ python manage.py runserver
 - alege repo-ul
 - Render va folosi `render.yaml` și va crea automat Web Service + PostgreSQL.
 
-3) După primul deploy, în Render → Web Service → **Shell**:
+3) **Crearea contului de Administrator (fără Shell, pe planul gratuit)**
 
-```bash
-python manage.py createsuperuser
-```
+Pe planul gratuit Render, accesul la Shell/SSH nu este disponibil. În schimb, proiectul include o comandă automată
+(`ensure_superuser`) care creează un administrator la deploy, dacă nu există deja.
 
-Gata.
+În Render → Web Service → **Environment**, adaugă variabilele:
+- `CIE_ADMIN_EMAIL` = emailul tău
+- `CIE_ADMIN_PASSWORD` = o parolă temporară (o vei putea schimba ulterior)
+- (opțional) `CIE_ADMIN_USERNAME` = username (dacă nu pui, se folosește emailul)
+
+Apoi declanșează un redeploy (Deploy latest commit).
+
+După redeploy, te poți loga la `.../login/` cu credențialele de mai sus.
 
 ---
 
