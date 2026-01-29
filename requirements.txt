@@ -1,0 +1,15 @@
+Django>=4.2,<6.0
+python-dotenv>=1.0
+whitenoise>=6.6
+gunicorn>=21.2
+
+# DB (Render Postgres)
+dj-database-url>=2.1
+psycopg2-binary>=2.9
+
+# Exporturi
+openpyxl>=3.1
+reportlab>=4.1
+
+# Timezone
+tzdata>=2024.1

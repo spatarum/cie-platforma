@@ -1,0 +1,46 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Experți | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h5 mb-0">Experți</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'admin_expert_create' %}"><i class="bi bi-person-plus me-1"></i>Expert nou</a>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    {% if experti %}
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Nume</th>
+              <th>Email</th>
+              <th>Organizație / funcție</th>
+              <th class="text-end"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in experti %}
+              <tr>
+                <td class="fw-semibold">{{ e.get_full_name|default:e.username }}</td>
+                <td>{{ e.email }}</td>
+                <td class="text-muted">
+                  {% if e.profil_expert.organizatie %}{{ e.profil_expert.organizatie }}{% endif %}
+                  {% if e.profil_expert.functie %}<div class="small">{{ e.profil_expert.functie }}</div>{% endif %}
+                </td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_expert_edit' e.pk %}">Editează</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted">Nu există experți.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

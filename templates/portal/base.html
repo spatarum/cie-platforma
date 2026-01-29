@@ -1,0 +1,82 @@
+{% load static %}
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Platforma experți CIE{% endblock %}</title>
+
+  <!-- Font Onest -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="{% static 'portal/css/style.css' %}">
+
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="gov-header">
+    <div class="container d-flex align-items-center justify-content-between py-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="gov-badge">CIE</div>
+        <div>
+          <div class="gov-title">Platforma experți – Comisia Integrare Europeană</div>
+          <div class="gov-subtitle">Comentarii la proiecte de lege / transpunerea acquis-ului UE</div>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        {% if request.user.is_authenticated %}
+          <span class="text-white-50 small">
+            <i class="bi bi-person-circle me-1"></i>
+            {{ request.user.get_full_name|default:request.user.username }}
+            {% if request.user.is_staff %}<span class="badge text-bg-light ms-2">Administrator</span>{% else %}<span class="badge text-bg-light ms-2">Expert</span>{% endif %}
+          </span>
+          <a class="btn btn-sm btn-outline-light" href="{% url 'logout' %}">Ieșire</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if request.user.is_authenticated %}
+    <nav class="gov-nav">
+      <div class="container d-flex flex-wrap gap-2 py-2">
+        {% if request.user.is_staff %}
+          <a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Panou</a>
+          <a class="nav-link" href="{% url 'admin_chestionare_list' %}"><i class="bi bi-ui-checks-grid me-1"></i>Chestionare</a>
+          <a class="nav-link" href="{% url 'admin_experti_list' %}"><i class="bi bi-people me-1"></i>Experți</a>
+          <a class="nav-link" href="{% url 'admin_referinte' %}"><i class="bi bi-journal-bookmark me-1"></i>Capitole & criterii</a>
+          <a class="nav-link" href="{% url 'admin_export' %}"><i class="bi bi-download me-1"></i>Export</a>
+        {% else %}
+          <a class="nav-link" href="{% url 'expert_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Chestionare</a>
+          <a class="nav-link" href="{% url 'expert_profile' %}"><i class="bi bi-person-lines-fill me-1"></i>Profil</a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+  </header>
+
+  <main class="container my-4">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="gov-footer py-4 mt-5">
+    <div class="container small text-muted">
+      © {% now "Y" %} Platforma experți CIE (versiune de test)
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

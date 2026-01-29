@@ -1,0 +1,138 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}{{ titlu_pagina }} | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
+    {% if expert_user %}<div class="text-muted small">Utilizator: {{ expert_user.username }}</div>{% endif %}
+  </div>
+  <a class="btn btn-light" href="{% url 'admin_experti_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.prenume.label }}</label>
+            {{ form.prenume }}
+            {{ form.prenume.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.nume.label }}</label>
+            {{ form.nume }}
+            {{ form.nume.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.email.label }}</label>
+            {{ form.email }}
+            {{ form.email.errors }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.telefon.label }}</label>
+            {{ form.telefon }}
+            {{ form.telefon.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.organizatie.label }}</label>
+            {{ form.organizatie }}
+            {{ form.organizatie.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.functie.label }}</label>
+            {{ form.functie }}
+            {{ form.functie.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.sumar_expertiza.label }}</label>
+            {{ form.sumar_expertiza }}
+            {{ form.sumar_expertiza.errors }}
+          </div>
+
+          {% if form.parola %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">{{ form.parola.label }}</label>
+              {{ form.parola }}
+              {{ form.parola.errors }}
+              <div class="form-text">Dacă lași gol, platforma generează automat o parolă.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">{{ form.confirma_parola.label }}</label>
+              {{ form.confirma_parola }}
+              {{ form.confirma_parola.errors }}
+            </div>
+          {% endif %}
+
+          {% if form.parola_noua %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">{{ form.parola_noua.label }}</label>
+              {{ form.parola_noua }}
+              {{ form.parola_noua.errors }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="col-lg-6">
+          <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between">
+              <label class="form-label fw-semibold">{{ form.capitole.label }}</label>
+              <span class="small text-muted"><i class="bi bi-journal-text me-1"></i>Capitole</span>
+            </div>
+            <div class="checkbox-grid">
+              {{ form.capitole }}
+            </div>
+            {{ form.capitole.errors }}
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between">
+              <label class="form-label fw-semibold">{{ form.criterii.label }}</label>
+              <span class="small text-muted"><i class="bi bi-flag me-1"></i>Criterii</span>
+            </div>
+            <div class="checkbox-grid">
+              {{ form.criterii }}
+            </div>
+            {{ form.criterii.errors }}
+          </div>
+
+          <div class="alert alert-light border mt-4">
+            <div class="small text-muted">
+              <i class="bi bi-info-circle me-1"></i>
+              Recomandare: selectează doar capitolele/criteriile unde expertul are competențe clare.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
+        <a class="btn btn-light" href="{% url 'admin_experti_list' %}">Anulează</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"], textarea').forEach((el) => {
+    el.classList.add('form-control');
+  });
+  document.querySelectorAll('.checkbox-grid input[type="checkbox"]').forEach((el) => {
+    el.classList.add('form-check-input');
+    if(el.parentElement && el.parentElement.tagName.toLowerCase() === 'label') {
+      el.parentElement.classList.add('form-check', 'form-check-inline');
+    }
+  });
+  // email disabled styling
+  const email = document.querySelector('#id_email');
+  if(email && email.hasAttribute('disabled')) email.classList.add('form-control-plaintext');
+</script>
+{% endblock %}

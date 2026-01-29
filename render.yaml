@@ -1,0 +1,26 @@
+databases:
+  - name: cie-db
+    databaseName: cie_platform
+    user: cie_platform
+    plan: free
+
+services:
+  - type: web
+    name: cie-platforma-experti
+    env: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn cie_platform.wsgi:application"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "false"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cie-db
+          property: connectionString

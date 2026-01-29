@@ -1,0 +1,45 @@
+{% extends 'portal/base.html' %}
+{% block title %}Autentificare | Platforma experți CIE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm gov-card">
+      <div class="card-body p-4">
+        <h1 class="h5 mb-2">Autentificare</h1>
+        <p class="text-muted mb-4">Introdu numele de utilizator (email) și parola.</p>
+        <form method="post">
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+          <div class="mb-3">
+            <label class="form-label" for="id_username">Email / utilizator</label>
+            {{ form.username }}
+            {{ form.username.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="id_password">Parola</label>
+            {{ form.password }}
+            {{ form.password.errors }}
+          </div>
+          <button class="btn btn-primary w-100" type="submit"><i class="bi bi-box-arrow-in-right me-1"></i>Intră în cont</button>
+        </form>
+
+        <hr class="my-4">
+        <p class="small text-muted mb-0">
+          Dacă ai uitat parola, contactează administratorul platformei.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Bootstrap styling for Django auth form widgets
+  const u = document.getElementById('id_username');
+  const p = document.getElementById('id_password');
+  if(u) u.classList.add('form-control');
+  if(p) p.classList.add('form-control');
+</script>
+{% endblock %}

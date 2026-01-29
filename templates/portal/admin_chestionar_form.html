@@ -1,0 +1,142 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}{{ titlu_pagina }} | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
+    {% if chestionar %}<div class="text-muted small">ID {{ chestionar.id }} · creat la {{ chestionar.creat_la|date:"d.m.Y H:i" }}</div>{% endif %}
+  </div>
+  <a class="btn btn-light" href="{% url 'admin_chestionare_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+</div>
+
+{% if chestionar %}
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm gov-card">
+      <div class="card-body">
+        <div class="text-muted small">Răspunsuri totale</div>
+        <div class="fs-4 fw-semibold">{{ total_raspunsuri }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm gov-card">
+      <div class="card-body">
+        <div class="text-muted small">Trimise</div>
+        <div class="fs-4 fw-semibold">{{ trimise }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm gov-card">
+      <div class="card-body">
+        <div class="text-muted small">Stare</div>
+        {% if chestionar.este_deschis %}
+          <div class="fs-6"><span class="badge text-bg-success">Deschis</span></div>
+        {% else %}
+          <div class="fs-6"><span class="badge text-bg-secondary">Închis</span></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.titlu.label }}</label>
+            {{ form.titlu }}
+            {{ form.titlu.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.descriere.label }}</label>
+            {{ form.descriere }}
+            {{ form.descriere.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.termen_limita.label }}</label>
+            {{ form.termen_limita }}
+            {{ form.termen_limita.errors }}
+            <div class="form-text">După termen, experții nu mai pot edita răspunsurile.</div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between">
+              <label class="form-label fw-semibold">{{ form.capitole.label }}</label>
+              <span class="small text-muted"><i class="bi bi-journal-text me-1"></i>Capitole</span>
+            </div>
+            <div class="checkbox-grid">
+              {{ form.capitole }}
+            </div>
+            {{ form.capitole.errors }}
+          </div>
+          <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between">
+              <label class="form-label fw-semibold">{{ form.criterii.label }}</label>
+              <span class="small text-muted"><i class="bi bi-flag me-1"></i>Criterii</span>
+            </div>
+            <div class="checkbox-grid">
+              {{ form.criterii }}
+            </div>
+            {{ form.criterii.errors }}
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <h2 class="h6 mb-3"><i class="bi bi-question-circle me-1"></i>Întrebări (max. 20)</h2>
+      {% if chestionar and chestionar.submisii.exists %}
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Au fost deja primite răspunsuri. Întrebările sunt blocate pentru a evita pierderea datelor.
+        </div>
+      {% endif %}
+
+      <div class="row g-3">
+        {% for field in question_fields %}
+          <div class="col-lg-6">
+            <div class="mb-3">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {{ field.errors }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
+        <a class="btn btn-light" href="{% url 'admin_chestionare_list' %}">Anulează</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Bootstrap styling
+  document.querySelectorAll('input[type="text"], input[type="datetime-local"], textarea').forEach((el) => {
+    el.classList.add('form-control');
+  });
+  // Checkbox styling
+  document.querySelectorAll('.checkbox-grid input[type="checkbox"]').forEach((el) => {
+    el.classList.add('form-check-input');
+    if(el.parentElement && el.parentElement.tagName.toLowerCase() === 'label') {
+      el.parentElement.classList.add('form-check', 'form-check-inline');
+    }
+  });
+</script>
+{% endblock %}

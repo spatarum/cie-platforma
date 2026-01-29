@@ -1,0 +1,61 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Profil | Platforma experți CIE{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h5 mb-0">Profil</h1>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm gov-card">
+      <div class="card-body">
+        <div class="mb-2"><span class="text-muted small">Nume</span><div class="fw-semibold">{{ request.user.get_full_name|default:request.user.username }}</div></div>
+        <div class="mb-2"><span class="text-muted small">Email</span><div class="fw-semibold">{{ request.user.email }}</div></div>
+        <div class="mb-2"><span class="text-muted small">Telefon</span><div class="fw-semibold">{{ profil.telefon|default:'—' }}</div></div>
+        <div class="mb-2"><span class="text-muted small">Organizație / instituție</span><div class="fw-semibold">{{ profil.organizatie|default:'—' }}</div></div>
+        <div class="mb-2"><span class="text-muted small">Funcție / poziție</span><div class="fw-semibold">{{ profil.functie|default:'—' }}</div></div>
+        <div class="mb-0"><span class="text-muted small">Sumar expertiză</span><div class="fw-semibold">{{ profil.sumar_expertiza|default:'—' }}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white">
+        <strong><i class="bi bi-award me-1"></i>Domenii de expertiză</strong>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="text-muted small mb-2">Capitole</div>
+          {% if profil.capitole.all %}
+            <div class="d-flex flex-wrap gap-2">
+              {% for ch in profil.capitole.all %}
+                <span class="badge text-bg-light"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }} me-1"></i>Cap. {{ ch.numar }} – {{ ch.denumire }}</span>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted">Nu sunt setate capitole.</div>
+          {% endif %}
+        </div>
+        <div>
+          <div class="text-muted small mb-2">Criterii</div>
+          {% if profil.criterii.all %}
+            <div class="d-flex flex-wrap gap-2">
+              {% for cr in profil.criterii.all %}
+                <span class="badge text-bg-light"><i class="bi {{ cr.pictograma|default:'bi-flag' }} me-1"></i>{{ cr.denumire }}</span>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted">Nu sunt setate criterii.</div>
+          {% endif %}
+        </div>
+
+        <hr>
+        <div class="small text-muted">Pentru modificarea profilului sau a domeniilor, contactează administratorul.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

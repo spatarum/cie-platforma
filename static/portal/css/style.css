@@ -1,0 +1,101 @@
+:root {
+  --gov-blue: #0b3d91;
+  --gov-blue-dark: #082f6f;
+  --gov-bg: #f5f7fb;
+  --gov-card-radius: 16px;
+}
+
+body {
+  font-family: 'Onest', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--gov-bg);
+}
+
+.gov-header {
+  background: linear-gradient(90deg, var(--gov-blue), var(--gov-blue-dark));
+  color: #fff;
+}
+
+.gov-title {
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.gov-subtitle {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.gov-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.gov-nav {
+  background: rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255,255,255,0.12);
+}
+
+.gov-nav .nav-link {
+  color: rgba(255,255,255,0.9);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.gov-nav .nav-link:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+
+.gov-card {
+  border-radius: var(--gov-card-radius);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.card-header {
+  border-top-left-radius: var(--gov-card-radius) !important;
+  border-top-right-radius: var(--gov-card-radius) !important;
+}
+
+.checkbox-grid {
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.checkbox-box {
+  max-height: 280px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.gov-footer {
+  background: transparent;
+}
+
+/* Improve list-group inside cards */
+.list-group-item {
+  border-left: 0;
+  border-right: 0;
+}
+
+/* Badges */
+.badge.text-bg-light {
+  border: 1px solid rgba(0,0,0,0.08);
+  font-weight: 600;
+}

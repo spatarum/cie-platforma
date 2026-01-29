@@ -1,0 +1,88 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Export răspunsuri | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h5 mb-0">Export răspunsuri</h1>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <h2 class="h6 mb-2"><i class="bi bi-ui-checks-grid me-1"></i>Chestionare</h2>
+          <div class="checkbox-box">
+            {% if chestionare %}
+              {% for c in chestionare %}
+                <label class="form-check d-block mb-1">
+                  <input class="form-check-input" type="checkbox" name="chestionare" value="{{ c.id }}">
+                  <span class="form-check-label">{{ c.titlu }} <span class="text-muted small">(ID {{ c.id }}, termen {{ c.termen_limita|date:"d.m.Y H:i" }})</span></span>
+                </label>
+              {% endfor %}
+            {% else %}
+              <div class="text-muted">Nu există chestionare.</div>
+            {% endif %}
+          </div>
+          <div class="form-text">Poți selecta mai multe chestionare.</div>
+        </div>
+
+        <div class="col-lg-6">
+          <h2 class="h6 mb-2"><i class="bi bi-funnel me-1"></i>Filtre (opțional)</h2>
+          <div class="mb-3">
+            <div class="text-muted small mb-1"><i class="bi bi-journal-text me-1"></i>Capitole</div>
+            <div class="checkbox-grid">
+              {% for ch in capitole %}
+                <label class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" name="capitole" value="{{ ch.id }}">
+                  <span class="form-check-label">{{ ch.numar }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="mb-3">
+            <div class="text-muted small mb-1"><i class="bi bi-flag me-1"></i>Criterii</div>
+            <div class="checkbox-grid">
+              {% for cr in criterii %}
+                <label class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" name="criterii" value="{{ cr.id }}">
+                  <span class="form-check-label">{{ cr.denumire }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="form-text">Dacă selectezi capitole/criterii, exportul va include toate chestionarele asociate (în plus față de cele selectate explicit).</div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="row g-3 align-items-end">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Format export</label>
+          <div class="d-flex gap-3">
+            <label class="form-check">
+              <input class="form-check-input" type="radio" name="format" value="csv" checked>
+              <span class="form-check-label">CSV</span>
+            </label>
+            <label class="form-check">
+              <input class="form-check-input" type="radio" name="format" value="xlsx">
+              <span class="form-check-label">Excel (XLSX)</span>
+            </label>
+            <label class="form-check">
+              <input class="form-check-input" type="radio" name="format" value="pdf">
+              <span class="form-check-label">PDF</span>
+            </label>
+          </div>
+        </div>
+        <div class="col-md-6 text-end">
+          <button class="btn btn-primary" type="submit"><i class="bi bi-download me-1"></i>Descarcă</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
