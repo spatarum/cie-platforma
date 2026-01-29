@@ -155,7 +155,8 @@ class Submission(models.Model):
 class Answer(models.Model):
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name="raspunsuri")
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="raspunsuri")
-    text = models.CharField(max_length=300, blank=True)
+    # Răspunsuri tip text scurt (max. 1500 caractere)
+    text = models.CharField(max_length=1500, blank=True)
 
     class Meta:
         verbose_name = "Răspuns"

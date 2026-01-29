@@ -269,11 +269,11 @@ class RaspunsChestionarForm(forms.Form):
             self.fields[field_name] = forms.CharField(
                 label=f"{q.ord}. {q.text}",
                 required=False,
-                max_length=300,
+                max_length=1500,
                 widget=forms.Textarea(attrs={
-                    "rows": 2,
-                    "maxlength": "300",
-                    "placeholder": "Răspuns (max. 300 caractere)",
+                    "rows": 4,
+                    "maxlength": "1500",
+                    "placeholder": "Răspuns (max. 1500 caractere)",
                 }),
             )
             self.initial[field_name] = existing.get(q.id, "")
@@ -283,5 +283,5 @@ class RaspunsChestionarForm(forms.Form):
             field_name = f"q_{q.id}"
             text = (self.cleaned_data.get(field_name) or "").strip()
             answer, _ = Answer.objects.get_or_create(submission=self.submission, question=q)
-            answer.text = text[:300]
+            answer.text = text[:1500]
             answer.save()

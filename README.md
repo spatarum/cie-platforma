@@ -5,7 +5,7 @@ Platformă web pentru administratori și experți ai Comisiei parlamentare pentr
 Funcționalități principale:
 - autentificare (Administrator / Expert)
 - chestionare cu termen limită
-- întrebări deschise (max. 300 caractere/răspuns)
+- întrebări deschise (max. 1500 caractere/răspuns)
 - max. 20 întrebări per chestionar
 - alocare chestionare pe **capitole** și **criterii**
 - alocare competențe experților pe **capitole** și **criterii**
