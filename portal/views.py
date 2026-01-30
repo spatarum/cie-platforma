@@ -67,7 +67,34 @@ def home(request):
 
 @user_passes_test(is_expert)
 def expert_dashboard(request):
+    profil = _get_or_create_profile(request.user)
     qs = _expert_accessible_qs(request.user)
+
+    # Filtre (opțional) după capitol / criteriu, doar dintre cele alocate expertului
+    cap_id = request.GET.get("capitol")
+    cr_id = request.GET.get("criteriu")
+
+    active_cap_id = None
+    active_cr_id = None
+
+    if cap_id:
+        try:
+            cap_id_int = int(cap_id)
+        except (TypeError, ValueError):
+            cap_id_int = None
+        if cap_id_int and profil.capitole.filter(id=cap_id_int).exists():
+            qs = qs.filter(capitole__id=cap_id_int).distinct()
+            active_cap_id = cap_id_int
+            active_cr_id = None
+    elif cr_id:
+        try:
+            cr_id_int = int(cr_id)
+        except (TypeError, ValueError):
+            cr_id_int = None
+        if cr_id_int and profil.criterii.filter(id=cr_id_int).exists():
+            qs = qs.filter(criterii__id=cr_id_int).distinct()
+            active_cr_id = cr_id_int
+            active_cap_id = None
     now = timezone.now()
     deschise = qs.filter(termen_limita__gte=now).order_by("termen_limita")
     inchise = qs.filter(termen_limita__lt=now).order_by("-termen_limita")
@@ -84,6 +111,10 @@ def expert_dashboard(request):
             "deschise": deschise,
             "inchise": inchise,
             "sub_map": sub_map,
+            "capitole_tile": profil.capitole.all().order_by("numar"),
+            "criterii_tile": profil.criterii.all().order_by("cod"),
+            "active_capitol": active_cap_id,
+            "active_criteriu": active_cr_id,
         },
     )
 
@@ -335,6 +366,69 @@ def admin_capitol_dashboard(request, pk: int):
             "chestionare": chestionare,
         },
     )
+
+
+@user_passes_test(is_admin)
+def admin_criteriu_dashboard(request, pk: int):
+    criteriu = get_object_or_404(Criterion, pk=pk)
+
+    expert_ids_qs = (
+        User.objects.filter(is_staff=False, profil_expert__criterii=criteriu)
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    expert_ids = list(expert_ids_qs)
+    nr_experti = len(expert_ids)
+
+    chestionare_qs = Questionnaire.objects.filter(criterii=criteriu).distinct().order_by("-creat_la")
+    chestionare = list(chestionare_qs)
+    nr_chestionare = len(chestionare)
+
+    # Per chestionar: câți experți (din cei alocați criteriului) au răspuns (trimis sau cel puțin un răspuns completat)
+    for q in chestionare:
+        if nr_experti == 0:
+            q.nr_respondenti = 0
+            q.proc_respondenti = 0
+            continue
+
+        nr_resp = (
+            Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
+            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .values("expert_id")
+            .distinct()
+            .count()
+        )
+        q.nr_respondenti = nr_resp
+        q.proc_respondenti = round((nr_resp / nr_experti) * 100, 1)
+
+    # La nivel de criteriu: experți unici care au răspuns la cel puțin un chestionar din acest criteriu
+    if nr_experti and nr_chestionare:
+        nr_experti_care_au_raspuns = (
+            Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
+            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .values("expert_id")
+            .distinct()
+            .count()
+        )
+    else:
+        nr_experti_care_au_raspuns = 0
+
+    rata_raspuns = round((nr_experti_care_au_raspuns / nr_experti) * 100, 1) if nr_experti else 0
+
+    return render(
+        request,
+        "portal/admin_criteriu_dashboard.html",
+        {
+            "criteriu": criteriu,
+            "nr_experti": nr_experti,
+            "nr_chestionare": nr_chestionare,
+            "nr_experti_care_au_raspuns": nr_experti_care_au_raspuns,
+            "rata_raspuns": rata_raspuns,
+            "chestionare": chestionare,
+        },
+    )
+
+
 @user_passes_test(is_admin)
 def admin_export(request):
     chestionare_all = Questionnaire.objects.all().order_by("-creat_la")

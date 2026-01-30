@@ -16,13 +16,13 @@
   <div class="card-body">
     <div class="ref-tiles">
       {% for cr in criterii %}
-        <div class="ref-tile" style="--tile-bg: {{ cr.culoare_ui }};">
+        <a class="ref-tile" href="{% url 'admin_criteriu_dashboard' cr.pk %}" style="--tile-bg: {{ cr.culoare_ui }};">
           <div class="ref-tile-icon"><i class="bi {{ cr.pictograma|default:'bi-flag' }}"></i></div>
           <div class="ref-tile-footer">
             <div class="ref-tile-code">{{ cr.cod }}</div>
             <div class="ref-tile-title">{{ cr.denumire }}</div>
           </div>
-        </div>
+        </a>
       {% endfor %}
     </div>
   </div>

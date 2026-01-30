@@ -8,6 +8,55 @@
   <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Răspunsurile pot fi editate până la termenul limită.</span>
 </div>
 
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <strong><i class="bi bi-funnel me-1"></i>Filtre rapide</strong>
+    <span class="text-muted small">Apasă pe un pătrat pentru a filtra lista de mai jos</span>
+  </div>
+  <div class="card-body">
+    <div class="mb-2 fw-semibold">Afișare</div>
+    <div class="ref-tiles mb-3">
+      <a class="ref-tile {% if not active_capitol and not active_criteriu %}active{% endif %}" href="{% url 'expert_dashboard' %}" style="--tile-bg: #0b3d91;">
+        <div class="ref-tile-icon"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+        <div class="ref-tile-footer">
+          <div class="ref-tile-code">Toate</div>
+          <div class="ref-tile-title">Afișează toate chestionarele</div>
+        </div>
+      </a>
+    </div>
+
+    {% if capitole_tile %}
+      <div class="mb-2 fw-semibold">Capitole alocate</div>
+      <div class="ref-tiles mb-3">
+        {% for ch in capitole_tile %}
+          <a class="ref-tile {% if active_capitol == ch.id %}active{% endif %}" href="?capitol={{ ch.id }}" style="--tile-bg: {{ ch.culoare_ui }};">
+            <div class="ref-tile-icon"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }}"></i></div>
+            <div class="ref-tile-footer">
+              <div class="ref-tile-code">Cap. {{ ch.numar }}</div>
+              <div class="ref-tile-title">{{ ch.denumire }}</div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if criterii_tile %}
+      <div class="mb-2 fw-semibold">Criterii alocate</div>
+      <div class="ref-tiles">
+        {% for cr in criterii_tile %}
+          <a class="ref-tile {% if active_criteriu == cr.id %}active{% endif %}" href="?criteriu={{ cr.id }}" style="--tile-bg: {{ cr.culoare_ui }};">
+            <div class="ref-tile-icon"><i class="bi {{ cr.pictograma|default:'bi-flag' }}"></i></div>
+            <div class="ref-tile-footer">
+              <div class="ref-tile-code">{{ cr.cod }}</div>
+              <div class="ref-tile-title">{{ cr.denumire }}</div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
 <div class="row g-3">
   <div class="col-lg-6">
     <div class="card shadow-sm gov-card">

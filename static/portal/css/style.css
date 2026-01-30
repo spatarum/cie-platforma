@@ -168,6 +168,11 @@ a.ref-tile:hover {
   color: #fff;
 }
 
+/* Evidențiere pentru filtrul selectat */
+.ref-tile.active {
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.85), 0 0 0 6px rgba(0,0,0,0.12);
+}
+
 /* Dashboard stat cards */
 .stat-card {
   border-left: 6px solid var(--stat-accent, var(--gov-blue));

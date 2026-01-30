@@ -13,6 +13,12 @@ class Cluster(models.Model):
         blank=True,
         help_text="Clasa Bootstrap Icons, de ex. 'bi-shield-check'.",
     )
+    culoare = models.CharField(
+        max_length=7,
+        blank=True,
+        default="#0b3d91",
+        help_text="Cod culoare HEX, de ex. #0B3D91 (folosit în interfață).",
+    )
     ordonare = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
@@ -22,6 +28,10 @@ class Cluster(models.Model):
 
     def __str__(self) -> str:
         return f"{self.cod}. {self.denumire}"
+
+    @property
+    def culoare_ui(self) -> str:
+        return (self.culoare or "#0b3d91").lower()
 
 
 class Chapter(models.Model):

@@ -109,9 +109,15 @@ USE_TZ = True
 
 
 # Static files
+# IMPORTANT: STATIC_URL trebuie să fie absolut ("/static/") ca să nu devină relativ la ruta curentă
+# (de ex. /administrare/referinte/static/...) și să nu se rupă stilurile / pictogramele.
 STATIC_URL = "/static/"
+
+# Render/WhiteNoise: fișierele statice sunt colectate în acest folder.
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# În proiect există un folder "static" la rădăcină (static/portal/css/style.css etc.).
+# Fără această setare, collectstatic nu le va lua.
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

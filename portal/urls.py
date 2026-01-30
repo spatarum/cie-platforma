@@ -26,5 +26,6 @@ urlpatterns = [
 
     path("administrare/referinte/", views.admin_referinte, name="admin_referinte"),
     path("administrare/capitole/<int:pk>/", views.admin_capitol_dashboard, name="admin_capitol_dashboard"),
+    path("administrare/criterii/<int:pk>/", views.admin_criteriu_dashboard, name="admin_criteriu_dashboard"),
     path("administrare/export/", views.admin_export, name="admin_export"),
 ]
