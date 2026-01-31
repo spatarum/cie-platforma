@@ -37,7 +37,10 @@
             {{ request.user.get_full_name|default:request.user.username }}
             {% if request.user.is_staff %}<span class="badge text-bg-light ms-2">Administrator</span>{% else %}<span class="badge text-bg-light ms-2">Expert</span>{% endif %}
           </span>
-          <a class="btn btn-sm btn-outline-light" href="{% url 'logout' %}">Ieșire</a>
+          <form method="post" action="{% url 'logout' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-light">Ieșire</button>
+          </form>
         {% endif %}
       </div>
     </div>
