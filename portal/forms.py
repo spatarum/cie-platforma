@@ -285,3 +285,11 @@ class RaspunsChestionarForm(forms.Form):
             answer, _ = Answer.objects.get_or_create(submission=self.submission, question=q)
             answer.text = text[:1500]
             answer.save()
+
+
+class ExpertImportCSVForm(forms.Form):
+    fisier = forms.FileField(
+        label="Fișier CSV (UTF-8)",
+        help_text="Formate acceptate: .csv. Coloane: email, prenume, nume, telefon, organizatie, functie, sumar_expertiza, capitole, criterii.",
+    )
+

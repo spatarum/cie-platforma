@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import csv
+import io
+import secrets
+import re
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .exports import export_csv, export_pdf, export_xlsx
-from .forms import ChestionarForm, ExpertCreateForm, ExpertUpdateForm, RaspunsChestionarForm
-from .models import Answer, Chapter, Criterion, ExpertProfile, Question, Questionnaire, Submission
+from .forms import ChestionarForm, ExpertCreateForm, ExpertUpdateForm, ExpertImportCSVForm, RaspunsChestionarForm
+from .models import Answer, Chapter, Criterion, ExpertProfile, ImportRun, Question, Questionnaire, Submission
 from .utils import group_chapters_by_cluster
 
 
@@ -250,6 +256,274 @@ def admin_questionnaire_edit(request, pk: int):
 def admin_expert_list(request):
     experti = User.objects.filter(is_staff=False, is_active=True).order_by("last_name", "first_name")
     return render(request, "portal/admin_experti_list.html", {"experti": experti})
+
+
+# -------------------- IMPORT experți (CSV) --------------------
+
+
+@user_passes_test(is_admin)
+def admin_expert_import_template(request):
+    """Descarcă șablon CSV pentru import experți."""
+    content = (
+        "email,prenume,nume,telefon,organizatie,functie,sumar_expertiza,capitole,criterii\n"
+        "ana.popa@example.com,Ana,Popa,+37369123456,Parlament,Consilier,achiziții publice și concurență,5;8,FID;RAP\n"
+    )
+    resp = HttpResponse(content, content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = 'attachment; filename="template_import_experti.csv"'
+    return resp
+
+
+def _parse_capitole(raw: str):
+    raw = (raw or "").strip()
+    if not raw:
+        return []
+    # Permitem separatori ; , |
+    raw = raw.replace("|", ";").replace(",", ";")
+    nums = set()
+    for token in [t.strip() for t in raw.split(";") if t.strip()]:
+        m = re.search(r"(\d{1,2})", token)
+        if not m:
+            raise ValueError(f"Capitol invalid: '{token}'")
+        nums.add(int(m.group(1)))
+    chapters = list(Chapter.objects.filter(numar__in=sorted(nums)))
+    found = set([c.numar for c in chapters])
+    missing = sorted(list(nums - found))
+    if missing:
+        raise ValueError(f"Capitole inexistente: {', '.join(str(x) for x in missing)}")
+    return chapters
+
+
+def _parse_criterii(raw: str):
+    raw = (raw or "").strip()
+    if not raw:
+        return []
+    raw = raw.replace("|", ";").replace(",", ";")
+    codes = []
+    for token in [t.strip() for t in raw.split(";") if t.strip()]:
+        codes.append(token.upper())
+    qs = list(Criterion.objects.filter(cod__in=codes))
+    found = set([c.cod.upper() for c in qs])
+    missing = [c for c in codes if c not in found]
+    if missing:
+        raise ValueError(f"Criterii inexistente: {', '.join(missing)}")
+    # păstrăm ordinea din fișier
+    by_code = {c.cod.upper(): c for c in qs}
+    return [by_code[c] for c in codes]
+
+
+@user_passes_test(is_admin)
+def admin_expert_import(request):
+    """Importă experți din CSV.
+
+    - Cheia unică: email
+    - Duplicate: se actualizează (update)
+    - Parole: se generează doar pentru utilizatorii noi (opțiunea A)
+    """
+
+    if request.method == "POST":
+        form = ExpertImportCSVForm(request.POST, request.FILES)
+        if form.is_valid():
+            f = form.cleaned_data["fisier"]
+            filename = getattr(f, 'name', '') or ''
+
+            try:
+                raw_bytes = f.read()
+                text_csv = raw_bytes.decode("utf-8-sig")
+            except Exception:
+                messages.error(request, "Fișierul nu poate fi citit. Te rog salvează-l ca CSV UTF-8 și reîncearcă.")
+                return redirect("admin_expert_import")
+
+            reader = csv.DictReader(io.StringIO(text_csv))
+            required = {"email", "prenume", "nume"}
+            headers = set([h.strip() for h in (reader.fieldnames or [])])
+            if not required.issubset(headers):
+                messages.error(
+                    request,
+                    "Lipsesc coloane obligatorii. Fișierul trebuie să conțină cel puțin: email, prenume, nume.",
+                )
+                return redirect("admin_expert_import")
+
+            report_rows = []
+            cred_rows = []
+            nr_create = nr_update = nr_error = 0
+
+            for idx, row in enumerate(reader, start=2):
+                email = (row.get("email") or "").strip().lower()
+                prenume = (row.get("prenume") or "").strip()
+                nume = (row.get("nume") or "").strip()
+
+                if not email:
+                    nr_error += 1
+                    report_rows.append((idx, "", "ERROR", "Lipsește email"))
+                    continue
+                if not prenume or not nume:
+                    nr_error += 1
+                    report_rows.append((idx, email, "ERROR", "Lipsește prenume sau nume"))
+                    continue
+
+                telefon = (row.get("telefon") or "").strip()
+                organizatie = (row.get("organizatie") or "").strip()
+                functie = (row.get("functie") or "").strip()
+                sumar = (row.get("sumar_expertiza") or "").strip()
+                raw_caps = (row.get("capitole") or "").strip()
+                raw_cr = (row.get("criterii") or "").strip()
+
+                try:
+                    capitole = _parse_capitole(raw_caps)
+                    criterii = _parse_criterii(raw_cr)
+                except Exception as e:
+                    nr_error += 1
+                    report_rows.append((idx, email, "ERROR", str(e)))
+                    continue
+
+                # găsim utilizator existent
+                existing = (
+                    User.objects.filter(username=email).first()
+                    or User.objects.filter(email=email).first()
+                )
+
+                try:
+                    with transaction.atomic():
+                        if existing:
+                            if existing.is_staff:
+                                raise ValueError("Email-ul aparține unui administrator; rândul a fost ignorat.")
+
+                            existing.username = email
+                            existing.email = email
+                            existing.first_name = prenume
+                            existing.last_name = nume
+                            existing.is_staff = False
+                            existing.is_active = True
+                            existing.save()
+
+                            profil = _get_or_create_profile(existing)
+                            profil.telefon = telefon
+                            profil.organizatie = organizatie
+                            profil.functie = functie
+                            profil.sumar_expertiza = sumar
+                            # dacă era arhivat, îl reactivăm
+                            profil.arhivat = False
+                            profil.arhivat_la = None
+                            profil.save()
+                            profil.capitole.set(capitole)
+                            profil.criterii.set(criterii)
+
+                            nr_update += 1
+                            report_rows.append((idx, email, "UPDATED", "Actualizat"))
+
+                        else:
+                            parola = secrets.token_urlsafe(10)
+                            user = User.objects.create_user(
+                                username=email,
+                                email=email,
+                                password=parola,
+                                first_name=prenume,
+                                last_name=nume,
+                            )
+                            user.is_staff = False
+                            user.is_active = True
+                            user.save()
+
+                            profil = _get_or_create_profile(user)
+                            profil.telefon = telefon
+                            profil.organizatie = organizatie
+                            profil.functie = functie
+                            profil.sumar_expertiza = sumar
+                            profil.arhivat = False
+                            profil.arhivat_la = None
+                            profil.save()
+                            profil.capitole.set(capitole)
+                            profil.criterii.set(criterii)
+
+                            nr_create += 1
+                            cred_rows.append((email, parola))
+                            report_rows.append((idx, email, "CREATED", "Creat"))
+
+                except Exception as e:
+                    nr_error += 1
+                    report_rows.append((idx, email, "ERROR", str(e)))
+
+            # Construim CSV-urile pentru download
+            rep_buf = io.StringIO()
+            rep_w = csv.writer(rep_buf)
+            rep_w.writerow(["rand", "email", "status", "mesaj"])
+            rep_w.writerows(report_rows)
+
+            cred_buf = io.StringIO()
+            cred_w = csv.writer(cred_buf)
+            cred_w.writerow(["email", "parola_temporara"])
+            cred_w.writerows(cred_rows)
+
+            run = ImportRun.objects.create(
+                kind=ImportRun.KIND_EXPERTI,
+                creat_de=request.user,
+                nume_fisier=filename,
+                nr_create=nr_create,
+                nr_actualizate=nr_update,
+                nr_erori=nr_error,
+                raport_csv=rep_buf.getvalue(),
+                cred_csv=cred_buf.getvalue() if cred_rows else "",
+            )
+
+            messages.success(
+                request,
+                f"Import finalizat. Creați: {nr_create}, Actualizați: {nr_update}, Erori: {nr_error}.",
+            )
+            return redirect("admin_import_run_detail", pk=run.pk)
+
+    else:
+        form = ExpertImportCSVForm()
+
+    return render(
+        request,
+        "portal/admin_import_experti.html",
+        {
+            "form": form,
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_import_run_detail(request, pk: int):
+    run = get_object_or_404(ImportRun, pk=pk)
+
+    # extragem erorile (max 30) pentru afișaj
+    errors_preview = []
+    if run.raport_csv:
+        r = csv.DictReader(io.StringIO(run.raport_csv))
+        for row in r:
+            if (row.get("status") or "").upper() == "ERROR":
+                errors_preview.append(row)
+            if len(errors_preview) >= 30:
+                break
+
+    return render(
+        request,
+        "portal/admin_import_run_detail.html",
+        {
+            "run": run,
+            "errors_preview": errors_preview,
+            "has_credentials": bool(run.cred_csv),
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_import_run_report_csv(request, pk: int):
+    run = get_object_or_404(ImportRun, pk=pk)
+    resp = HttpResponse(run.raport_csv or "", content_type="text/csv; charset=utf-8")
+    ts = run.creat_la.strftime("%Y%m%d_%H%M")
+    resp["Content-Disposition"] = f'attachment; filename="raport_import_experti_{ts}.csv"'
+    return resp
+
+
+@user_passes_test(is_admin)
+def admin_import_run_credentials_csv(request, pk: int):
+    run = get_object_or_404(ImportRun, pk=pk)
+    resp = HttpResponse(run.cred_csv or "", content_type="text/csv; charset=utf-8")
+    ts = run.creat_la.strftime("%Y%m%d_%H%M")
+    resp["Content-Disposition"] = f'attachment; filename="credentiale_experti_{ts}.csv"'
+    return resp
 
 @user_passes_test(is_admin)
 def admin_expert_create(request):

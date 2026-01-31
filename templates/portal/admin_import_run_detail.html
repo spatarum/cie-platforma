@@ -1,0 +1,86 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Rezultat import | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">Rezultat import experți</h1>
+    <div class="text-muted small">Rulare: {{ run.creat_la|date:"d.m.Y H:i" }}{% if run.nume_fisier %} • Fișier: {{ run.nume_fisier }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_experti_list' %}"><i class="bi bi-people me-1"></i>Înapoi la Experți</a>
+    <a class="btn btn-light btn-sm" href="{% url 'admin_expert_import' %}"><i class="bi bi-upload me-1"></i>Import nou</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
+      <div class="card-body">
+        <div class="stat-label">Experți creați</div>
+        <div class="stat-value">{{ run.nr_create }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
+      <div class="card-body">
+        <div class="stat-label">Experți actualizați</div>
+        <div class="stat-value">{{ run.nr_actualizate }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #b91c1c;">
+      <div class="card-body">
+        <div class="stat-label">Erori</div>
+        <div class="stat-value">{{ run.nr_erori }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <strong><i class="bi bi-download me-1"></i>Descărcări</strong>
+    <span class="text-muted small">Păstrează fișierele în siguranță</span>
+  </div>
+  <div class="card-body d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-primary" href="{% url 'admin_import_run_report_csv' run.pk %}"><i class="bi bi-file-earmark-text me-1"></i>Descarcă raport import (CSV)</a>
+    {% if has_credentials %}
+      <a class="btn btn-outline-success" href="{% url 'admin_import_run_credentials_csv' run.pk %}"><i class="bi bi-key me-1"></i>Descarcă credențiale (CSV)</a>
+    {% else %}
+      <span class="text-muted small align-self-center">Nu au fost create conturi noi, deci nu există credențiale noi.</span>
+    {% endif %}
+  </div>
+</div>
+
+{% if errors_preview %}
+  <div class="card shadow-sm gov-card">
+    <div class="card-header bg-white"><strong><i class="bi bi-exclamation-triangle me-1"></i>Erori (primele {{ errors_preview|length }})</strong></div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Rând</th>
+            <th>Email</th>
+            <th>Mesaj</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in errors_preview %}
+            <tr>
+              <td class="text-nowrap">{{ e.rand }}</td>
+              <td>{{ e.email }}</td>
+              <td class="text-muted">{{ e.mesaj }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="text-muted small">Nu s-au înregistrat erori.</div>
+{% endif %}
+{% endblock %}

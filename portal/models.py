@@ -155,6 +155,42 @@ class Questionnaire(models.Model):
         return timezone.now() <= self.termen_limita
 
 
+
+
+class ImportRun(models.Model):
+    KIND_EXPERTI = "EXPERTI"
+
+    KIND_CHOICES = [
+        (KIND_EXPERTI, "Import experți"),
+    ]
+
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_EXPERTI)
+    creat_de = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="importuri_create",
+    )
+    creat_la = models.DateTimeField(auto_now_add=True)
+    nume_fisier = models.CharField(max_length=255, blank=True)
+
+    nr_create = models.PositiveIntegerField(default=0)
+    nr_actualizate = models.PositiveIntegerField(default=0)
+    nr_erori = models.PositiveIntegerField(default=0)
+
+    raport_csv = models.TextField(blank=True)
+    cred_csv = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Rulare import"
+        verbose_name_plural = "Rulări import"
+        ordering = ["-creat_la"]
+
+    def __str__(self) -> str:
+        return f"{self.get_kind_display()} – {self.creat_la:%d.%m.%Y %H:%M}"
+
+
 class Question(models.Model):
     questionnaire = models.ForeignKey(Questionnaire, on_delete=models.CASCADE, related_name="intrebari")
     ord = models.PositiveSmallIntegerField()

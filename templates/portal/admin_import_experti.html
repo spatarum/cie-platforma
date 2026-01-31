@@ -1,0 +1,70 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Import experți (CSV) | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">Import experți (CSV)</h1>
+    <div class="text-muted small">Creează sau actualizează mai mulți experți odată. Cheia unică este <strong>email</strong>.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_experti_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la Experți</a>
+    <a class="btn btn-light btn-sm" href="{% url 'admin_expert_import_template' %}"><i class="bi bi-download me-1"></i>Descarcă șablon CSV</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-upload me-1"></i>Încarcă fișier CSV</strong></div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="mb-3">
+            {{ form.fisier.label_tag }}
+            {{ form.fisier }}
+            {% if form.fisier.help_text %}<div class="form-text">{{ form.fisier.help_text }}</div>{% endif %}
+            {% for error in form.fisier.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-cloud-upload me-1"></i>Importă</button>
+        </form>
+
+        <hr />
+        <div class="small text-muted">
+          <div class="fw-semibold mb-1">Reguli:</div>
+          <ul class="mb-0">
+            <li>Duplicate (același email): <strong>se actualizează</strong> profilul și domeniile (capitole/criterii).</li>
+            <li>Parole temporare: se generează <strong>doar pentru experții noi</strong> (pentru cei existenți parola rămâne neschimbată).</li>
+            <li>Capitole: scrie numerele (1–35) separate prin <code>;</code> (ex: <code>5;8;23</code>).</li>
+            <li>Criterii: coduri separate prin <code>;</code> (ex: <code>FID;RAP;ECON</code>).</li>
+            <li>Dacă un expert era arhivat, importul îl <strong>reactivează</strong>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-info-circle me-1"></i>Cum pregătești fișierul</strong></div>
+      <div class="card-body small">
+        <ol class="mb-0">
+          <li>Descarcă șablonul CSV de mai sus.</li>
+          <li>Deschide-l în Excel și completează rândurile.</li>
+          <li>Salvează ca <strong>CSV UTF-8</strong> (recomandat).</li>
+          <li>Încarcă fișierul aici și apasă <strong>Importă</strong>.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card shadow-sm gov-card mt-3">
+      <div class="card-header bg-white"><strong><i class="bi bi-shield-lock me-1"></i>Parole temporare</strong></div>
+      <div class="card-body small">
+        După import vei putea descărca un fișier CSV cu <strong>email + parolă temporară</strong> pentru experții nou creați.
+        Păstrează-l în siguranță și distribuie-l doar persoanelor autorizate.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

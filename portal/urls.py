@@ -35,6 +35,13 @@ urlpatterns = [
     path("administrare/experti/<int:pk>/arhivare/", views.admin_expert_arhivare, name="admin_expert_arhivare"),
     path("administrare/experti/<int:pk>/restabilire/", views.admin_expert_restabilire, name="admin_expert_restabilire"),
 
+    # Import experți (CSV)
+    path("administrare/import/experti/", views.admin_expert_import, name="admin_expert_import"),
+    path("administrare/import/experti/template/", views.admin_expert_import_template, name="admin_expert_import_template"),
+    path("administrare/import/rulari/<int:pk>/", views.admin_import_run_detail, name="admin_import_run_detail"),
+    path("administrare/import/rulari/<int:pk>/raport.csv", views.admin_import_run_report_csv, name="admin_import_run_report_csv"),
+    path("administrare/import/rulari/<int:pk>/credentiale.csv", views.admin_import_run_credentials_csv, name="admin_import_run_credentials_csv"),
+
     path("administrare/referinte/", views.admin_referinte, name="admin_referinte"),
     path("administrare/capitole/<int:pk>/", views.admin_capitol_dashboard, name="admin_capitol_dashboard"),
     path("administrare/criterii/<int:pk>/", views.admin_criteriu_dashboard, name="admin_criteriu_dashboard"),
