@@ -106,6 +106,15 @@ class ExpertProfile(models.Model):
     functie = models.CharField(max_length=255, blank=True)
     sumar_expertiza = models.CharField(max_length=500, blank=True)
 
+    # Arhivare (ștergere logică)
+    arhivat = models.BooleanField(default=False)
+    arhivat_la = models.DateTimeField(null=True, blank=True)
+
+    # Statistici autentificare
+    numar_logari = models.PositiveIntegerField(default=0)
+    ultima_logare_la = models.DateTimeField(null=True, blank=True)
+
+
     capitole = models.ManyToManyField(Chapter, blank=True, related_name="experti")
     criterii = models.ManyToManyField(Criterion, blank=True, related_name="experti")
 
@@ -127,6 +136,11 @@ class Questionnaire(models.Model):
 
     creat_de = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     creat_la = models.DateTimeField(auto_now_add=True)
+
+    # Arhivare (ștergere logică)
+    arhivat = models.BooleanField(default=False)
+    arhivat_la = models.DateTimeField(null=True, blank=True)
+
 
     class Meta:
         verbose_name = "Chestionar"

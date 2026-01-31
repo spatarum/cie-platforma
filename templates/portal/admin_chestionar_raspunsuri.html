@@ -1,0 +1,93 @@
+{% extends 'portal/base.html' %}
+{% load portal_extras %}
+
+{% block title %}Răspunsuri | {{ chestionar.titlu }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-1">Răspunsuri – {{ chestionar.titlu }}</h1>
+    <div class="text-muted small">Ordine: pentru fiecare întrebare, sunt listate răspunsurile experților (click pe expert = vizualizare răspunsuri per expert).</div>
+  </div>
+  <div class="d-flex gap-2">
+    {% if back_url %}
+      <a class="btn btn-light btn-sm" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    {% else %}
+      <a class="btn btn-light btn-sm" href="{% url 'admin_chestionare_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    {% endif %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_chestionar_edit' chestionar.pk %}"><i class="bi bi-pencil me-1"></i>Editează chestionar</a>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="text-muted small">Termen limită</div>
+        <div class="fw-semibold">{{ chestionar.termen_limita|date:"d.m.Y H:i" }}</div>
+      </div>
+      <div class="col-md-4">
+        <div class="text-muted small">Status</div>
+        {% if chestionar.este_deschis %}
+          <span class="badge text-bg-success"><i class="bi bi-unlock me-1"></i>Deschis</span>
+        {% else %}
+          <span class="badge text-bg-secondary"><i class="bi bi-lock me-1"></i>Închis</span>
+        {% endif %}
+      </div>
+      <div class="col-md-4">
+        <div class="text-muted small">Experți care au răspuns</div>
+        <div class="fw-semibold">{{ experti|length }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not experti %}
+  <div class="alert alert-info">Nu există răspunsuri pentru acest chestionar.</div>
+{% endif %}
+
+{% for intrebare in intrebari %}
+  <div class="card shadow-sm gov-card mb-3">
+    <div class="card-header bg-white">
+      <strong>Întrebarea {{ intrebare.ord }}</strong>
+    </div>
+    <div class="card-body">
+      <div class="fw-semibold mb-2">{{ intrebare.text }}</div>
+
+      {% if experti %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 260px;">Expert</th>
+                <th>Răspuns</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in experti %}
+                {% with m=answers|get_item:e.id %}
+                  <tr>
+                    <td class="fw-semibold">
+                      <a class="text-decoration-none" href="{% url 'admin_chestionar_raspunsuri_expert' chestionar.pk e.pk %}?back={{ request.get_full_path|urlencode }}">
+                        {{ e.get_full_name|default:e.username }}
+                      </a>
+                    </td>
+                    <td>
+                      {% if m and m|get_item:intrebare.id %}
+                        {{ m|get_item:intrebare.id }}
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endwith %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+
+{% endblock %}

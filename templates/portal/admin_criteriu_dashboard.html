@@ -61,7 +61,7 @@
 <div class="card shadow-sm gov-card">
   <div class="card-header bg-white d-flex align-items-center justify-content-between">
     <strong><i class="bi bi-ui-checks-grid me-1"></i>Chestionare în acest criteriu</strong>
-    <span class="text-muted small">Include chestionare deschise și închise</span>
+    <span class="text-muted small">Include chestionare deschise și închise (cele arhivate nu sunt afișate)</span>
   </div>
 
   <div class="table-responsive">
@@ -80,9 +80,21 @@
         {% for q in chestionare %}
           <tr>
             <td>
-              <a class="fw-semibold text-decoration-none" href="{% url 'admin_chestionar_edit' q.pk %}">{{ q.titlu }}</a>
+              <a class="fw-semibold text-decoration-none" href="{% url 'admin_chestionar_raspunsuri' q.pk %}?back={{ request.path|urlencode }}">{{ q.titlu }}</a>
               {% if q.descriere %}
                 <div class="text-muted small">{{ q.descriere|truncatechars:120 }}</div>
+              {% endif %}
+
+              {% if q.respondenti %}
+                <div class="mt-2 d-flex flex-wrap gap-1">
+                  {% for e in q.respondenti %}
+                    <a class="badge text-bg-light text-decoration-none" href="{% url 'admin_chestionar_raspunsuri_expert' q.pk e.pk %}?back={{ request.path|urlencode }}">
+                      {{ e.get_full_name|default:e.username }}
+                    </a>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="mt-2 text-muted small">Niciun răspuns încă.</div>
               {% endif %}
             </td>
 

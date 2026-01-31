@@ -1,0 +1,54 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Răspunsuri expert | {{ expert.get_full_name|default:expert.username }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-1">Răspunsuri – {{ expert.get_full_name|default:expert.username }}</h1>
+    <div class="text-muted small">Chestionar: {{ chestionar.titlu }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    {% if back_url %}
+      <a class="btn btn-light btn-sm" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    {% else %}
+      <a class="btn btn-light btn-sm" href="{% url 'admin_chestionar_raspunsuri' chestionar.pk %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    {% endif %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_chestionar_edit' chestionar.pk %}"><i class="bi bi-pencil me-1"></i>Editează chestionar</a>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <strong><i class="bi bi-list-check me-1"></i>Răspunsuri</strong>
+    <span class="text-muted small">Actualizat: {{ submission.actualizat_la|date:"d.m.Y H:i" }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 55%">Întrebare</th>
+          <th>Răspuns</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>
+              <div class="fw-semibold">Întrebarea {{ r.question.ord }}</div>
+              <div class="text-muted small">{{ r.question.text }}</div>
+            </td>
+            <td>
+              {% if r.text %}
+                {{ r.text }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

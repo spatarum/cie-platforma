@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from .exports import export_csv, export_pdf, export_xlsx
 from .forms import ChestionarForm, ExpertCreateForm, ExpertUpdateForm, RaspunsChestionarForm
-from .models import Chapter, Criterion, ExpertProfile, Questionnaire, Submission
+from .models import Answer, Chapter, Criterion, ExpertProfile, Question, Questionnaire, Submission
 from .utils import group_chapters_by_cluster
 
 
@@ -32,7 +32,7 @@ def _get_or_create_profile(user: User) -> ExpertProfile:
 def _expert_accessible_qs(user: User):
     profil = _get_or_create_profile(user)
     return (
-        Questionnaire.objects.filter(
+        Questionnaire.objects.filter(arhivat=False).filter(
             Q(capitole__in=profil.capitole.all()) | Q(criterii__in=profil.criterii.all())
         )
         .distinct()
@@ -41,6 +41,9 @@ def _expert_accessible_qs(user: User):
 
 
 def _expert_can_access(user: User, chestionar: Questionnaire) -> bool:
+    if getattr(chestionar, 'arhivat', False):
+        return False
+
     profil = _get_or_create_profile(user)
     expert_chapters = set(profil.capitole.values_list("id", flat=True))
     expert_criteria = set(profil.criterii.values_list("id", flat=True))
@@ -178,20 +181,18 @@ def expert_questionnaire(request, pk: int):
 
 @user_passes_test(is_admin)
 def admin_dashboard(request):
-    chestionare = Questionnaire.objects.all().order_by("-creat_la")[:10]
-    experti = User.objects.filter(is_staff=False).count()
+    chestionare = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")[:10]
+    experti = User.objects.filter(is_staff=False, is_active=True).count()
     return render(
         request,
         "portal/admin_dashboard.html",
         {"chestionare": chestionare, "nr_experti": experti},
     )
 
-
 @user_passes_test(is_admin)
 def admin_questionnaire_list(request):
-    chestionare = Questionnaire.objects.all().order_by("-creat_la")
+    chestionare = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")
     return render(request, "portal/admin_chestionare_list.html", {"chestionare": chestionare})
-
 
 @user_passes_test(is_admin)
 def admin_questionnaire_create(request):
@@ -247,9 +248,8 @@ def admin_questionnaire_edit(request, pk: int):
 
 @user_passes_test(is_admin)
 def admin_expert_list(request):
-    experti = User.objects.filter(is_staff=False).order_by("last_name", "first_name")
+    experti = User.objects.filter(is_staff=False, is_active=True).order_by("last_name", "first_name")
     return render(request, "portal/admin_experti_list.html", {"experti": experti})
-
 
 @user_passes_test(is_admin)
 def admin_expert_create(request):
@@ -312,33 +312,39 @@ def admin_capitol_dashboard(request, pk: int):
     capitol = get_object_or_404(Chapter, pk=pk)
 
     expert_ids_qs = (
-        User.objects.filter(is_staff=False, profil_expert__capitole=capitol)
+        User.objects.filter(is_staff=False, is_active=True, profil_expert__capitole=capitol)
         .values_list("id", flat=True)
         .distinct()
     )
     expert_ids = list(expert_ids_qs)
     nr_experti = len(expert_ids)
 
-    chestionare_qs = Questionnaire.objects.filter(capitole=capitol).distinct().order_by("-creat_la")
+    chestionare_qs = (
+        Questionnaire.objects.filter(arhivat=False, capitole=capitol)
+        .distinct()
+        .order_by("-creat_la")
+    )
     chestionare = list(chestionare_qs)
     nr_chestionare = len(chestionare)
 
-    # Per chestionar: câți experți (din cei alocați capitolului) au răspuns (trimis sau cel puțin un răspuns completat)
+    # Per chestionar: respondenti + procent
     for q in chestionare:
         if nr_experti == 0:
             q.nr_respondenti = 0
             q.proc_respondenti = 0
+            q.respondenti = []
             continue
 
-        nr_resp = (
+        resp_ids_qs = (
             Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
             .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
-            .values("expert_id")
+            .values_list("expert_id", flat=True)
             .distinct()
-            .count()
         )
-        q.nr_respondenti = nr_resp
-        q.proc_respondenti = round((nr_resp / nr_experti) * 100, 1)
+        resp_ids = list(resp_ids_qs)
+        q.nr_respondenti = len(resp_ids)
+        q.proc_respondenti = round((q.nr_respondenti / nr_experti) * 100, 1)
+        q.respondenti = list(User.objects.filter(id__in=resp_ids).order_by("last_name", "first_name"))
 
     # La nivel de capitol: experți unici care au răspuns la cel puțin un chestionar din acest capitol
     if nr_experti and nr_chestionare:
@@ -368,40 +374,45 @@ def admin_capitol_dashboard(request, pk: int):
     )
 
 
+
 @user_passes_test(is_admin)
 def admin_criteriu_dashboard(request, pk: int):
     criteriu = get_object_or_404(Criterion, pk=pk)
 
     expert_ids_qs = (
-        User.objects.filter(is_staff=False, profil_expert__criterii=criteriu)
+        User.objects.filter(is_staff=False, is_active=True, profil_expert__criterii=criteriu)
         .values_list("id", flat=True)
         .distinct()
     )
     expert_ids = list(expert_ids_qs)
     nr_experti = len(expert_ids)
 
-    chestionare_qs = Questionnaire.objects.filter(criterii=criteriu).distinct().order_by("-creat_la")
+    chestionare_qs = (
+        Questionnaire.objects.filter(arhivat=False, criterii=criteriu)
+        .distinct()
+        .order_by("-creat_la")
+    )
     chestionare = list(chestionare_qs)
     nr_chestionare = len(chestionare)
 
-    # Per chestionar: câți experți (din cei alocați criteriului) au răspuns (trimis sau cel puțin un răspuns completat)
     for q in chestionare:
         if nr_experti == 0:
             q.nr_respondenti = 0
             q.proc_respondenti = 0
+            q.respondenti = []
             continue
 
-        nr_resp = (
+        resp_ids_qs = (
             Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
             .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
-            .values("expert_id")
+            .values_list("expert_id", flat=True)
             .distinct()
-            .count()
         )
-        q.nr_respondenti = nr_resp
-        q.proc_respondenti = round((nr_resp / nr_experti) * 100, 1)
+        resp_ids = list(resp_ids_qs)
+        q.nr_respondenti = len(resp_ids)
+        q.proc_respondenti = round((q.nr_respondenti / nr_experti) * 100, 1)
+        q.respondenti = list(User.objects.filter(id__in=resp_ids).order_by("last_name", "first_name"))
 
-    # La nivel de criteriu: experți unici care au răspuns la cel puțin un chestionar din acest criteriu
     if nr_experti and nr_chestionare:
         nr_experti_care_au_raspuns = (
             Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
@@ -429,9 +440,10 @@ def admin_criteriu_dashboard(request, pk: int):
     )
 
 
+
 @user_passes_test(is_admin)
 def admin_export(request):
-    chestionare_all = Questionnaire.objects.all().order_by("-creat_la")
+    chestionare_all = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")
     chapters_all = Chapter.objects.all().order_by("numar")
     criteria_all = Criterion.objects.all().order_by("cod")
 
@@ -443,11 +455,11 @@ def admin_export(request):
 
         qs = Questionnaire.objects.none()
         if ids:
-            qs = qs | Questionnaire.objects.filter(id__in=ids)
+            qs = qs | Questionnaire.objects.filter(arhivat=False, id__in=ids)
         if ch_ids:
-            qs = qs | Questionnaire.objects.filter(capitole__id__in=ch_ids)
+            qs = qs | Questionnaire.objects.filter(arhivat=False, capitole__id__in=ch_ids)
         if cr_ids:
-            qs = qs | Questionnaire.objects.filter(criterii__id__in=cr_ids)
+            qs = qs | Questionnaire.objects.filter(arhivat=False, criterii__id__in=cr_ids)
         qs = qs.distinct().order_by("-creat_la")
 
         if not qs.exists():
@@ -480,4 +492,206 @@ def admin_export(request):
         request,
         "portal/admin_export.html",
         {"chestionare": chestionare_all, "capitole": chapters_all, "criterii": criteria_all},
+    )
+
+
+# -------------------- ARHIVARE (soft delete) --------------------
+
+
+@user_passes_test(is_admin)
+def admin_arhiva(request):
+    experti_arhivati = (
+        User.objects.filter(is_staff=False, is_active=False, profil_expert__arhivat=True)
+        .select_related("profil_expert")
+        .order_by("last_name", "first_name")
+    )
+    chestionare_arhivate = Questionnaire.objects.filter(arhivat=True).order_by("-arhivat_la", "-creat_la")
+    return render(
+        request,
+        "portal/admin_arhiva.html",
+        {"experti": experti_arhivati, "chestionare": chestionare_arhivate},
+    )
+
+
+@user_passes_test(is_admin)
+def admin_expert_arhivare(request, pk: int):
+    user = get_object_or_404(User, pk=pk)
+    if user.is_staff:
+        messages.error(request, "Acest utilizator este administrator.")
+        return redirect("admin_experti_list")
+
+    profil = _get_or_create_profile(user)
+
+    if request.method == "POST":
+        profil.arhivat = True
+        profil.arhivat_la = timezone.now()
+        profil.save(update_fields=["arhivat", "arhivat_la"])
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+        messages.success(request, "Expertul a fost mutat în arhivă (nu a fost șters definitiv).")
+        return redirect("admin_experti_list")
+
+    return render(
+        request,
+        "portal/admin_confirm.html",
+        {
+            "titlu": "Arhivare expert",
+            "obiect": user.get_full_name() or user.username,
+            "mesaj": "Acest expert va fi scos din listele principale și nu va mai putea accesa platforma. Îl vei putea restabili ulterior din Arhivă.",
+            "confirm_text": "Arhivează",
+            "confirm_class": "btn-danger",
+            "cancel_url": request.GET.get("next") or "/administrare/experti/",
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_expert_restabilire(request, pk: int):
+    user = get_object_or_404(User, pk=pk)
+    profil = _get_or_create_profile(user)
+
+    if request.method == "POST":
+        profil.arhivat = False
+        profil.arhivat_la = None
+        profil.save(update_fields=["arhivat", "arhivat_la"])
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+        messages.success(request, "Expertul a fost restabilit.")
+        return redirect("admin_arhiva")
+
+    return render(
+        request,
+        "portal/admin_confirm.html",
+        {
+            "titlu": "Restabilire expert",
+            "obiect": user.get_full_name() or user.username,
+            "mesaj": "Expertul va reapărea în listele principale și va putea accesa din nou platforma.",
+            "confirm_text": "Restabilește",
+            "confirm_class": "btn-success",
+            "cancel_url": request.GET.get("next") or "/administrare/arhiva/",
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_chestionar_arhivare(request, pk: int):
+    chestionar = get_object_or_404(Questionnaire, pk=pk)
+
+    if request.method == "POST":
+        chestionar.arhivat = True
+        chestionar.arhivat_la = timezone.now()
+        chestionar.save(update_fields=["arhivat", "arhivat_la"])
+        messages.success(request, "Chestionarul a fost mutat în arhivă (nu a fost șters definitiv).")
+        return redirect("admin_chestionare_list")
+
+    return render(
+        request,
+        "portal/admin_confirm.html",
+        {
+            "titlu": "Arhivare chestionar",
+            "obiect": chestionar.titlu,
+            "mesaj": "Chestionarul va fi scos din listele principale (admin și experți). Îl vei putea restabili ulterior din Arhivă.",
+            "confirm_text": "Arhivează",
+            "confirm_class": "btn-danger",
+            "cancel_url": request.GET.get("next") or "/administrare/chestionare/",
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_chestionar_restabilire(request, pk: int):
+    chestionar = get_object_or_404(Questionnaire, pk=pk)
+
+    if request.method == "POST":
+        chestionar.arhivat = False
+        chestionar.arhivat_la = None
+        chestionar.save(update_fields=["arhivat", "arhivat_la"])
+        messages.success(request, "Chestionarul a fost restabilit.")
+        return redirect("admin_arhiva")
+
+    return render(
+        request,
+        "portal/admin_confirm.html",
+        {
+            "titlu": "Restabilire chestionar",
+            "obiect": chestionar.titlu,
+            "mesaj": "Chestionarul va reapărea în listele principale.",
+            "confirm_text": "Restabilește",
+            "confirm_class": "btn-success",
+            "cancel_url": request.GET.get("next") or "/administrare/arhiva/",
+        },
+    )
+
+
+# -------------------- RĂSPUNSURI (dashboard avansat) --------------------
+
+
+@user_passes_test(is_admin)
+def admin_chestionar_raspunsuri(request, pk: int):
+    chestionar = get_object_or_404(Questionnaire, pk=pk)
+
+    submissions = (
+        Submission.objects.filter(questionnaire=chestionar)
+        .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+        .select_related("expert")
+        .prefetch_related("raspunsuri", "raspunsuri__question")
+        .order_by("expert__last_name", "expert__first_name")
+        .distinct()
+    )
+
+    experti = [s.expert for s in submissions]
+    intrebari = list(chestionar.intrebari.all().order_by("ord"))
+
+    # answers[expert_id][question_id] = text
+    answers = {}
+    for s in submissions:
+        m = {}
+        for a in s.raspunsuri.all():
+            m[a.question_id] = a.text
+        answers[s.expert_id] = m
+
+    back_url = request.GET.get("back")
+
+    return render(
+        request,
+        "portal/admin_chestionar_raspunsuri.html",
+        {
+            "chestionar": chestionar,
+            "experti": experti,
+            "intrebari": intrebari,
+            "answers": answers,
+            "back_url": back_url,
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_chestionar_raspunsuri_expert(request, pk: int, expert_id: int):
+    chestionar = get_object_or_404(Questionnaire, pk=pk)
+    expert = get_object_or_404(User, pk=expert_id)
+
+    submission = get_object_or_404(Submission, questionnaire=chestionar, expert=expert)
+
+    # Map question_id -> answer
+    ans_map = {
+        a.question_id: a.text
+        for a in Answer.objects.filter(submission=submission).select_related("question")
+    }
+
+    rows = []
+    for q in chestionar.intrebari.all().order_by("ord"):
+        rows.append({"question": q, "text": ans_map.get(q.id, "")})
+
+    back_url = request.GET.get("back")
+
+    return render(
+        request,
+        "portal/admin_chestionar_raspunsuri_expert.html",
+        {
+            "chestionar": chestionar,
+            "expert": expert,
+            "submission": submission,
+            "rows": rows,
+            "back_url": back_url,
+        },
     )

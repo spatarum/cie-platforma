@@ -4,8 +4,14 @@
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <h1 class="h5 mb-0">Chestionare</h1>
-  <a class="btn btn-primary btn-sm" href="{% url 'admin_chestionar_create' %}"><i class="bi bi-plus-lg me-1"></i>Chestionar nou</a>
+  <div>
+    <h1 class="h5 mb-0">Chestionare</h1>
+    <div class="text-muted small">Lista principală (fără chestionarele arhivate). Pentru restore, mergi în Arhivă.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_arhiva' %}"><i class="bi bi-archive me-1"></i>Arhivă</a>
+    <a class="btn btn-primary btn-sm" href="{% url 'admin_chestionar_create' %}"><i class="bi bi-plus-lg me-1"></i>Chestionar nou</a>
+  </div>
 </div>
 
 <div class="card shadow-sm gov-card">
@@ -19,7 +25,7 @@
               <th>Termen limită</th>
               <th>Capitole / criterii</th>
               <th class="text-end">Răspunsuri</th>
-              <th></th>
+              <th class="text-end"></th>
             </tr>
           </thead>
           <tbody>
@@ -40,7 +46,7 @@
                 <td>
                   <div class="d-flex flex-wrap gap-1">
                     {% for ch in c.capitole.all %}<span class="badge text-bg-light"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }} me-1"></i>{{ ch.numar }}</span>{% endfor %}
-                    {% for cr in c.criterii.all %}<span class="badge text-bg-light"><i class="bi {{ cr.pictograma|default:'bi-flag' }} me-1"></i>{{ cr.denumire }}</span>{% endfor %}
+                    {% for cr in c.criterii.all %}<span class="badge text-bg-light"><i class="bi {{ cr.pictograma|default:'bi-flag' }} me-1"></i>{{ cr.cod }}</span>{% endfor %}
                   </div>
                 </td>
                 <td class="text-end">
@@ -48,6 +54,8 @@
                 </td>
                 <td class="text-end">
                   <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_chestionar_edit' c.pk %}">Editează</a>
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin_chestionar_raspunsuri' c.pk %}"><i class="bi bi-table me-1"></i>Răspunsuri</a>
+                  <a class="btn btn-sm btn-outline-danger" href="{% url 'admin_chestionar_arhivare' c.pk %}?next=/administrare/chestionare/"><i class="bi bi-archive me-1"></i>Arhivează</a>
                 </td>
               </tr>
             {% endfor %}
