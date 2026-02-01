@@ -16,11 +16,19 @@
   <div class="card-body">
     <div class="mb-2 fw-semibold">Afișare</div>
     <div class="ref-tiles mb-3">
-      <a class="ref-tile {% if not active_capitol and not active_criteriu %}active{% endif %}" href="{% url 'expert_dashboard' %}" style="--tile-bg: #0b3d91;">
+      <a class="ref-tile {% if not active_capitol and not active_criteriu and not active_general %}active{% endif %}" href="{% url 'expert_dashboard' %}" style="--tile-bg: #0b3d91;">
         <div class="ref-tile-icon"><i class="bi bi-grid-3x3-gap-fill"></i></div>
         <div class="ref-tile-footer">
           <div class="ref-tile-code">Toate</div>
           <div class="ref-tile-title">Afișează toate chestionarele</div>
+        </div>
+      </a>
+
+      <a class="ref-tile {% if active_general %}active{% endif %}" href="?general=1" style="--tile-bg: #1e40af;">
+        <div class="ref-tile-icon"><i class="bi bi-megaphone"></i></div>
+        <div class="ref-tile-footer">
+          <div class="ref-tile-code">General</div>
+          <div class="ref-tile-title">Chestionare pentru toți experții</div>
         </div>
       </a>
     </div>
@@ -76,6 +84,9 @@
                     <div class="fw-semibold">{{ c.titlu }}</div>
                     {% if c.descriere %}<div class="text-muted small">{{ c.descriere|truncatechars:120 }}</div>{% endif %}
                     <div class="mt-2 d-flex flex-wrap gap-2">
+                      {% if c.este_general %}
+                        <span class="badge text-bg-light"><i class="bi bi-megaphone me-1"></i>General</span>
+                      {% endif %}
                       {% for ch in c.capitole.all %}
                         <span class="badge text-bg-light"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }} me-1"></i>{{ ch.numar }}</span>
                       {% endfor %}
@@ -127,6 +138,9 @@
                   <div class="me-3">
                     <div class="fw-semibold">{{ c.titlu }}</div>
                     {% if c.descriere %}<div class="text-muted small">{{ c.descriere|truncatechars:120 }}</div>{% endif %}
+                    {% if c.este_general %}
+                      <div class="mt-2"><span class="badge text-bg-light"><i class="bi bi-megaphone me-1"></i>General</span></div>
+                    {% endif %}
                   </div>
                   <div class="text-end">
                     <div class="small text-muted">Termen</div>

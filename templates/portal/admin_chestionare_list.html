@@ -45,6 +45,7 @@
                 </td>
                 <td>
                   <div class="d-flex flex-wrap gap-1">
+                    {% if c.este_general %}<span class="badge text-bg-primary"><i class="bi bi-megaphone me-1"></i>General</span>{% endif %}
                     {% for ch in c.capitole.all %}<span class="badge text-bg-light"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }} me-1"></i>{{ ch.numar }}</span>{% endfor %}
                     {% for cr in c.criterii.all %}<span class="badge text-bg-light"><i class="bi {{ cr.pictograma|default:'bi-flag' }} me-1"></i>{{ cr.cod }}</span>{% endfor %}
                   </div>

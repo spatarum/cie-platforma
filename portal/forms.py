@@ -184,10 +184,11 @@ class ChestionarForm(forms.ModelForm):
 
     class Meta:
         model = Questionnaire
-        fields = ["titlu", "descriere", "termen_limita", "capitole", "criterii"]
+        fields = ["titlu", "descriere", "termen_limita", "este_general", "capitole", "criterii"]
         widgets = {
             "descriere": forms.Textarea(attrs={"rows": 3}),
             "termen_limita": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "este_general": forms.CheckboxInput(),
             "capitole": forms.CheckboxSelectMultiple(),
             "criterii": forms.CheckboxSelectMultiple(),
         }
@@ -195,6 +196,7 @@ class ChestionarForm(forms.ModelForm):
             "titlu": "Titlu",
             "descriere": "Descriere (opțional)",
             "termen_limita": "Termen limită",
+            "este_general": "General (pentru toți experții)",
             "capitole": "Capitole alocate",
             "criterii": "Criterii alocate",
         }
@@ -231,6 +233,15 @@ class ChestionarForm(forms.ModelForm):
             raise forms.ValidationError("Adaugă cel puțin o întrebare.")
         if len(intrebari) > 20:
             raise forms.ValidationError("Un chestionar poate avea maximum 20 de întrebări.")
+
+        este_general = bool(cleaned.get("este_general"))
+        capitole = cleaned.get("capitole")
+        criterii = cleaned.get("criterii")
+        if not este_general:
+            if (not capitole) and (not criterii):
+                raise forms.ValidationError(
+                    "Selectează cel puțin un capitol sau criteriu, sau bifează «General (pentru toți experții)»."
+                )
         return cleaned
 
     def save(self, commit=True, user=None):
@@ -240,6 +251,11 @@ class ChestionarForm(forms.ModelForm):
         if commit:
             questionnaire.save()
             self.save_m2m()
+
+            # Dacă este «General», golim alocările pe capitole/criterii (pentru claritate)
+            if getattr(questionnaire, "este_general", False):
+                questionnaire.capitole.clear()
+                questionnaire.criterii.clear()
 
             # Dacă întrebările sunt editabile, refacem lista
             if not questionnaire.submisii.exists():

@@ -8,6 +8,9 @@
     <h1 class="h5 mb-1">{{ chestionar.titlu }}</h1>
     {% if chestionar.descriere %}<div class="text-muted">{{ chestionar.descriere }}</div>{% endif %}
     <div class="mt-2 d-flex flex-wrap gap-2">
+      {% if chestionar.este_general %}
+        <span class="badge text-bg-primary"><i class="bi bi-megaphone me-1"></i>General (pentru toți experții)</span>
+      {% endif %}
       {% for ch in chestionar.capitole.all %}
         <span class="badge text-bg-light"><i class="bi {{ ch.pictograma|default:'bi-journal-text' }} me-1"></i>Cap. {{ ch.numar }} – {{ ch.denumire }}</span>
       {% endfor %}

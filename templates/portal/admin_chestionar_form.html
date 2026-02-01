@@ -68,10 +68,21 @@
             {{ form.termen_limita.errors }}
             <div class="form-text">După termen, experții nu mai pot edita răspunsurile.</div>
           </div>
+
+          <div class="mb-3">
+            <div class="form-check">
+              {{ form.este_general }}
+              <label class="form-check-label fw-semibold" for="id_este_general">
+                <i class="bi bi-megaphone me-1"></i>{{ form.este_general.label }}
+              </label>
+            </div>
+            {{ form.este_general.errors }}
+            <div class="form-text">Dacă este bifat, chestionarul va fi disponibil pentru <strong>toți experții</strong> și nu va mai fi legat de capitole/criterii.</div>
+          </div>
         </div>
 
         <div class="col-lg-6">
-          <div class="mb-3">
+          <div class="mb-3" id="capitole_block">
             <div class="d-flex align-items-center justify-content-between">
               <label class="form-label fw-semibold">{{ form.capitole.label }}</label>
               <span class="small text-muted"><i class="bi bi-journal-text me-1"></i>Capitole</span>
@@ -81,7 +92,7 @@
             </div>
             {{ form.capitole.errors }}
           </div>
-          <div class="mb-3">
+          <div class="mb-3" id="criterii_block">
             <div class="d-flex align-items-center justify-content-between">
               <label class="form-label fw-semibold">{{ form.criterii.label }}</label>
               <span class="small text-muted"><i class="bi bi-flag me-1"></i>Criterii</span>
@@ -138,5 +149,37 @@
       el.parentElement.classList.add('form-check', 'form-check-inline');
     }
   });
+
+  // Styling pentru checkbox "General"
+  const gen = document.getElementById('id_este_general');
+  if (gen) {
+    gen.classList.add('form-check-input');
+  }
+
+  // Dacă este bifat "General", dezactivăm capitolele/criteriile (și le debifăm)
+  function toggleGeneral() {
+    if (!gen) return;
+    const isGeneral = gen.checked;
+    const capInputs = document.querySelectorAll('input[name="capitole"]');
+    const crInputs = document.querySelectorAll('input[name="criterii"]');
+    capInputs.forEach((cb) => {
+      cb.disabled = isGeneral;
+      if (isGeneral) cb.checked = false;
+    });
+    crInputs.forEach((cb) => {
+      cb.disabled = isGeneral;
+      if (isGeneral) cb.checked = false;
+    });
+
+    const capBlock = document.getElementById('capitole_block');
+    const crBlock = document.getElementById('criterii_block');
+    if (capBlock) capBlock.classList.toggle('opacity-50', isGeneral);
+    if (crBlock) crBlock.classList.toggle('opacity-50', isGeneral);
+  }
+
+  if (gen) {
+    gen.addEventListener('change', toggleGeneral);
+    toggleGeneral();
+  }
 </script>
 {% endblock %}

@@ -39,7 +39,9 @@ def _expert_accessible_qs(user: User):
     profil = _get_or_create_profile(user)
     return (
         Questionnaire.objects.filter(arhivat=False).filter(
-            Q(capitole__in=profil.capitole.all()) | Q(criterii__in=profil.criterii.all())
+            Q(este_general=True)
+            | Q(capitole__in=profil.capitole.all())
+            | Q(criterii__in=profil.criterii.all())
         )
         .distinct()
         .order_by("termen_limita")
@@ -49,6 +51,10 @@ def _expert_accessible_qs(user: User):
 def _expert_can_access(user: User, chestionar: Questionnaire) -> bool:
     if getattr(chestionar, 'arhivat', False):
         return False
+
+    # Chestionarele generale sunt disponibile pentru toți experții
+    if getattr(chestionar, "este_general", False):
+        return True
 
     profil = _get_or_create_profile(user)
     expert_chapters = set(profil.capitole.values_list("id", flat=True))
@@ -79,14 +85,20 @@ def expert_dashboard(request):
     profil = _get_or_create_profile(request.user)
     qs = _expert_accessible_qs(request.user)
 
-    # Filtre (opțional) după capitol / criteriu, doar dintre cele alocate expertului
+    # Filtre (opțional) după categorie/capitol/criteriu
+    general = request.GET.get("general")
     cap_id = request.GET.get("capitol")
     cr_id = request.GET.get("criteriu")
 
     active_cap_id = None
     active_cr_id = None
+    active_general = False
 
-    if cap_id:
+    # Prioritate: General -> Capitol -> Criteriu
+    if general:
+        qs = qs.filter(este_general=True).distinct()
+        active_general = True
+    elif cap_id:
         try:
             cap_id_int = int(cap_id)
         except (TypeError, ValueError):
@@ -124,6 +136,7 @@ def expert_dashboard(request):
             "criterii_tile": profil.criterii.all().order_by("cod"),
             "active_capitol": active_cap_id,
             "active_criteriu": active_cr_id,
+            "active_general": active_general,
         },
     )
 
@@ -579,6 +592,70 @@ def admin_referinte(request):
     )
 
 
+@user_passes_test(is_admin)
+def admin_general_dashboard(request):
+    """Dashboard pentru categoria «General» (chestionare pentru toți experții)."""
+
+    expert_ids_qs = (
+        User.objects.filter(is_staff=False, is_active=True)
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    expert_ids = list(expert_ids_qs)
+    nr_experti = len(expert_ids)
+
+    chestionare_qs = (
+        Questionnaire.objects.filter(arhivat=False, este_general=True)
+        .distinct()
+        .order_by("-creat_la")
+    )
+    chestionare = list(chestionare_qs)
+    nr_chestionare = len(chestionare)
+
+    for q in chestionare:
+        if nr_experti == 0:
+            q.nr_respondenti = 0
+            q.proc_respondenti = 0
+            q.respondenti = []
+            continue
+
+        resp_ids_qs = (
+            Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
+            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .values_list("expert_id", flat=True)
+            .distinct()
+        )
+        resp_ids = list(resp_ids_qs)
+        q.nr_respondenti = len(resp_ids)
+        q.proc_respondenti = round((q.nr_respondenti / nr_experti) * 100, 1)
+        q.respondenti = list(User.objects.filter(id__in=resp_ids).order_by("last_name", "first_name"))
+
+    if nr_experti and nr_chestionare:
+        nr_experti_care_au_raspuns = (
+            Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
+            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .values("expert_id")
+            .distinct()
+            .count()
+        )
+    else:
+        nr_experti_care_au_raspuns = 0
+
+    rata_raspuns = round((nr_experti_care_au_raspuns / nr_experti) * 100, 1) if nr_experti else 0
+
+    return render(
+        request,
+        "portal/admin_general_dashboard.html",
+        {
+            "nr_experti": nr_experti,
+            "nr_chestionare": nr_chestionare,
+            "nr_experti_care_au_raspuns": nr_experti_care_au_raspuns,
+            "rata_raspuns": rata_raspuns,
+            "chestionare": chestionare,
+        },
+    )
+
+
 
 
 @user_passes_test(is_admin)
@@ -726,6 +803,7 @@ def admin_export(request):
         ids = request.POST.getlist("chestionare")
         ch_ids = request.POST.getlist("capitole")
         cr_ids = request.POST.getlist("criterii")
+        include_general = bool(request.POST.get("general"))
 
         qs = Questionnaire.objects.none()
         if ids:
@@ -734,10 +812,12 @@ def admin_export(request):
             qs = qs | Questionnaire.objects.filter(arhivat=False, capitole__id__in=ch_ids)
         if cr_ids:
             qs = qs | Questionnaire.objects.filter(arhivat=False, criterii__id__in=cr_ids)
+        if include_general:
+            qs = qs | Questionnaire.objects.filter(arhivat=False, este_general=True)
         qs = qs.distinct().order_by("-creat_la")
 
         if not qs.exists():
-            messages.error(request, "Selectează cel puțin un chestionar sau un filtru (capitol/criteriu).")
+            messages.error(request, "Selectează cel puțin un chestionar sau un filtru (General/capitol/criteriu).")
             return redirect("admin_export")
 
         filename_base = f"raspunsuri_{timezone.now().strftime('%Y%m%d_%H%M')}"

@@ -33,6 +33,7 @@ def export_csv(questionnaires: Iterable[Questionnaire]) -> bytes:
             "Termen limită",
             "Capitole",
             "Criterii",
+            "Categorie",
             "Expert",
             "Email",
             "Status",
@@ -47,6 +48,7 @@ def export_csv(questionnaires: Iterable[Questionnaire]) -> bytes:
     for q in questionnaires:
         chapters = "; ".join([str(ch) for ch in q.capitole.all().order_by("numar")])
         criteria = "; ".join([c.denumire for c in q.criterii.all().order_by("cod")])
+        cat = "General" if getattr(q, "este_general", False) else "Alocat"
 
         questions = list(q.intrebari.all().order_by("ord"))
         submissions = (
@@ -66,6 +68,7 @@ def export_csv(questionnaires: Iterable[Questionnaire]) -> bytes:
                         _fmt_dt(q.termen_limita),
                         chapters,
                         criteria,
+                        cat,
                         expert,
                         sub.expert.email,
                         dict(sub.STATUS_CHOICES).get(sub.status, sub.status),
@@ -101,6 +104,7 @@ def export_xlsx(questionnaires: Iterable[Questionnaire]) -> bytes:
             "Telefon",
             "Organizație",
             "Funcție",
+            "Categorie",
             "Status",
             "Actualizat la",
             "Trimis la",
@@ -119,12 +123,15 @@ def export_xlsx(questionnaires: Iterable[Questionnaire]) -> bytes:
             profil = getattr(expert, "profil_expert", None)
             ans_map = {a.question_id: a.text for a in sub.raspunsuri.all()}
 
+            cat = "General" if getattr(q, "este_general", False) else "Alocat"
+
             row = [
                 expert.get_full_name() or expert.username,
                 expert.email,
                 getattr(profil, "telefon", ""),
                 getattr(profil, "organizatie", ""),
                 getattr(profil, "functie", ""),
+                cat,
                 dict(sub.STATUS_CHOICES).get(sub.status, sub.status),
                 _fmt_dt(sub.actualizat_la),
                 _fmt_dt(sub.trimis_la),
@@ -137,7 +144,7 @@ def export_xlsx(questionnaires: Iterable[Questionnaire]) -> bytes:
 
         # formatare: lățimi
         for idx, _ in enumerate(headers, start=1):
-            ws.column_dimensions[get_column_letter(idx)].width = 22 if idx <= 8 else 35
+            ws.column_dimensions[get_column_letter(idx)].width = 22 if idx <= 9 else 35
 
         ws.freeze_panes = "A2"
 
@@ -180,6 +187,8 @@ def export_pdf(questionnaires: Iterable[Questionnaire]) -> bytes:
 
         y = write_line(f"Chestionar: {q.titlu}", y, font="Helvetica-Bold", size=12)
         y = write_line(f"Termen limită: {_fmt_dt(q.termen_limita)}", y)
+        categorie = "General" if getattr(q, "este_general", False) else "Alocat"
+        y = write_line(f"Categorie: {categorie}", y)
         chapters = "; ".join([str(ch) for ch in q.capitole.all().order_by("numar")])
         criteria = "; ".join([c.denumire for c in q.criterii.all().order_by("cod")])
         if chapters:

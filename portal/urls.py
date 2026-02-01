@@ -43,6 +43,7 @@ urlpatterns = [
     path("administrare/import/rulari/<int:pk>/credentiale.csv", views.admin_import_run_credentials_csv, name="admin_import_run_credentials_csv"),
 
     path("administrare/referinte/", views.admin_referinte, name="admin_referinte"),
+    path("administrare/general/", views.admin_general_dashboard, name="admin_general_dashboard"),
     path("administrare/capitole/<int:pk>/", views.admin_capitol_dashboard, name="admin_capitol_dashboard"),
     path("administrare/criterii/<int:pk>/", views.admin_criteriu_dashboard, name="admin_criteriu_dashboard"),
 

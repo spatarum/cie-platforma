@@ -131,6 +131,12 @@ class Questionnaire(models.Model):
     descriere = models.TextField(blank=True)
     termen_limita = models.DateTimeField(help_text="După termen, răspunsurile nu mai pot fi editate.")
 
+    # Categorie specială: chestionare pentru toți experții (General)
+    este_general = models.BooleanField(
+        default=False,
+        help_text="Dacă este bifat, chestionarul este disponibil pentru toți experții (categoria «General»).",
+    )
+
     capitole = models.ManyToManyField(Chapter, blank=True, related_name="chestionare")
     criterii = models.ManyToManyField(Criterion, blank=True, related_name="chestionare")
 

@@ -34,6 +34,7 @@
                   <tr>
                     <td>
                       <div class="fw-semibold">{{ c.titlu }}</div>
+                      {% if c.este_general %}<div><span class="badge text-bg-primary"><i class="bi bi-megaphone me-1"></i>General</span></div>{% endif %}
                       {% if c.descriere %}<div class="text-muted small">{{ c.descriere|truncatechars:80 }}</div>{% endif %}
                       <div class="small text-muted">Termen: {{ c.termen_limita|date:"d.m.Y H:i" }}</div>
                     </td>
