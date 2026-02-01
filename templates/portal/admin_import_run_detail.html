@@ -5,12 +5,12 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
   <div>
-    <h1 class="h5 mb-0">Rezultat import experți</h1>
+    <h1 class="h5 mb-0">Rezultat {{ run.get_kind_display|lower }}</h1>
     <div class="text-muted small">Rulare: {{ run.creat_la|date:"d.m.Y H:i" }}{% if run.nume_fisier %} • Fișier: {{ run.nume_fisier }}{% endif %}</div>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_experti_list' %}"><i class="bi bi-people me-1"></i>Înapoi la Experți</a>
-    <a class="btn btn-light btn-sm" href="{% url 'admin_expert_import' %}"><i class="bi bi-upload me-1"></i>Import nou</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url back_url %}"><i class="bi {{ back_icon }} me-1"></i>{{ back_label }}</a>
+    <a class="btn btn-light btn-sm" href="{% url new_url %}"><i class="bi {{ new_icon }} me-1"></i>{{ new_label }}</a>
   </div>
 </div>
 
@@ -18,7 +18,7 @@
   <div class="col-md-4">
     <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
       <div class="card-body">
-        <div class="stat-label">Experți creați</div>
+        <div class="stat-label">{{ create_label }}</div>
         <div class="stat-value">{{ run.nr_create }}</div>
       </div>
     </div>
@@ -26,7 +26,7 @@
   <div class="col-md-4">
     <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
       <div class="card-body">
-        <div class="stat-label">Experți actualizați</div>
+        <div class="stat-label">{{ update_label }}</div>
         <div class="stat-value">{{ run.nr_actualizate }}</div>
       </div>
     </div>
@@ -51,7 +51,11 @@
     {% if has_credentials %}
       <a class="btn btn-outline-success" href="{% url 'admin_import_run_credentials_csv' run.pk %}"><i class="bi bi-key me-1"></i>Descarcă credențiale (CSV)</a>
     {% else %}
-      <span class="text-muted small align-self-center">Nu au fost create conturi noi, deci nu există credențiale noi.</span>
+      {% if run.kind == "EXPERTI" %}
+        <span class="text-muted small align-self-center">Nu au fost create conturi noi, deci nu există credențiale noi.</span>
+      {% else %}
+        <span class="text-muted small align-self-center">Acest tip de import nu generează credențiale.</span>
+      {% endif %}
     {% endif %}
   </div>
 </div>
@@ -64,7 +68,7 @@
         <thead class="table-light">
           <tr>
             <th>Rând</th>
-            <th>Email</th>
+            <th>Identificator</th>
             <th>Mesaj</th>
           </tr>
         </thead>
@@ -72,7 +76,7 @@
           {% for e in errors_preview %}
             <tr>
               <td class="text-nowrap">{{ e.rand }}</td>
-              <td>{{ e.email }}</td>
+              <td>{{ e.email|default:e.id_chestionar }}</td>
               <td class="text-muted">{{ e.mesaj }}</td>
             </tr>
           {% endfor %}

@@ -1,0 +1,72 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Import chestionare (CSV) | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">Import chestionare (CSV)</h1>
+    <div class="text-muted small">Creează sau actualizează mai multe chestionare odată. Pentru actualizare, completează coloana <strong>id</strong>.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_chestionare_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la Chestionare</a>
+    <a class="btn btn-light btn-sm" href="{% url 'admin_questionnaire_import_template' %}"><i class="bi bi-download me-1"></i>Descarcă șablon CSV</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-upload me-1"></i>Încarcă fișier CSV</strong></div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="mb-3">
+            {{ form.fisier.label_tag }}
+            {{ form.fisier }}
+            {% if form.fisier.help_text %}<div class="form-text">{{ form.fisier.help_text }}</div>{% endif %}
+            {% for error in form.fisier.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-cloud-upload me-1"></i>Importă</button>
+        </form>
+
+        <hr />
+        <div class="small text-muted">
+          <div class="fw-semibold mb-1">Reguli:</div>
+          <ul class="mb-0">
+            <li><strong>Creare:</strong> dacă <code>id</code> este gol, se creează un chestionar nou.</li>
+            <li><strong>Actualizare:</strong> dacă <code>id</code> este completat și există, se actualizează chestionarul.</li>
+            <li>Întrebările se pot actualiza doar dacă nu există răspunsuri; altfel rămân neschimbate.</li>
+            <li><strong>Termen limită:</strong> folosește formatul <code>2026-02-15 23:59</code> sau <code>15.02.2026 23:59</code>.</li>
+            <li><strong>General:</strong> coloana <code>este_general</code> = <code>da</code>/<code>nu</code>. Dacă este <em>General</em>, capitolele/criteriile sunt ignorate.</li>
+            <li>Capitole: numere separate prin <code>;</code> (ex: <code>23;24</code>). Criterii: <code>FID;RAP;ECON</code>.</li>
+            <li>Întrebări: completează <code>intrebare_1</code> ... <code>intrebare_20</code> (minim una).</li>
+            <li>Pentru chestionarele nou create, sistemul trimite notificări email către experții relevanți.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-info-circle me-1"></i>Cum pregătești fișierul</strong></div>
+      <div class="card-body small">
+        <ol class="mb-0">
+          <li>Descarcă șablonul CSV de mai sus.</li>
+          <li>Deschide-l în Excel și completează rândurile.</li>
+          <li>Salvează ca <strong>CSV UTF-8</strong> (recomandat).</li>
+          <li>Încarcă fișierul aici și apasă <strong>Importă</strong>.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card shadow-sm gov-card mt-3">
+      <div class="card-header bg-white"><strong><i class="bi bi-megaphone me-1"></i>Notificări</strong></div>
+      <div class="card-body small">
+        Pentru chestionarele noi, platforma va trimite automat email către experții relevanți (General → toți experții activi).
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

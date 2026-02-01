@@ -165,9 +165,11 @@ class Questionnaire(models.Model):
 
 class ImportRun(models.Model):
     KIND_EXPERTI = "EXPERTI"
+    KIND_CHESTIONARE = "CHESTIONARE"
 
     KIND_CHOICES = [
         (KIND_EXPERTI, "Import experți"),
+        (KIND_CHESTIONARE, "Import chestionare"),
     ]
 
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_EXPERTI)

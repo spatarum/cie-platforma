@@ -309,3 +309,13 @@ class ExpertImportCSVForm(forms.Form):
         help_text="Formate acceptate: .csv. Coloane: email, prenume, nume, telefon, organizatie, functie, sumar_expertiza, capitole, criterii.",
     )
 
+
+class QuestionnaireImportCSVForm(forms.Form):
+    fisier = forms.FileField(
+        label="Fișier CSV (UTF-8)",
+        help_text=(
+            "Formate acceptate: .csv. Coloane: id (opțional), titlu, descriere, termen_limita, este_general, capitole, criterii, "
+            "intrebare_1 ... intrebare_20. Separator recomandat pentru liste: ;"
+        ),
+    )
+

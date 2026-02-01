@@ -129,8 +129,23 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
 
-# Email (pentru resetări de parolă; implicit, afișează în consolă)
+# URL public al platformei (folosit pentru linkuri în emailuri)
+# Exemplu: https://cie-platforma-experti.onrender.com sau https://platforma.md
+SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
+
+# Email
+# Implicit, afișează emailurile în loguri (console backend).
+# Pentru trimitere reală, setează DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+# și variabilele SMTP de mai jos.
 EMAIL_BACKEND = os.environ.get("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587") or 587)
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in ("1", "true", "yes")
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() in ("1", "true", "yes")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", os.environ.get("EMAIL_HOST_USER", "no-reply@example.com"))
 
 # În spatele proxy-urilor (Render, etc.)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

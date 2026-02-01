@@ -38,6 +38,15 @@ urlpatterns = [
     # Import experți (CSV)
     path("administrare/import/experti/", views.admin_expert_import, name="admin_expert_import"),
     path("administrare/import/experti/template/", views.admin_expert_import_template, name="admin_expert_import_template"),
+
+    # Import chestionare (CSV)
+    path("administrare/import/chestionare/", views.admin_questionnaire_import, name="admin_questionnaire_import"),
+    path(
+        "administrare/import/chestionare/template/",
+        views.admin_questionnaire_import_template,
+        name="admin_questionnaire_import_template",
+    ),
+
     path("administrare/import/rulari/<int:pk>/", views.admin_import_run_detail, name="admin_import_run_detail"),
     path("administrare/import/rulari/<int:pk>/raport.csv", views.admin_import_run_report_csv, name="admin_import_run_report_csv"),
     path("administrare/import/rulari/<int:pk>/credentiale.csv", views.admin_import_run_credentials_csv, name="admin_import_run_credentials_csv"),

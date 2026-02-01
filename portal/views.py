@@ -4,6 +4,7 @@ import csv
 import io
 import secrets
 import re
+from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -15,8 +16,16 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .exports import export_csv, export_pdf, export_xlsx
-from .forms import ChestionarForm, ExpertCreateForm, ExpertUpdateForm, ExpertImportCSVForm, RaspunsChestionarForm
+from .forms import (
+    ChestionarForm,
+    ExpertCreateForm,
+    ExpertUpdateForm,
+    ExpertImportCSVForm,
+    QuestionnaireImportCSVForm,
+    RaspunsChestionarForm,
+)
 from .models import Answer, Chapter, Criterion, ExpertProfile, ImportRun, Question, Questionnaire, Submission
+from .notifications import send_new_questionnaire_emails
 from .utils import group_chapters_by_cluster
 
 
@@ -219,7 +228,23 @@ def admin_questionnaire_create(request):
         form = ChestionarForm(request.POST)
         if form.is_valid():
             chestionar = form.save(user=request.user)
-            messages.success(request, "Chestionarul a fost creat.")
+
+            # Trimite notificări pe email către experții relevanți (General -> toți; altfel după capitole/criterii)
+            base_url = request.build_absolute_uri("/").rstrip("/")
+            ok, fail = send_new_questionnaire_emails(chestionar, request_base_url=base_url)
+
+            if ok and not fail:
+                messages.success(request, f"Chestionarul a fost creat. Notificări trimise: {ok}.")
+            elif ok and fail:
+                messages.warning(
+                    request,
+                    f"Chestionarul a fost creat. Notificări trimise: {ok}. Eșecuri: {fail} (verifică setările email).")
+            elif fail:
+                messages.warning(
+                    request,
+                    f"Chestionarul a fost creat, dar trimiterea notificărilor a eșuat (Eșecuri: {fail}). ")
+            else:
+                messages.success(request, "Chestionarul a fost creat.")
             return redirect("admin_chestionar_edit", pk=chestionar.pk)
     else:
         form = ChestionarForm()
@@ -286,6 +311,56 @@ def admin_expert_import_template(request):
     return resp
 
 
+@user_passes_test(is_admin)
+def admin_questionnaire_import_template(request):
+    """Descarcă șablon CSV pentru import chestionare."""
+    headers = [
+        "id",
+        "titlu",
+        "descriere",
+        "termen_limita",
+        "este_general",
+        "capitole",
+        "criterii",
+    ] + [f"intrebare_{i}" for i in range(1, 21)]
+
+    example_row = [
+        "",  # id (opțional)
+        "Chestionar exemplu (General)",
+        "Completează răspunsuri scurte și concrete.",
+        "2026-02-15 23:59",
+        "da",
+        "",
+        "",
+    ] + [
+        "Care sunt principalele riscuri de implementare?",
+        "Ce modificări legislative sunt necesare?",
+    ] + ["" for _ in range(3, 21)]
+
+    example_row2 = [
+        "",
+        "Chestionar exemplu (Cap. 23 + FID)",
+        "Comentarii pe transpunere și implementare.",
+        "15.02.2026 18:00",
+        "nu",
+        "23",
+        "FID",
+    ] + [
+        "Care sunt principalele lacune în cadrul normativ existent?",
+        "Ce instituții trebuie implicate în implementare?",
+    ] + ["" for _ in range(3, 21)]
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(headers)
+    w.writerow(example_row)
+    w.writerow(example_row2)
+
+    resp = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = 'attachment; filename="template_import_chestionare.csv"'
+    return resp
+
+
 def _parse_capitole(raw: str):
     raw = (raw or "").strip()
     if not raw:
@@ -322,6 +397,63 @@ def _parse_criterii(raw: str):
     # păstrăm ordinea din fișier
     by_code = {c.cod.upper(): c for c in qs}
     return [by_code[c] for c in codes]
+
+
+def _parse_bool(raw: str) -> bool:
+    raw = (raw or "").strip().lower()
+    if not raw:
+        return False
+    return raw in {"1", "true", "t", "yes", "y", "da", "adevărat", "adevarat"}
+
+
+def _parse_deadline(raw: str) -> timezone.datetime:
+    """Parsează termenul limită din CSV.
+
+    Formate acceptate (exemple):
+      - 2026-02-15 23:59
+      - 15.02.2026 23:59
+      - 2026-02-15
+      - 15.02.2026
+
+    Dacă lipsește ora, folosim 23:59.
+    """
+    raw0 = (raw or "").strip()
+    if not raw0:
+        raise ValueError("Lipsește termen_limita")
+
+    fmts = [
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%d.%m.%Y %H:%M",
+        "%d.%m.%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d",
+        "%d.%m.%Y",
+        "%d/%m/%Y",
+    ]
+
+    dt = None
+    for fmt in fmts:
+        try:
+            dt = datetime.strptime(raw0, fmt)
+            break
+        except Exception:
+            continue
+    if dt is None:
+        raise ValueError(
+            "Format termen_limita invalid. Folosește de ex. 2026-02-15 23:59 sau 15.02.2026 23:59."
+        )
+
+    # Dacă e doar data, setăm 23:59
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw0) or re.fullmatch(r"\d{2}\.\d{2}\.\d{4}", raw0) or re.fullmatch(r"\d{2}/\d{2}/\d{4}", raw0):
+        dt = dt.replace(hour=23, minute=59, second=0)
+
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
 
 
 @user_passes_test(is_admin)
@@ -497,6 +629,215 @@ def admin_expert_import(request):
 
 
 @user_passes_test(is_admin)
+def admin_questionnaire_import(request):
+    """Importă chestionare din CSV.
+
+    - Cheia de update: id (opțional). Dacă id este completat și există, chestionarul se actualizează.
+    - Dacă id lipsește: se creează chestionar nou.
+    - Întrebări: intrebare_1...intrebare_20 (cel puțin una).
+    - Pentru chestionarele noi: se trimit notificări email către experții relevanți.
+    """
+
+    if request.method == "POST":
+        form = QuestionnaireImportCSVForm(request.POST, request.FILES)
+        if form.is_valid():
+            f = form.cleaned_data["fisier"]
+            filename = getattr(f, "name", "") or ""
+
+            try:
+                raw_bytes = f.read()
+                text_csv = raw_bytes.decode("utf-8-sig")
+            except Exception:
+                messages.error(request, "Fișierul nu poate fi citit. Te rog salvează-l ca CSV UTF-8 și reîncearcă.")
+                return redirect("admin_questionnaire_import")
+
+            reader = csv.DictReader(io.StringIO(text_csv))
+            headers = set([h.strip() for h in (reader.fieldnames or []) if h])
+            required = {"titlu", "termen_limita"}
+            if not required.issubset(headers):
+                messages.error(
+                    request,
+                    "Lipsesc coloane obligatorii. Fișierul trebuie să conțină cel puțin: titlu, termen_limita.",
+                )
+                return redirect("admin_questionnaire_import")
+
+            # Cel puțin o coloană intrebare_1..20 trebuie să existe în antet
+            has_q_cols = any([f"intrebare_{i}" in headers for i in range(1, 21)])
+            if not has_q_cols:
+                messages.error(
+                    request,
+                    "Lipsesc coloanele pentru întrebări. Adaugă cel puțin intrebare_1 (și până la intrebare_20).",
+                )
+                return redirect("admin_questionnaire_import")
+
+            report_rows = []
+            nr_create = nr_update = nr_error = 0
+
+            base_url = request.build_absolute_uri("/").rstrip("/")
+
+            for idx, row in enumerate(reader, start=2):
+                raw_id = (row.get("id") or "").strip()
+                qid = None
+                if raw_id:
+                    try:
+                        qid = int(raw_id)
+                    except Exception:
+                        nr_error += 1
+                        report_rows.append((idx, raw_id, "ERROR", "ID invalid (nu este număr)"))
+                        continue
+
+                titlu = (row.get("titlu") or "").strip()
+                descriere = (row.get("descriere") or "").strip()
+                raw_deadline = (row.get("termen_limita") or "").strip()
+                raw_general = (row.get("este_general") or "").strip()
+                raw_caps = (row.get("capitole") or "").strip()
+                raw_cr = (row.get("criterii") or "").strip()
+
+                if not titlu:
+                    nr_error += 1
+                    report_rows.append((idx, raw_id or "", "ERROR", "Lipsește titlu"))
+                    continue
+
+                try:
+                    termen = _parse_deadline(raw_deadline)
+                except Exception as e:
+                    nr_error += 1
+                    report_rows.append((idx, raw_id or "", "ERROR", str(e)))
+                    continue
+
+                este_general = _parse_bool(raw_general)
+
+                try:
+                    capitole = [] if este_general else _parse_capitole(raw_caps)
+                    criterii = [] if este_general else _parse_criterii(raw_cr)
+                except Exception as e:
+                    nr_error += 1
+                    report_rows.append((idx, raw_id or "", "ERROR", str(e)))
+                    continue
+
+                if not este_general and not capitole and not criterii:
+                    nr_error += 1
+                    report_rows.append(
+                        (idx, raw_id or "", "ERROR", "Chestionar ne-general: trebuie selectat cel puțin un capitol sau criteriu"),
+                    )
+                    continue
+
+                # întrebări
+                intrebari = []
+                for i in range(1, 21):
+                    text = (row.get(f"intrebare_{i}") or "").strip()
+                    if text:
+                        intrebari.append(text)
+
+                if not intrebari:
+                    nr_error += 1
+                    report_rows.append((idx, raw_id or "", "ERROR", "Nu există întrebări (completează cel puțin intrebare_1)"))
+                    continue
+
+                try:
+                    with transaction.atomic():
+                        created = False
+                        if qid is not None:
+                            q = Questionnaire.objects.filter(pk=qid).first()
+                            if not q:
+                                raise ValueError(f"Nu există chestionar cu id={qid}")
+
+                            q.titlu = titlu
+                            q.descriere = descriere
+                            q.termen_limita = termen
+                            q.este_general = este_general
+                            q.arhivat = False
+                            q.arhivat_la = None
+                            q.save()
+
+                            if este_general:
+                                q.capitole.clear()
+                                q.criterii.clear()
+                            else:
+                                q.capitole.set(capitole)
+                                q.criterii.set(criterii)
+
+                            # actualizăm întrebările doar dacă nu există răspunsuri
+                            if not q.submisii.exists():
+                                q.intrebari.all().delete()
+                                for ord_no, t in enumerate(intrebari, start=1):
+                                    Question.objects.create(questionnaire=q, ord=ord_no, text=t)
+                                msg = "Actualizat (întrebări înlocuite)"
+                            else:
+                                msg = "Actualizat (întrebările nu au fost modificate – există răspunsuri)"
+
+                            nr_update += 1
+                            report_rows.append((idx, str(q.pk), "UPDATED", msg))
+
+                        else:
+                            q = Questionnaire.objects.create(
+                                titlu=titlu,
+                                descriere=descriere,
+                                termen_limita=termen,
+                                este_general=este_general,
+                                creat_de=request.user,
+                                arhivat=False,
+                            )
+
+                            if este_general:
+                                # păstrăm gol
+                                pass
+                            else:
+                                q.capitole.set(capitole)
+                                q.criterii.set(criterii)
+
+                            for ord_no, t in enumerate(intrebari, start=1):
+                                Question.objects.create(questionnaire=q, ord=ord_no, text=t)
+
+                            created = True
+                            nr_create += 1
+
+                            report_rows.append((idx, str(q.pk), "CREATED", "Creat"))
+
+                    # Email notificări doar pentru chestionare noi (în afara tranzacției)
+                    if created:
+                        ok, fail = send_new_questionnaire_emails(q, request_base_url=base_url)
+                        if ok and not fail:
+                            report_rows.append((idx, str(q.pk), "EMAIL", f"Notificări trimise: {ok}"))
+                        elif ok and fail:
+                            report_rows.append((idx, str(q.pk), "EMAIL", f"Notificări trimise: {ok}; Eșecuri: {fail}"))
+                        elif fail:
+                            report_rows.append((idx, str(q.pk), "EMAIL", f"Eșecuri la notificare: {fail}"))
+
+                except Exception as e:
+                    nr_error += 1
+                    report_rows.append((idx, raw_id or "", "ERROR", str(e)))
+
+            # Raport CSV
+            rep_buf = io.StringIO()
+            rep_w = csv.writer(rep_buf)
+            rep_w.writerow(["rand", "id_chestionar", "status", "mesaj"])
+            rep_w.writerows(report_rows)
+
+            run = ImportRun.objects.create(
+                kind=ImportRun.KIND_CHESTIONARE,
+                creat_de=request.user,
+                nume_fisier=filename,
+                nr_create=nr_create,
+                nr_actualizate=nr_update,
+                nr_erori=nr_error,
+                raport_csv=rep_buf.getvalue(),
+                cred_csv="",
+            )
+
+            messages.success(
+                request,
+                f"Import finalizat. Create: {nr_create}, Actualizate: {nr_update}, Erori: {nr_error}.",
+            )
+            return redirect("admin_import_run_detail", pk=run.pk)
+
+    else:
+        form = QuestionnaireImportCSVForm()
+
+    return render(request, "portal/admin_import_chestionare.html", {"form": form})
+
+
+@user_passes_test(is_admin)
 def admin_import_run_detail(request, pk: int):
     run = get_object_or_404(ImportRun, pk=pk)
 
@@ -510,13 +851,53 @@ def admin_import_run_detail(request, pk: int):
             if len(errors_preview) >= 30:
                 break
 
+    # UI labels în funcție de tipul importului
+    if run.kind == ImportRun.KIND_EXPERTI:
+        back_url = "admin_experti_list"
+        back_label = "Înapoi la Experți"
+        back_icon = "bi-people"
+        new_url = "admin_expert_import"
+        new_label = "Import nou"
+        new_icon = "bi-upload"
+        create_label = "Experți creați"
+        update_label = "Experți actualizați"
+        has_credentials = bool(run.cred_csv)
+    elif run.kind == ImportRun.KIND_CHESTIONARE:
+        back_url = "admin_chestionare_list"
+        back_label = "Înapoi la Chestionare"
+        back_icon = "bi-ui-checks-grid"
+        new_url = "admin_questionnaire_import"
+        new_label = "Import nou"
+        new_icon = "bi-upload"
+        create_label = "Chestionare create"
+        update_label = "Chestionare actualizate"
+        has_credentials = False
+    else:
+        back_url = "admin_dashboard"
+        back_label = "Înapoi"
+        back_icon = "bi-arrow-left"
+        new_url = "admin_dashboard"
+        new_label = "Panou"
+        new_icon = "bi-speedometer2"
+        create_label = "Înregistrări create"
+        update_label = "Înregistrări actualizate"
+        has_credentials = bool(run.cred_csv)
+
     return render(
         request,
         "portal/admin_import_run_detail.html",
         {
             "run": run,
             "errors_preview": errors_preview,
-            "has_credentials": bool(run.cred_csv),
+            "has_credentials": has_credentials,
+            "back_url": back_url,
+            "back_label": back_label,
+            "back_icon": back_icon,
+            "new_url": new_url,
+            "new_label": new_label,
+            "new_icon": new_icon,
+            "create_label": create_label,
+            "update_label": update_label,
         },
     )
 
@@ -526,7 +907,8 @@ def admin_import_run_report_csv(request, pk: int):
     run = get_object_or_404(ImportRun, pk=pk)
     resp = HttpResponse(run.raport_csv or "", content_type="text/csv; charset=utf-8")
     ts = run.creat_la.strftime("%Y%m%d_%H%M")
-    resp["Content-Disposition"] = f'attachment; filename="raport_import_experti_{ts}.csv"'
+    kind_slug = "experti" if run.kind == ImportRun.KIND_EXPERTI else ("chestionare" if run.kind == ImportRun.KIND_CHESTIONARE else "import")
+    resp["Content-Disposition"] = f'attachment; filename="raport_{kind_slug}_{ts}.csv"'
     return resp
 
 
@@ -535,7 +917,7 @@ def admin_import_run_credentials_csv(request, pk: int):
     run = get_object_or_404(ImportRun, pk=pk)
     resp = HttpResponse(run.cred_csv or "", content_type="text/csv; charset=utf-8")
     ts = run.creat_la.strftime("%Y%m%d_%H%M")
-    resp["Content-Disposition"] = f'attachment; filename="credentiale_experti_{ts}.csv"'
+    resp["Content-Disposition"] = f'attachment; filename="credentiale_{ts}.csv"'
     return resp
 
 @user_passes_test(is_admin)
