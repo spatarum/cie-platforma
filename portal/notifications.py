@@ -91,7 +91,7 @@ def send_new_questionnaire_emails(
                 + ", ".join([f"{c.numar} – {c.denumire}" for c in caps])
             )
         if crs:
-            parts.append("Criterii: " + ", ".join([f"{c.cod} – {c.denumire}" for c in crs]))
+            parts.append("Foi de parcurs: " + ", ".join([f"{c.cod} – {c.denumire}" for c in crs]))
         context_txt = " | ".join(parts) if parts else ""
 
     subject = f"[CIE] Chestionar nou: {questionnaire.titlu}".strip()

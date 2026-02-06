@@ -49,7 +49,7 @@
     {% endif %}
 
     {% if criterii_tile %}
-      <div class="mb-2 fw-semibold">Criterii alocate</div>
+      <div class="mb-2 fw-semibold">Foi de parcurs alocate</div>
       <div class="ref-tiles">
         {% for cr in criterii_tile %}
           <a class="ref-tile {% if active_criteriu == cr.id %}active{% endif %}" href="?criteriu={{ cr.id }}" style="--tile-bg: {{ cr.culoare_ui }};">

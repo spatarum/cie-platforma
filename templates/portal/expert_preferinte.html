@@ -1,0 +1,58 @@
+{% extends 'portal/base.html' %}
+{% block title %}Preferințe | Expert{% endblock %}
+
+{% block content %}
+<h1 class="h5 mb-3">Preferințe</h1>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-universal-access me-1"></i>Accesibilitate</strong></div>
+      <div class="card-body">
+        <form method="post" autocomplete="off">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="prefs">
+          <div class="form-check form-switch">
+            {{ pref_form.text_mare }}
+            <label class="form-check-label ms-2" for="{{ pref_form.text_mare.id_for_label }}">
+              {{ pref_form.text_mare.label }}
+            </label>
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">Salvează</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-key me-1"></i>Schimbă parola</strong></div>
+      <div class="card-body">
+        <form method="post" autocomplete="off">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="pwd">
+          {{ pwd_form.non_field_errors }}
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ pwd_form.old_password.label }}</label>
+            {{ pwd_form.old_password }}
+            {{ pwd_form.old_password.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ pwd_form.new_password1.label }}</label>
+            {{ pwd_form.new_password1 }}
+            {{ pwd_form.new_password1.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ pwd_form.new_password2.label }}</label>
+            {{ pwd_form.new_password2 }}
+            {{ pwd_form.new_password2.errors }}
+          </div>
+
+          <button class="btn btn-outline-primary" type="submit">Schimbă parola</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -7,6 +7,8 @@ import re
 from datetime import datetime
 
 from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -23,6 +25,7 @@ from .forms import (
     ExpertImportCSVForm,
     QuestionnaireImportCSVForm,
     RaspunsChestionarForm,
+    ExpertPreferinteForm,
 )
 from .models import Answer, Chapter, Criterion, ExpertProfile, ImportRun, Question, Questionnaire, Submission
 from .notifications import send_new_questionnaire_emails
@@ -154,6 +157,49 @@ def expert_dashboard(request):
 def expert_profile(request):
     profil = _get_or_create_profile(request.user)
     return render(request, "portal/expert_profile.html", {"profil": profil})
+
+
+@user_passes_test(is_expert)
+def expert_preferinte(request):
+    profil = _get_or_create_profile(request.user)
+
+    pref_form = ExpertPreferinteForm(initial={"text_mare": profil.pref_text_mare})
+    pwd_form = PasswordChangeForm(user=request.user)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "prefs":
+            pref_form = ExpertPreferinteForm(request.POST)
+            pwd_form = PasswordChangeForm(user=request.user)
+            if pref_form.is_valid():
+                profil.pref_text_mare = pref_form.cleaned_data.get("text_mare", False)
+                profil.save(update_fields=["pref_text_mare"])
+                messages.success(request, "Preferințele au fost salvate.")
+                return redirect("expert_preferinte")
+
+        elif action == "pwd":
+            pwd_form = PasswordChangeForm(user=request.user, data=request.POST)
+            pref_form = ExpertPreferinteForm(initial={"text_mare": profil.pref_text_mare})
+            if pwd_form.is_valid():
+                user = pwd_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, "Parola a fost schimbată.")
+                return redirect("expert_preferinte")
+
+    # Stilizare inputuri
+    for f in [pwd_form.fields.get("old_password"), pwd_form.fields.get("new_password1"), pwd_form.fields.get("new_password2")]:
+        if f and "widget" in dir(f):
+            try:
+                f.widget.attrs.update({"class": "form-control"})
+            except Exception:
+                pass
+
+    return render(
+        request,
+        "portal/expert_preferinte.html",
+        {"pref_form": pref_form, "pwd_form": pwd_form},
+    )
 
 
 @user_passes_test(is_expert)
@@ -303,7 +349,7 @@ def admin_expert_list(request):
 def admin_expert_import_template(request):
     """Descarcă șablon CSV pentru import experți."""
     content = (
-        "email,prenume,nume,telefon,organizatie,functie,sumar_expertiza,capitole,criterii\n"
+        "email,prenume,nume,telefon,organizatie,functie,sumar_expertiza,capitole,foi_de_parcurs\n"
         "ana.popa@example.com,Ana,Popa,+37369123456,Parlament,Consilier,achiziții publice și concurență,5;8,FID;RAP\n"
     )
     resp = HttpResponse(content, content_type="text/csv; charset=utf-8")
@@ -321,7 +367,7 @@ def admin_questionnaire_import_template(request):
         "termen_limita",
         "este_general",
         "capitole",
-        "criterii",
+        "foi_de_parcurs",
     ] + [f"intrebare_{i}" for i in range(1, 21)]
 
     example_row = [
@@ -393,7 +439,7 @@ def _parse_criterii(raw: str):
     found = set([c.cod.upper() for c in qs])
     missing = [c for c in codes if c not in found]
     if missing:
-        raise ValueError(f"Criterii inexistente: {', '.join(missing)}")
+        raise ValueError(f"Foi de parcurs inexistente: {', '.join(missing)}")
     # păstrăm ordinea din fișier
     by_code = {c.cod.upper(): c for c in qs}
     return [by_code[c] for c in codes]
@@ -511,7 +557,7 @@ def admin_expert_import(request):
                 functie = (row.get("functie") or "").strip()
                 sumar = (row.get("sumar_expertiza") or "").strip()
                 raw_caps = (row.get("capitole") or "").strip()
-                raw_cr = (row.get("criterii") or "").strip()
+                raw_cr = (row.get("foi_de_parcurs") or row.get("criterii") or "").strip()
 
                 try:
                     capitole = _parse_capitole(raw_caps)
@@ -691,7 +737,7 @@ def admin_questionnaire_import(request):
                 raw_deadline = (row.get("termen_limita") or "").strip()
                 raw_general = (row.get("este_general") or "").strip()
                 raw_caps = (row.get("capitole") or "").strip()
-                raw_cr = (row.get("criterii") or "").strip()
+                raw_cr = (row.get("foi_de_parcurs") or row.get("criterii") or "").strip()
 
                 if not titlu:
                     nr_error += 1

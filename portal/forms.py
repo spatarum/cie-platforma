@@ -44,7 +44,7 @@ class ExpertCreateForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(),
     )
     criterii = forms.ModelMultipleChoiceField(
-        label="Criterii (domenii de expertiză)",
+        label="Foi de parcurs (domenii de expertiză)",
         queryset=Criterion.objects.all(),
         required=False,
         widget=forms.CheckboxSelectMultiple(),
@@ -122,7 +122,7 @@ class ExpertUpdateForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(),
     )
     criterii = forms.ModelMultipleChoiceField(
-        label="Criterii (domenii de expertiză)",
+        label="Foi de parcurs (domenii de expertiză)",
         queryset=Criterion.objects.all(),
         required=False,
         widget=forms.CheckboxSelectMultiple(),
@@ -198,7 +198,7 @@ class ChestionarForm(forms.ModelForm):
             "termen_limita": "Termen limită",
             "este_general": "General (pentru toți experții)",
             "capitole": "Capitole alocate",
-            "criterii": "Criterii alocate",
+            "criterii": "Foi de parcurs alocate",
         }
 
     def __init__(self, *args, **kwargs):
@@ -285,11 +285,11 @@ class RaspunsChestionarForm(forms.Form):
             self.fields[field_name] = forms.CharField(
                 label=f"{q.ord}. {q.text}",
                 required=False,
-                max_length=1500,
+                max_length=3000,
                 widget=forms.Textarea(attrs={
                     "rows": 4,
-                    "maxlength": "1500",
-                    "placeholder": "Răspuns (max. 1500 caractere)",
+                    "maxlength": "3000",
+                    "placeholder": "Răspuns (max. 3000 caractere)",
                 }),
             )
             self.initial[field_name] = existing.get(q.id, "")
@@ -299,14 +299,14 @@ class RaspunsChestionarForm(forms.Form):
             field_name = f"q_{q.id}"
             text = (self.cleaned_data.get(field_name) or "").strip()
             answer, _ = Answer.objects.get_or_create(submission=self.submission, question=q)
-            answer.text = text[:1500]
+            answer.text = text[:3000]
             answer.save()
 
 
 class ExpertImportCSVForm(forms.Form):
     fisier = forms.FileField(
         label="Fișier CSV (UTF-8)",
-        help_text="Formate acceptate: .csv. Coloane: email, prenume, nume, telefon, organizatie, functie, sumar_expertiza, capitole, criterii.",
+        help_text="Formate acceptate: .csv. Coloane: email, prenume, nume, telefon, organizatie, functie, sumar_expertiza, capitole, foi_de_parcurs (sau criterii).",
     )
 
 
@@ -314,8 +314,16 @@ class QuestionnaireImportCSVForm(forms.Form):
     fisier = forms.FileField(
         label="Fișier CSV (UTF-8)",
         help_text=(
-            "Formate acceptate: .csv. Coloane: id (opțional), titlu, descriere, termen_limita, este_general, capitole, criterii, "
+            "Formate acceptate: .csv. Coloane: id (opțional), titlu, descriere, termen_limita, este_general, capitole, foi_de_parcurs (sau criterii), "
             "intrebare_1 ... intrebare_20. Separator recomandat pentru liste: ;"
         ),
     )
 
+
+
+class ExpertPreferinteForm(forms.Form):
+    text_mare = forms.BooleanField(
+        label="Text mare (accesibilitate)",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )

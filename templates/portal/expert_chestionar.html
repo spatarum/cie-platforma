@@ -48,7 +48,7 @@
           {{ field }}
           {{ field.errors }}
           <div class="small text-muted d-flex justify-content-between">
-            <span>Maxim 1500 caractere.</span>
+            <span>Maxim 3000 caractere.</span>
             <span class="char-counter" data-for="{{ field.id_for_label }}"></span>
           </div>
         </div>
@@ -83,14 +83,14 @@
   // Bootstrap styling for textarea fields
   document.querySelectorAll('textarea').forEach((t) => {
     t.classList.add('form-control');
-    t.setAttribute('maxlength', '1500');
+    t.setAttribute('maxlength', '3000');
     if ({{ editabil|yesno:"true,false" }} === false) {
       t.setAttribute('disabled', 'disabled');
     }
   });
 
   function updateCounter(textarea) {
-    const max = 1500;
+    const max = 3000;
     const len = textarea.value.length;
     const remaining = max - len;
     const counter = document.querySelector(`.char-counter[data-for='${textarea.id}']`);

@@ -13,7 +13,7 @@
 
 <div class="card shadow-sm gov-card">
   <div class="card-body">
-    <form method="post">
+    <form method="post" autocomplete="off">
       {% csrf_token %}
       {{ form.non_field_errors }}
 
@@ -94,7 +94,7 @@
           <div class="mb-3">
             <div class="d-flex align-items-center justify-content-between">
               <label class="form-label fw-semibold">{{ form.criterii.label }}</label>
-              <span class="small text-muted"><i class="bi bi-flag me-1"></i>Criterii</span>
+              <span class="small text-muted"><i class="bi bi-flag me-1"></i>Foi de parcurs</span>
             </div>
             <div class="checkbox-grid">
               {{ form.criterii }}

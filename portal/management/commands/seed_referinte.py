@@ -29,16 +29,13 @@ class Command(BaseCommand):
             )
             # Nu suprascriem modificările făcute manual de admin; completăm doar lipsurile.
             changed = False
-            if not obj.denumire:
+            if obj.denumire != denumire:
                 obj.denumire = denumire
                 changed = True
-            if not obj.pictograma:
+            if (obj.pictograma or "") != pictograma:
                 obj.pictograma = pictograma
                 changed = True
-            if not obj.ordonare:
-                obj.ordonare = ordonare
-                changed = True
-            if not obj.culoare or obj.culoare == "#0b3d91":
+            if (obj.culoare or "").lower() != culoare.lower():
                 obj.culoare = culoare
                 changed = True
             if changed:
@@ -47,8 +44,8 @@ class Command(BaseCommand):
 
         criterii = [
             ("FID", "Funcționarea instituțiilor democratice", "bi-building", "#1e40af"),
-            ("RAP", "Reforma administrației publice", "bi-diagram-3", "#0f766e"),
-            ("ECON", "Criterii economice", "bi-bar-chart-line", "#b45309"),
+            ("RAP", "Reforma administrației publice", "bi-gear", "#0f766e"),
+            ("SD", "Statul de drept", "bi-shield-lock", "#7f1d1d"),
         ]
         for cod, denumire, pictograma, culoare in criterii:
             obj, _created = Criterion.objects.get_or_create(

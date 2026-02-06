@@ -32,7 +32,7 @@ def export_csv(questionnaires: Iterable[Questionnaire]) -> bytes:
             "ID chestionar",
             "Termen limită",
             "Capitole",
-            "Criterii",
+            "Foi de parcurs",
             "Categorie",
             "Expert",
             "Email",
@@ -194,7 +194,7 @@ def export_pdf(questionnaires: Iterable[Questionnaire]) -> bytes:
         if chapters:
             y = write_line(f"Capitole: {chapters}", y)
         if criteria:
-            y = write_line(f"Criterii: {criteria}", y)
+            y = write_line(f"Foi de parcurs: {criteria}", y)
         y -= 6
 
         questions = list(q.intrebari.all().order_by("ord"))

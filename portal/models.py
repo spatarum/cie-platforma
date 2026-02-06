@@ -85,8 +85,8 @@ class Criterion(models.Model):
     )
 
     class Meta:
-        verbose_name = "Criteriu"
-        verbose_name_plural = "Criterii"
+        verbose_name = "Foaie de parcurs"
+        verbose_name_plural = "Foi de parcurs"
         ordering = ["cod"]
 
     def __str__(self) -> str:
@@ -113,6 +113,10 @@ class ExpertProfile(models.Model):
     # Statistici autentificare
     numar_logari = models.PositiveIntegerField(default=0)
     ultima_logare_la = models.DateTimeField(null=True, blank=True)
+
+
+    # Preferințe UI (expert)
+    pref_text_mare = models.BooleanField(default=False)
 
 
     capitole = models.ManyToManyField(Chapter, blank=True, related_name="experti")
@@ -248,8 +252,8 @@ class Submission(models.Model):
 class Answer(models.Model):
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name="raspunsuri")
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="raspunsuri")
-    # Răspunsuri tip text scurt (max. 1500 caractere)
-    text = models.CharField(max_length=1500, blank=True)
+    # Răspunsuri tip text scurt (max. 3000 caractere)
+    text = models.CharField(max_length=3000, blank=True)
 
     class Meta:
         verbose_name = "Răspuns"
