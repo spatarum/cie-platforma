@@ -22,7 +22,22 @@ class ExpertCreateForm(forms.Form):
     email = forms.EmailField(label="Email", max_length=254)
     telefon = forms.CharField(label="Telefon", max_length=50, required=False)
     organizatie = forms.CharField(label="Organizație / instituție", max_length=255, required=False)
-    functie = forms.CharField(label="Funcție / poziție", max_length=255, required=False)
+    functie = forms.CharField(
+        label="Funcție / poziție",
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                # Unele browsere/password-managers pot face autofill (ex: "admin") chiar și cu
+                # autocomplete="off" pe <form>. Încercăm să descurajăm autofill-ul.
+                "autocomplete": "off",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+                "autocorrect": "off",
+                "spellcheck": "false",
+            }
+        ),
+    )
     sumar_expertiza = forms.CharField(
         label="Sumar expertiză (scurt)",
         max_length=500,
@@ -105,7 +120,20 @@ class ExpertUpdateForm(forms.Form):
     email = forms.EmailField(label="Email", max_length=254, disabled=True)
     telefon = forms.CharField(label="Telefon", max_length=50, required=False)
     organizatie = forms.CharField(label="Organizație / instituție", max_length=255, required=False)
-    functie = forms.CharField(label="Funcție / poziție", max_length=255, required=False)
+    functie = forms.CharField(
+        label="Funcție / poziție",
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+                "autocorrect": "off",
+                "spellcheck": "false",
+            }
+        ),
+    )
     sumar_expertiza = forms.CharField(
         label="Sumar expertiză (scurt)",
         max_length=500,

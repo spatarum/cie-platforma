@@ -134,5 +134,21 @@
   // email disabled styling
   const email = document.querySelector('#id_email');
   if(email && email.hasAttribute('disabled')) email.classList.add('form-control-plaintext');
+
+  // Unele browsere/password-managers pot completa automat câmpul "Funcție / poziție" cu "admin".
+  // Dacă serverul nu a setat o valoare inițială, îl golim.
+  const functie = document.querySelector('#id_functie');
+  if (functie) {
+    const serverVal = "{{ form.functie.value|default_if_none:''|escapejs }}";
+    const clearAutofill = () => {
+      if (!serverVal && (functie.value || "").trim().toLowerCase() === "admin") {
+        functie.value = "";
+      }
+    };
+    clearAutofill();
+    setTimeout(clearAutofill, 300);
+    setTimeout(clearAutofill, 1200);
+    setTimeout(clearAutofill, 2500);
+  }
 </script>
 {% endblock %}
