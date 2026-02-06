@@ -90,7 +90,7 @@ class Command(BaseCommand):
             (21, 4, "Rețele transeuropene", "bi-diagram-3"),
             (22, 5, "Politica regională și coordonarea instrumentelor structurale", "bi-map"),
             # Cap. 23: pictograma corectă ("bi-balance-scale" nu există în Bootstrap Icons)
-            (23, 1, "Sistem judiciar și drepturi fundamentale", "bi-hammer"),
+            (23, 1, "Sistem judiciar și drepturi fundamentale", "bi-shield-check"),
             (24, 1, "Justiție, libertate și securitate", "bi-shield-lock"),
             (25, 3, "Știință și cercetare", "bi-mortarboard"),
             (26, 3, "Educație și cultură", "bi-book"),
@@ -125,7 +125,11 @@ class Command(BaseCommand):
                 obj.cluster = cluster_obj
                 changed = True
             # Dacă icon-ul lipsește sau este unul cunoscut ca invalid, îl corectăm
-            if (not obj.pictograma) or (obj.pictograma.strip() == "bi-balance-scale"):
+            # (Cap. 23: am considerat bi-hammer nepotrivit; îl înlocuim automat)
+            if numar == 23 and (not obj.pictograma or obj.pictograma.strip() in ("bi-balance-scale", "bi-hammer")):
+                obj.pictograma = pictograma
+                changed = True
+            elif (not obj.pictograma) or (obj.pictograma.strip() == "bi-balance-scale"):
                 obj.pictograma = pictograma
                 changed = True
 

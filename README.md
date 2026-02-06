@@ -87,6 +87,6 @@ După redeploy, te poți loga la `.../login/` cu credențialele de mai sus.
 ---
 
 ## Note
-- Pentru schimbări în capitole/clustere/criterii: **Administrare → Capitole & criterii → Administrare avansată**.
+- Pentru schimbări în capitole/clustere/criterii: **Administrare → Capitole & foi de parcurs → Administrare avansată**.
 - În producție, setează `DJANGO_SECURE_SSL_REDIRECT=true` și folosește HTTPS.
 
