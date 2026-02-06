@@ -165,6 +165,57 @@ class Questionnaire(models.Model):
         return timezone.now() <= self.termen_limita
 
 
+class Newsletter(models.Model):
+    """Newsletter trimis către toți experții."""
+
+    subiect = models.CharField(max_length=255)
+    continut = models.TextField(
+        help_text=(
+            "Textul newsletterului. Poți include hyperlinkuri folosind formatul: "
+            "[text](https://exemplu.md)"
+        )
+    )
+    continut_html = models.TextField(blank=True)
+
+    creat_de = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="newsletter_create",
+    )
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    trimis_la = models.DateTimeField(null=True, blank=True)
+    trimis_de = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="newsletter_trimite",
+    )
+
+    nr_destinatari = models.PositiveIntegerField(default=0)
+    nr_trimise = models.PositiveIntegerField(default=0)
+    nr_esecuri = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Newsletter"
+        verbose_name_plural = "Newslettere"
+        ordering = ["-creat_la"]
+
+    def __str__(self) -> str:
+        return self.subiect
+
+    @property
+    def este_trimis(self) -> bool:
+        return bool(self.trimis_la)
+
+    @property
+    def este_trimis(self) -> bool:
+        return bool(self.trimis_la)
+
+
 
 
 class ImportRun(models.Model):

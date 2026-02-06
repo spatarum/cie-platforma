@@ -1,0 +1,35 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Trimite newsletter | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">Trimite newsletter</h1>
+    <div class="text-muted small">Vei trimite newsletterul către toți experții activi (cu email). Trimiterea se face individual (un email per expert).</div>
+  </div>
+  <a class="btn btn-light btn-sm" href="{% url 'admin_newsletter_edit' nl.pk %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">{{ nl.subiect }}</div>
+    <div class="text-muted small mb-3">Destinatari: {{ nr_destinatari }}</div>
+
+    <div class="mb-3 newsletter-preview">{{ nl.continut_html|safe }}</div>
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" value="da" id="confirm" name="confirm">
+        <label class="form-check-label" for="confirm">
+          Confirm că doresc să trimit acest newsletter către toți experții.
+        </label>
+      </div>
+
+      <button class="btn btn-success" type="submit"><i class="bi bi-send me-1"></i>Trimite acum</button>
+      <a class="btn btn-outline-secondary" href="{% url 'admin_newsletter_edit' nl.pk %}">Anulează</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

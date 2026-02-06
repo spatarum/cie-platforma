@@ -13,10 +13,17 @@ urlpatterns = [
     path("expert/", views.expert_dashboard, name="expert_dashboard"),
     path("expert/profil/", views.expert_profile, name="expert_profile"),
     path("expert/preferinte/", views.expert_preferinte, name="expert_preferinte"),
+    path("expert/newslettere/", views.expert_newsletters, name="expert_newsletters"),
+    path("expert/newslettere/<int:pk>/", views.expert_newsletter_detail, name="expert_newsletter_detail"),
     path("expert/chestionar/<int:pk>/", views.expert_questionnaire, name="expert_chestionar"),
 
     # Admin
     path("administrare/", views.admin_dashboard, name="admin_dashboard"),
+
+    path("administrare/newslettere/", views.admin_newsletter_list, name="admin_newsletters_list"),
+    path("administrare/newslettere/nou/", views.admin_newsletter_create, name="admin_newsletter_create"),
+    path("administrare/newslettere/<int:pk>/editare/", views.admin_newsletter_edit, name="admin_newsletter_edit"),
+    path("administrare/newslettere/<int:pk>/trimite/", views.admin_newsletter_send, name="admin_newsletter_send"),
 
     path("administrare/chestionare/", views.admin_questionnaire_list, name="admin_chestionare_list"),
     path("administrare/chestionare/nou/", views.admin_questionnaire_create, name="admin_chestionar_create"),

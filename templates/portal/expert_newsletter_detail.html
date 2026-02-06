@@ -1,0 +1,22 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Newsletter | Expert{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <a class="btn btn-light btn-sm" href="{% url 'expert_newsletters' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    <div>
+      <div class="text-muted small">Newsletter</div>
+      <h1 class="h5 mb-0">{{ nl.subiect }}</h1>
+    </div>
+  </div>
+  <span class="text-muted small">Trimis: {{ nl.trimis_la|date:"d.m.Y H:i" }}</span>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <div class="newsletter-preview">{{ nl.continut_html|safe }}</div>
+  </div>
+</div>
+{% endblock %}

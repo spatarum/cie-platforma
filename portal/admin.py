@@ -9,6 +9,7 @@ from .models import (
     Question,
     Questionnaire,
     Submission,
+    Newsletter,
 )
 
 
@@ -69,3 +70,9 @@ class SubmissionAdmin(admin.ModelAdmin):
 
 admin.site.register(Answer)
 admin.site.register(Question)
+
+
+@admin.register(Newsletter)
+class NewsletterAdmin(admin.ModelAdmin):
+    list_display = ("subiect", "creat_la", "trimis_la", "nr_trimise", "nr_esecuri")
+    search_fields = ("subiect", "continut")

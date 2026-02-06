@@ -198,3 +198,13 @@ body.text-mare .form-control,
 body.text-mare .form-select,
 body.text-mare .form-label,
 body.text-mare .btn { font-size: 1.05rem; }
+
+/* Newsletter */
+.newsletter-preview {
+  line-height: 1.5;
+}
+
+.newsletter-preview a {
+  color: var(--gov-blue);
+  text-decoration: underline;
+}

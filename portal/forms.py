@@ -13,6 +13,7 @@ from .models import (
     Question,
     Questionnaire,
     Submission,
+    Newsletter,
 )
 
 
@@ -355,3 +356,23 @@ class ExpertPreferinteForm(forms.Form):
         required=False,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
+
+
+class NewsletterForm(forms.ModelForm):
+    class Meta:
+        model = Newsletter
+        fields = ["subiect", "continut"]
+        widgets = {
+            "subiect": forms.TextInput(attrs={"class": "form-control"}),
+            "continut": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 10,
+                    "placeholder": "Scrie textul newsletterului aici...",
+                }
+            ),
+        }
+        labels = {
+            "subiect": "Subiect",
+            "continut": "Conținut (poți include linkuri: [text](https://exemplu.md))",
+        }

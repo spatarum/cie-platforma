@@ -51,11 +51,13 @@
           <a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Panou</a>
           <a class="nav-link" href="{% url 'admin_chestionare_list' %}"><i class="bi bi-ui-checks-grid me-1"></i>Chestionare</a>
           <a class="nav-link" href="{% url 'admin_experti_list' %}"><i class="bi bi-people me-1"></i>Experți</a>
+          <a class="nav-link" href="{% url 'admin_newsletters_list' %}"><i class="bi bi-newspaper me-1"></i>Newslettere</a>
           <a class="nav-link" href="{% url 'admin_referinte' %}"><i class="bi bi-journal-bookmark me-1"></i>Capitole & foi de parcurs</a>
           <a class="nav-link" href="{% url 'admin_arhiva' %}"><i class="bi bi-archive me-1"></i>Arhivă</a>
           <a class="nav-link" href="{% url 'admin_export' %}"><i class="bi bi-download me-1"></i>Export</a>
         {% else %}
           <a class="nav-link" href="{% url 'expert_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Chestionare</a>
+          <a class="nav-link" href="{% url 'expert_newsletters' %}"><i class="bi bi-newspaper me-1"></i>Newslettere</a>
           <a class="nav-link" href="{% url 'expert_profile' %}"><i class="bi bi-person-lines-fill me-1"></i>Profil</a>
               <a class="nav-link" href="{% url 'expert_preferinte' %}"><i class="bi bi-sliders me-1"></i>Preferințe</a>
         {% endif %}

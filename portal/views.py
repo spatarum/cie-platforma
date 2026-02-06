@@ -26,9 +26,10 @@ from .forms import (
     QuestionnaireImportCSVForm,
     RaspunsChestionarForm,
     ExpertPreferinteForm,
+    NewsletterForm,
 )
-from .models import Answer, Chapter, Criterion, ExpertProfile, ImportRun, Question, Questionnaire, Submission
-from .notifications import send_new_questionnaire_emails
+from .models import Answer, Chapter, Criterion, ExpertProfile, ImportRun, Question, Questionnaire, Submission, Newsletter
+from .notifications import send_new_questionnaire_emails, send_newsletter_emails
 from .utils import group_chapters_by_cluster
 
 
@@ -203,6 +204,18 @@ def expert_preferinte(request):
 
 
 @user_passes_test(is_expert)
+def expert_newsletters(request):
+    newsletters = Newsletter.objects.filter(trimis_la__isnull=False).order_by("-trimis_la", "-creat_la")
+    return render(request, "portal/expert_newsletters.html", {"newsletters": newsletters})
+
+
+@user_passes_test(is_expert)
+def expert_newsletter_detail(request, pk: int):
+    nl = get_object_or_404(Newsletter, pk=pk, trimis_la__isnull=False)
+    return render(request, "portal/expert_newsletter_detail.html", {"nl": nl})
+
+
+@user_passes_test(is_expert)
 def expert_questionnaire(request, pk: int):
     chestionar = get_object_or_404(Questionnaire, pk=pk)
     if not _expert_can_access(request.user, chestionar):
@@ -261,6 +274,105 @@ def admin_dashboard(request):
         request,
         "portal/admin_dashboard.html",
         {"chestionare": chestionare, "nr_experti": experti},
+    )
+
+
+@user_passes_test(is_admin)
+def admin_newsletter_list(request):
+    newsletters = Newsletter.objects.all().order_by("-creat_la")
+    return render(request, "portal/admin_newsletters_list.html", {"newsletters": newsletters})
+
+
+@user_passes_test(is_admin)
+def admin_newsletter_create(request):
+    if request.method == "POST":
+        form = NewsletterForm(request.POST)
+        if form.is_valid():
+            nl = form.save(commit=False)
+            nl.creat_de = request.user
+            # continut_html se va calcula la salvare în view, pentru a păstra controlul asupra formatării
+            from .textutils import newsletter_text_to_html
+
+            nl.continut_html = newsletter_text_to_html(nl.continut)
+            nl.save()
+            messages.success(request, "Newsletterul a fost creat.")
+            return redirect("admin_newsletter_edit", pk=nl.pk)
+    else:
+        form = NewsletterForm()
+
+    return render(request, "portal/admin_newsletter_form.html", {"form": form, "titlu_pagina": "Newsletter nou"})
+
+
+@user_passes_test(is_admin)
+def admin_newsletter_edit(request, pk: int):
+    nl = get_object_or_404(Newsletter, pk=pk)
+    if request.method == "POST":
+        if nl.este_trimis:
+            messages.warning(request, "Newsletterul a fost deja trimis. Conținutul nu mai poate fi modificat.")
+            return redirect("admin_newsletter_edit", pk=pk)
+
+        form = NewsletterForm(request.POST, instance=nl)
+        if form.is_valid():
+            nl = form.save(commit=False)
+            from .textutils import newsletter_text_to_html
+
+            nl.continut_html = newsletter_text_to_html(nl.continut)
+            nl.save()
+            messages.success(request, "Newsletterul a fost actualizat.")
+            return redirect("admin_newsletter_edit", pk=pk)
+    else:
+        form = NewsletterForm(instance=nl)
+
+    nr_destinatari = User.objects.filter(is_staff=False, is_active=True).exclude(email="").count()
+    return render(
+        request,
+        "portal/admin_newsletter_form.html",
+        {
+            "form": form,
+            "nl": nl,
+            "titlu_pagina": "Editare newsletter",
+            "nr_destinatari": nr_destinatari,
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_newsletter_send(request, pk: int):
+    nl = get_object_or_404(Newsletter, pk=pk)
+    nr_destinatari = User.objects.filter(is_staff=False, is_active=True).exclude(email="").count()
+
+    if nl.este_trimis:
+        messages.info(request, "Newsletterul a fost deja trimis.")
+        return redirect("admin_newsletter_edit", pk=pk)
+
+    if request.method == "POST":
+        # confirmare dublă
+        if request.POST.get("confirm") != "da":
+            messages.error(request, "Bifează confirmarea pentru a trimite newsletterul.")
+            return redirect("admin_newsletter_send", pk=pk)
+
+        base_url = request.build_absolute_uri("/").rstrip("/")
+        ok, fail = send_newsletter_emails(nl, request_base_url=base_url)
+        nl.trimis_la = timezone.now()
+        nl.trimis_de = request.user
+        nl.nr_destinatari = nr_destinatari
+        nl.nr_trimise = ok
+        nl.nr_esecuri = fail
+        nl.save(update_fields=["trimis_la", "trimis_de", "nr_destinatari", "nr_trimise", "nr_esecuri"])
+
+        if ok and not fail:
+            messages.success(request, f"Newsletter trimis cu succes către {ok} experți.")
+        elif ok and fail:
+            messages.warning(request, f"Newsletter trimis către {ok} experți. Eșecuri: {fail}.")
+        else:
+            messages.error(request, "Trimiterea newsletterului a eșuat. Verifică setările email.")
+
+        return redirect("admin_newsletter_edit", pk=pk)
+
+    return render(
+        request,
+        "portal/admin_newsletter_send_confirm.html",
+        {"nl": nl, "nr_destinatari": nr_destinatari},
     )
 
 @user_passes_test(is_admin)

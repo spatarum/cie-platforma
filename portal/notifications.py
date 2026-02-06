@@ -6,11 +6,12 @@ from typing import Iterable, Tuple
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Questionnaire
+from .models import Questionnaire, Newsletter
 
 
 logger = logging.getLogger(__name__)
@@ -137,5 +138,83 @@ def send_new_questionnaire_emails(
         except Exception as e:
             fail += 1
             logger.exception("Eroare trimitere email pentru chestionar %s către %s: %s", questionnaire.id, getattr(u, "email", ""), e)
+
+    return ok, fail
+
+
+def _build_expert_newsletter_url(base_url: str, newsletter_id: int) -> str:
+    path = reverse("expert_newsletter_detail", args=[newsletter_id])
+    base = (base_url or "").rstrip("/")
+    return f"{base}{path}" if base else path
+
+
+def send_newsletter_emails(
+    newsletter: Newsletter,
+    *,
+    request_base_url: str | None = None,
+) -> Tuple[int, int]:
+    """Trimite un newsletter către toți experții activi (un email per expert).
+
+    Returnează (nr_trimise_cu_succes, nr_esecuri).
+    """
+    base_url = _get_site_base_url(request_base_url)
+    link = _build_expert_newsletter_url(base_url, newsletter.id)
+
+    subject = f"[CIE] Newsletter: {newsletter.subiect}".strip()
+
+    # Lista destinatari
+    recipients = User.objects.filter(is_staff=False, is_active=True).exclude(email="").order_by("last_name", "first_name").distinct()
+
+    ok = 0
+    fail = 0
+
+    # Body text (fallback)
+    plain_lines = [
+        "Bună,",
+        "",
+        "Ai primit un newsletter nou în platforma experților.",
+        "",
+        f"Subiect: {newsletter.subiect}",
+        "",
+        (newsletter.continut or "").strip(),
+        "",
+        f"Vezi online: {link}",
+        "",
+        "Mulțumim,",
+        "Echipa Comisiei pentru integrare europeană",
+    ]
+    plain_body = "\n".join([l for l in plain_lines if l is not None])
+
+    # HTML body
+    html_body = f"""
+    <div style='font-family: Onest, Arial, sans-serif; font-size: 14px; line-height: 1.5;'>
+      <p>Bună,</p>
+      <p>Ai primit un newsletter nou în platforma experților.</p>
+      <h3 style='margin: 12px 0 8px 0;'>{newsletter.subiect}</h3>
+      <div style='margin: 8px 0 16px 0;'>{newsletter.continut_html or ''}</div>
+      <p style='margin-top: 16px;'>Vezi online: <a href='{link}' target='_blank' rel='noopener noreferrer'>{link}</a></p>
+      <p style='margin-top: 16px;'>Mulțumim,<br>Echipa Comisiei pentru integrare europeană</p>
+    </div>
+    """
+
+    for u in recipients:
+        try:
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_body,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None) or None,
+                to=[u.email],
+            )
+            msg.attach_alternative(html_body, "text/html")
+            msg.send(fail_silently=False)
+            ok += 1
+        except Exception as e:
+            fail += 1
+            logger.exception(
+                "Eroare trimitere newsletter %s către %s: %s",
+                newsletter.id,
+                getattr(u, "email", ""),
+                e,
+            )
 
     return ok, fail
