@@ -207,9 +207,22 @@ class Newsletter(models.Model):
     def __str__(self) -> str:
         return self.subiect
 
-    @property
-    def este_trimis(self) -> bool:
-        return bool(self.trimis_la)
+    def save(self, *args, **kwargs):
+        """Păstrează `continut_html` sincronizat cu `continut`.
+
+        `continut_html` este folosit atât pentru previzualizarea din platformă, cât și pentru corpul HTML
+        al emailului. Îl generăm mereu din `continut` pentru a evita inconsecvențe (ex: editare din Django Admin).
+        """
+        try:
+            from .textutils import newsletter_text_to_html
+
+            self.continut_html = newsletter_text_to_html(self.continut or "")
+        except Exception:
+            # Fallback sigur: nu blocăm salvarea dacă apare o problemă de import/format.
+            # În cel mai rău caz rămâne varianta existentă / goală.
+            if self.continut_html is None:
+                self.continut_html = ""
+        return super().save(*args, **kwargs)
 
     @property
     def este_trimis(self) -> bool:

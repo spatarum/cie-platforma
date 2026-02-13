@@ -32,6 +32,7 @@ Platformă web (Django) pentru administratori și experți ai Comisiei parlament
 
 ### Newsletter
 - Administrator: creează / editează / trimite newsletter către **toți experții activi**
+- Newsletterele deja trimise pot fi **editate ulterior** pentru a actualiza varianta "vezi online" din platformă (emailurile deja livrate nu se modifică).
 - Expert: listă newslettere + pagină de detaliu („vezi online”)
 - conținutul suportă linkuri în format: `[text](https://exemplu.md)`
 

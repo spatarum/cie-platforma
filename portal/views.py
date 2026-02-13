@@ -290,10 +290,6 @@ def admin_newsletter_create(request):
         if form.is_valid():
             nl = form.save(commit=False)
             nl.creat_de = request.user
-            # continut_html se va calcula la salvare în view, pentru a păstra controlul asupra formatării
-            from .textutils import newsletter_text_to_html
-
-            nl.continut_html = newsletter_text_to_html(nl.continut)
             nl.save()
             messages.success(request, "Newsletterul a fost creat.")
             return redirect("admin_newsletter_edit", pk=nl.pk)
@@ -307,18 +303,17 @@ def admin_newsletter_create(request):
 def admin_newsletter_edit(request, pk: int):
     nl = get_object_or_404(Newsletter, pk=pk)
     if request.method == "POST":
-        if nl.este_trimis:
-            messages.warning(request, "Newsletterul a fost deja trimis. Conținutul nu mai poate fi modificat.")
-            return redirect("admin_newsletter_edit", pk=pk)
-
         form = NewsletterForm(request.POST, instance=nl)
         if form.is_valid():
             nl = form.save(commit=False)
-            from .textutils import newsletter_text_to_html
-
-            nl.continut_html = newsletter_text_to_html(nl.continut)
             nl.save()
-            messages.success(request, "Newsletterul a fost actualizat.")
+            if nl.este_trimis:
+                messages.success(
+                    request,
+                    "Newsletterul a fost actualizat. Notă: emailurile deja trimise nu se modifică; se actualizează doar vizualizarea în platformă.",
+                )
+            else:
+                messages.success(request, "Newsletterul a fost actualizat.")
             return redirect("admin_newsletter_edit", pk=pk)
     else:
         form = NewsletterForm(instance=nl)

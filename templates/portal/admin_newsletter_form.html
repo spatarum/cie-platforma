@@ -27,7 +27,8 @@
             <div class="alert alert-info">
               <i class="bi bi-envelope-check me-1"></i>
               Newsletter trimis la {{ nl.trimis_la|date:"d.m.Y H:i" }}.
-              Conținutul nu mai poate fi modificat.
+              Îl poți modifica pentru a actualiza varianta afișată în platformă ("vezi online").
+              <strong>Emailurile deja trimise nu se modifică automat.</strong>
             </div>
           {% endif %}
 
@@ -44,12 +45,8 @@
             {{ form.continut.errors }}
           </div>
 
-          {% if not nl or not nl.este_trimis %}
-            <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
-            <a class="btn btn-outline-secondary" href="{% url 'admin_newsletters_list' %}">Anulează</a>
-          {% else %}
-            <a class="btn btn-outline-secondary" href="{% url 'admin_newsletters_list' %}">Înapoi</a>
-          {% endif %}
+          <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
+          <a class="btn btn-outline-secondary" href="{% url 'admin_newsletters_list' %}">Înapoi</a>
         </form>
       </div>
     </div>
