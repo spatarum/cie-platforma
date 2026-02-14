@@ -16,16 +16,16 @@
   <div class="col-md-4">
     <div class="card shadow-sm gov-card">
       <div class="card-body">
-        <div class="text-muted small">Răspunsuri totale</div>
-        <div class="fs-4 fw-semibold">{{ total_raspunsuri }}</div>
+        <div class="text-muted small">Răspunsuri (trimise)</div>
+        <div class="fs-4 fw-semibold">{{ trimise }}</div>
       </div>
     </div>
   </div>
   <div class="col-md-4">
     <div class="card shadow-sm gov-card">
       <div class="card-body">
-        <div class="text-muted small">Trimise</div>
-        <div class="fs-4 fw-semibold">{{ trimise }}</div>
+        <div class="text-muted small">Ciorne</div>
+        <div class="fs-4 fw-semibold">{{ ciorne }}</div>
       </div>
     </div>
   </div>
@@ -111,7 +111,8 @@
       {% if chestionar and chestionar.submisii.exists %}
         <div class="alert alert-warning">
           <i class="bi bi-exclamation-triangle me-1"></i>
-          Au fost deja primite răspunsuri. Întrebările sunt blocate pentru a evita pierderea datelor.
+          Au fost deja începute/trimise răspunsuri. Poți corecta textul întrebărilor (ex: erori de tipar),
+          dar <strong>nu schimba numărul sau ordinea</strong> întrebărilor pentru a păstra legătura cu răspunsurile existente.
         </div>
       {% endif %}
 

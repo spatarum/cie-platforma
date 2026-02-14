@@ -12,7 +12,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -372,7 +372,18 @@ def admin_newsletter_send(request, pk: int):
 
 @user_passes_test(is_admin)
 def admin_questionnaire_list(request):
-    chestionare = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")
+    # Număr de răspunsuri = doar submisiile TRIMIS (nu includem ciornele)
+    chestionare = (
+        Questionnaire.objects.filter(arhivat=False)
+        .annotate(
+            nr_raspunsuri=Count(
+                "submisii",
+                filter=Q(submisii__status=Submission.STATUS_TRIMIS),
+                distinct=True,
+            )
+        )
+        .order_by("-creat_la")
+    )
     return render(request, "portal/admin_chestionare_list.html", {"chestionare": chestionare})
 
 @user_passes_test(is_admin)
@@ -426,8 +437,10 @@ def admin_questionnaire_edit(request, pk: int):
 
     question_fields = [form[f"intrebare_{i}"] for i in range(1, 21)]
 
-    total_raspunsuri = chestionar.submisii.count()
+    # Număr de răspunsuri = doar cele TRIMIS (nu includem ciornele).
     trimise = chestionar.submisii.filter(status=Submission.STATUS_TRIMIS).count()
+    ciorne = chestionar.submisii.filter(status=Submission.STATUS_DRAFT).count()
+    total_raspunsuri = trimise
 
     return render(
         request,
@@ -437,6 +450,7 @@ def admin_questionnaire_edit(request, pk: int):
             "chestionar": chestionar,
             "titlu_pagina": "Editare chestionar",
             "total_raspunsuri": total_raspunsuri,
+            "ciorne": ciorne,
             "trimise": trimise,
             "question_fields": question_fields,
         },
@@ -910,14 +924,27 @@ def admin_questionnaire_import(request):
                                 q.capitole.set(capitole)
                                 q.criterii.set(criterii)
 
-                            # actualizăm întrebările doar dacă nu există răspunsuri
+                            # Întrebări:
+                            # - dacă NU există submisii: putem înlocui lista complet (număr/ordine);
+                            # - dacă EXISTĂ submisii: permitem doar actualizarea textului (typo/clarificări),
+                            #   păstrând numărul/ordinea, pentru a nu rupe legătura cu răspunsurile.
                             if not q.submisii.exists():
                                 q.intrebari.all().delete()
                                 for ord_no, t in enumerate(intrebari, start=1):
-                                    Question.objects.create(questionnaire=q, ord=ord_no, text=t)
+                                    Question.objects.create(questionnaire=q, ord=ord_no, text=t[:1000])
                                 msg = "Actualizat (întrebări înlocuite)"
                             else:
-                                msg = "Actualizat (întrebările nu au fost modificate – există răspunsuri)"
+                                existing_qs = list(q.intrebari.all().order_by("ord"))
+                                if len(existing_qs) != len(intrebari):
+                                    msg = (
+                                        "Actualizat (întrebările nu au fost modificate – există răspunsuri și numărul de întrebări diferă)"
+                                    )
+                                else:
+                                    for ord_no, t in enumerate(intrebari, start=1):
+                                        qq = existing_qs[ord_no - 1]
+                                        qq.text = t[:1000]
+                                        qq.save(update_fields=["text"])
+                                    msg = "Actualizat (întrebări actualizate)"
 
                             nr_update += 1
                             report_rows.append((idx, str(q.pk), "UPDATED", msg))
@@ -1156,7 +1183,7 @@ def admin_general_dashboard(request):
 
         resp_ids_qs = (
             Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
-            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .filter(status=Submission.STATUS_TRIMIS)
             .values_list("expert_id", flat=True)
             .distinct()
         )
@@ -1168,7 +1195,7 @@ def admin_general_dashboard(request):
     if nr_experti and nr_chestionare:
         nr_experti_care_au_raspuns = (
             Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
-            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .filter(status=Submission.STATUS_TRIMIS)
             .values("expert_id")
             .distinct()
             .count()
@@ -1223,7 +1250,7 @@ def admin_capitol_dashboard(request, pk: int):
 
         resp_ids_qs = (
             Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
-            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .filter(status=Submission.STATUS_TRIMIS)
             .values_list("expert_id", flat=True)
             .distinct()
         )
@@ -1236,7 +1263,7 @@ def admin_capitol_dashboard(request, pk: int):
     if nr_experti and nr_chestionare:
         nr_experti_care_au_raspuns = (
             Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
-            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .filter(status=Submission.STATUS_TRIMIS)
             .values("expert_id")
             .distinct()
             .count()
@@ -1290,7 +1317,7 @@ def admin_criteriu_dashboard(request, pk: int):
 
         resp_ids_qs = (
             Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
-            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .filter(status=Submission.STATUS_TRIMIS)
             .values_list("expert_id", flat=True)
             .distinct()
         )
@@ -1302,7 +1329,7 @@ def admin_criteriu_dashboard(request, pk: int):
     if nr_experti and nr_chestionare:
         nr_experti_care_au_raspuns = (
             Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
-            .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+            .filter(status=Submission.STATUS_TRIMIS)
             .values("expert_id")
             .distinct()
             .count()
@@ -1521,7 +1548,7 @@ def admin_chestionar_raspunsuri(request, pk: int):
 
     submissions = (
         Submission.objects.filter(questionnaire=chestionar)
-        .filter(Q(status=Submission.STATUS_TRIMIS) | Q(raspunsuri__text__gt=""))
+        .filter(status=Submission.STATUS_TRIMIS)
         .select_related("expert")
         .prefetch_related("raspunsuri", "raspunsuri__question")
         .order_by("expert__last_name", "expert__first_name")
@@ -1559,7 +1586,7 @@ def admin_chestionar_raspunsuri_expert(request, pk: int, expert_id: int):
     chestionar = get_object_or_404(Questionnaire, pk=pk)
     expert = get_object_or_404(User, pk=expert_id)
 
-    submission = get_object_or_404(Submission, questionnaire=chestionar, expert=expert)
+    submission = get_object_or_404(Submission, questionnaire=chestionar, expert=expert, status=Submission.STATUS_TRIMIS)
 
     # Map question_id -> answer
     ans_map = {

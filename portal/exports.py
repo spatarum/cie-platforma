@@ -11,7 +11,7 @@ from openpyxl.utils import get_column_letter
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from .models import Questionnaire
+from .models import Questionnaire, Submission
 
 
 def _fmt_dt(dt: datetime | None) -> str:
@@ -54,7 +54,7 @@ def export_csv(questionnaires: Iterable[Questionnaire]) -> bytes:
         submissions = (
             q.submisii.select_related("expert")
             .prefetch_related("raspunsuri", "raspunsuri__question")
-            .all()
+            .filter(status=Submission.STATUS_TRIMIS)
         )
 
         for sub in submissions:
@@ -115,7 +115,7 @@ def export_xlsx(questionnaires: Iterable[Questionnaire]) -> bytes:
         submissions = (
             q.submisii.select_related("expert")
             .prefetch_related("raspunsuri", "raspunsuri__question", "expert__profil_expert")
-            .all()
+            .filter(status=Submission.STATUS_TRIMIS)
         )
 
         for sub in submissions:
@@ -201,7 +201,7 @@ def export_pdf(questionnaires: Iterable[Questionnaire]) -> bytes:
         submissions = (
             q.submisii.select_related("expert")
             .prefetch_related("raspunsuri", "raspunsuri__question")
-            .all()
+            .filter(status=Submission.STATUS_TRIMIS)
         )
 
         if not submissions:

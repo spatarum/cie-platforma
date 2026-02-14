@@ -240,11 +240,20 @@ class ChestionarForm(forms.ModelForm):
                 if idx <= 20:
                     self.initial[f"intrebare_{idx}"] = q.text
 
-            # dacă există răspunsuri, blocăm editarea întrebărilor pentru a evita pierderi de date
+            # Dacă există răspunsuri, permitem corectarea textului întrebărilor (typo, clarificări),
+            # dar NU permitem schimbarea numărului/ordinii întrebărilor pentru a evita inconsistențe în date.
             if instance.submisii.exists():
+                existing_count = len(qs)
                 for i in range(1, 21):
-                    self.fields[f"intrebare_{i}"].disabled = True
-                    self.fields[f"intrebare_{i}"].help_text = "Întrebările nu pot fi modificate după ce au fost primite răspunsuri."
+                    if i <= existing_count:
+                        self.fields[f"intrebare_{i}"].help_text = (
+                            "Poți corecta formularea/erori de tipar. "
+                            "Nu modifica numărul sau ordinea întrebărilor după ce există răspunsuri."
+                        )
+                    else:
+                        self.fields[f"intrebare_{i}"].help_text = (
+                            "Nu poți adăuga întrebări noi după ce au fost începute/trimise răspunsuri."
+                        )
 
     def clean(self):
         cleaned = super().clean()
@@ -262,6 +271,35 @@ class ChestionarForm(forms.ModelForm):
             raise forms.ValidationError("Adaugă cel puțin o întrebare.")
         if len(intrebari) > 20:
             raise forms.ValidationError("Un chestionar poate avea maximum 20 de întrebări.")
+
+        # Dacă există deja submisii (ciorne sau trimise), permitem doar modificarea textului,
+        # fără a schimba numărul/ordinea întrebărilor (pentru a păstra legătura cu răspunsurile existente).
+        instance = getattr(self, "instance", None)
+        if instance and instance.pk and instance.submisii.exists():
+            existing_qs = list(instance.intrebari.all().order_by("ord"))
+            existing_count = len(existing_qs)
+
+            # În acest caz, formularul trebuie să conțină exact aceleași întrebări (ca număr),
+            # doar cu text actualizat.
+            if len(intrebari) != existing_count:
+                raise forms.ValidationError(
+                    f"Acest chestionar are deja {existing_count} întrebări (există răspunsuri). "
+                    "Poți modifica doar textul lor, fără a schimba numărul."
+                )
+
+            for i in range(1, existing_count + 1):
+                if not (cleaned.get(f"intrebare_{i}") or "").strip():
+                    raise forms.ValidationError(
+                        "Nu poți șterge întrebări după ce există răspunsuri. "
+                        "Poți doar corecta textul întrebărilor existente."
+                    )
+
+            for i in range(existing_count + 1, 21):
+                if (cleaned.get(f"intrebare_{i}") or "").strip():
+                    raise forms.ValidationError(
+                        "Nu poți adăuga întrebări noi după ce există răspunsuri. "
+                        "Creează un chestionar nou dacă ai nevoie de întrebări suplimentare."
+                    )
 
         este_general = bool(cleaned.get("este_general"))
         capitole = cleaned.get("capitole")
@@ -286,14 +324,26 @@ class ChestionarForm(forms.ModelForm):
                 questionnaire.capitole.clear()
                 questionnaire.criterii.clear()
 
-            # Dacă întrebările sunt editabile, refacem lista
-            if not questionnaire.submisii.exists():
+            # Gestionare întrebări:
+            # - dacă NU există submisii: putem recrea lista de întrebări (inclusiv ordine/număr);
+            # - dacă EXISTĂ submisii (ciorne/trimise): actualizăm doar textul întrebărilor existente,
+            #   fără a șterge/adauga întrebări (pentru a păstra legătura cu răspunsurile).
+            if questionnaire.submisii.exists():
+                existing_qs = list(questionnaire.intrebari.all().order_by("ord"))
+                for idx, q in enumerate(existing_qs, start=1):
+                    if idx > 20:
+                        break
+                    new_text = (self.cleaned_data.get(f"intrebare_{idx}") or "").strip()
+                    if new_text and new_text != q.text:
+                        q.text = new_text[:1000]
+                        q.save(update_fields=["text"])
+            else:
                 questionnaire.intrebari.all().delete()
                 ord_no = 1
                 for i in range(1, 21):
-                    text = (self.cleaned_data.get(f"intrebare_{i}") or "").strip()
-                    if text:
-                        Question.objects.create(questionnaire=questionnaire, ord=ord_no, text=text)
+                    q_text = (self.cleaned_data.get(f"intrebare_{i}") or "").strip()
+                    if q_text:
+                        Question.objects.create(questionnaire=questionnaire, ord=ord_no, text=q_text[:1000])
                         ord_no += 1
 
         return questionnaire
