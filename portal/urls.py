@@ -12,6 +12,7 @@ urlpatterns = [
     # Expert
     path("expert/", views.expert_dashboard, name="expert_dashboard"),
     path("expert/profil/", views.expert_profile, name="expert_profile"),
+    path("expert/contacte/", views.expert_contacte, name="expert_contacte"),
     path("expert/preferinte/", views.expert_preferinte, name="expert_preferinte"),
     path("expert/newslettere/", views.expert_newsletters, name="expert_newsletters"),
     path("expert/newslettere/<int:pk>/", views.expert_newsletter_detail, name="expert_newsletter_detail"),

@@ -161,6 +161,85 @@ def expert_profile(request):
 
 
 @user_passes_test(is_expert)
+def expert_contacte(request):
+    """Contactele experților cu domenii comune.
+
+    Experții pot vedea doar contactele altor experți care au alocate aceleași
+    capitole sau foi de parcurs (intersecție non-goală). Telefonul nu este afișat.
+    """
+
+    profil = _get_or_create_profile(request.user)
+    my_chapters = list(profil.capitole.all().order_by("numar"))
+    my_criteria = list(profil.criterii.all().order_by("cod"))
+
+    my_ch_ids = [c.id for c in my_chapters]
+    my_cr_ids = [c.id for c in my_criteria]
+
+    base_qs = (
+        ExpertProfile.objects.select_related("user")
+        .prefetch_related("capitole", "criterii")
+        .filter(user__is_staff=False, user__is_active=True, arhivat=False)
+        .exclude(user=request.user)
+    )
+
+    if my_ch_ids or my_cr_ids:
+        other_profiles = (
+            base_qs.filter(Q(capitole__id__in=my_ch_ids) | Q(criterii__id__in=my_cr_ids))
+            .distinct()
+            .order_by("user__last_name", "user__first_name", "user__username")
+        )
+    else:
+        other_profiles = base_qs.none()
+
+    contacts = []
+    for p in other_profiles:
+        other_ch_ids = {c.id for c in p.capitole.all()}
+        other_cr_ids = {c.id for c in p.criterii.all()}
+
+        shared_chapters = [c for c in my_chapters if c.id in other_ch_ids]
+        shared_criteria = [c for c in my_criteria if c.id in other_cr_ids]
+
+        # Siguranță suplimentară: păstrăm doar dacă există intersecție reală.
+        if not shared_chapters and not shared_criteria:
+            continue
+
+        contacts.append(
+            {
+                "user": p.user,
+                "profil": p,
+                "shared_chapters": shared_chapters,
+                "shared_criteria": shared_criteria,
+            }
+        )
+
+    # Grupări pentru afișare comodă (doar grupurile care au cel puțin un expert)
+    grouped_by_chapter = []
+    for ch in my_chapters:
+        ch_contacts = [c for c in contacts if ch in c["shared_chapters"]]
+        if ch_contacts:
+            grouped_by_chapter.append({"ref": ch, "contacts": ch_contacts})
+
+    grouped_by_criteria = []
+    for cr in my_criteria:
+        cr_contacts = [c for c in contacts if cr in c["shared_criteria"]]
+        if cr_contacts:
+            grouped_by_criteria.append({"ref": cr, "contacts": cr_contacts})
+
+    return render(
+        request,
+        "portal/expert_contacte.html",
+        {
+            "profil": profil,
+            "my_chapters": my_chapters,
+            "my_criteria": my_criteria,
+            "contacts": contacts,
+            "grouped_by_chapter": grouped_by_chapter,
+            "grouped_by_criteria": grouped_by_criteria,
+        },
+    )
+
+
+@user_passes_test(is_expert)
 def expert_preferinte(request):
     profil = _get_or_create_profile(request.user)
 
