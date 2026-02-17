@@ -11,50 +11,7 @@
   </div>
 </div>
 
-<div class="row g-3">
-  <div class="col-lg-4">
-    <div class="card shadow-sm gov-card">
-      <div class="card-body">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-people fs-4"></i>
-          <div>
-            <div class="text-muted small">Experți înregistrați</div>
-            <div class="fs-4 fw-semibold">{{ nr_experti }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-8">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white d-flex align-items-center justify-content-between">
-        <strong><i class="bi bi-ui-checks-grid me-1"></i>Chestionare recente</strong>
-        <a class="btn btn-sm btn-light" href="{% url 'admin_chestionare_list' %}">Vezi toate</a>
-      </div>
-      <div class="card-body">
-        {% if chestionare %}
-          <div class="list-group list-group-flush">
-            {% for c in chestionare %}
-              <a class="list-group-item list-group-item-action" href="{% url 'admin_chestionar_edit' c.pk %}">
-                <div class="d-flex justify-content-between">
-                  <div>
-                    <div class="fw-semibold">{{ c.titlu }}</div>
-                    <div class="text-muted small">Termen: {{ c.termen_limita|date:"d.m.Y H:i" }}</div>
-                  </div>
-                  <span class="badge text-bg-light">ID {{ c.id }}</span>
-                </div>
-              </a>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="text-muted">Nu există chestionare încă.</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="card shadow-sm gov-card mt-4">
+<div class="card shadow-sm gov-card mb-4">
   <div class="card-header bg-white d-flex align-items-center justify-content-between">
     <strong><i class="bi bi-bar-chart-line me-1"></i>Capitole & foi de parcurs — statistică</strong>
     <a class="btn btn-sm btn-light" href="{% url 'admin_referinte' %}"><i class="bi bi-journal-bookmark me-1"></i>Deschide pagina</a>
@@ -155,6 +112,66 @@
     „Rată medie de răspuns” este media ratelor de răspuns ale chestionarelor din capitol / foaie de parcurs.
     Pentru chestionarele închise, procentul rămâne înghețat la termenul limită.
     Ciornele nu sunt incluse.
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm gov-card">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <i class="bi bi-people fs-4"></i>
+          <div>
+            <div class="text-muted small">Experți înregistrați</div>
+            <div class="fs-4 fw-semibold">{{ nr_experti }}</div>
+          </div>
+        </div>
+
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="text-muted small">Total chestionare</div>
+            <div class="fw-semibold">{{ nr_chestionare_total }}</div>
+          </div>
+          <div class="col-6">
+            <div class="text-muted small">Rată globală de răspuns</div>
+            <div class="fw-semibold">{{ rata_globala }}%</div>
+          </div>
+          <div class="col-12">
+            <div class="progress" style="height: 6px;">
+              <div class="progress-bar" role="progressbar" style="width: {{ rata_globala }}%" aria-valuenow="{{ rata_globala }}" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div class="text-muted small mt-2">Rată globală = media ratelor medii pe capitole.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between">
+        <strong><i class="bi bi-ui-checks-grid me-1"></i>Chestionare recente</strong>
+        <a class="btn btn-sm btn-light" href="{% url 'admin_chestionare_list' %}">Vezi toate</a>
+      </div>
+      <div class="card-body">
+        {% if chestionare %}
+          <div class="list-group list-group-flush">
+            {% for c in chestionare %}
+              <a class="list-group-item list-group-item-action" href="{% url 'admin_chestionar_edit' c.pk %}">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <div class="fw-semibold">{{ c.titlu }}</div>
+                    <div class="text-muted small">Termen: {{ c.termen_limita|date:"d.m.Y H:i" }}</div>
+                  </div>
+                  <span class="badge text-bg-light">ID {{ c.id }}</span>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted">Nu există chestionare încă.</div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </div>
 

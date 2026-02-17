@@ -361,6 +361,7 @@ def expert_questionnaire(request, pk: int):
 def admin_dashboard(request):
     chestionare = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")[:10]
     nr_experti = User.objects.filter(is_staff=False, is_active=True).count()
+    nr_chestionare_total = Questionnaire.objects.filter(arhivat=False).count()
 
     # ------------------------------
     # Statistici sintetice: Capitole & foi de parcurs
@@ -581,12 +582,23 @@ def admin_dashboard(request):
 
         grouped_chapter_stats.append((cl, chapter_rows))
 
+    # Rată globală de răspuns = media tuturor mediilor pe capitole.
+    # (Capitole fără chestionare au rata 0.0 în calculele de mai sus.)
+    all_chapter_rates: list[float] = [
+        float(r.get("rata_medie_raspuns") or 0.0)
+        for _cl, rows in grouped_chapter_stats
+        for r in rows
+    ]
+    rata_globala = round(sum(all_chapter_rates) / len(all_chapter_rates), 1) if all_chapter_rates else 0.0
+
     return render(
         request,
         "portal/admin_dashboard.html",
         {
             "chestionare": chestionare,
             "nr_experti": nr_experti,
+            "nr_chestionare_total": nr_chestionare_total,
+            "rata_globala": rata_globala,
             "criterii_stats": criterii_stats,
             "grouped_chapter_stats": grouped_chapter_stats,
         },
