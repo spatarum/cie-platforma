@@ -38,8 +38,8 @@
     <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
       <div class="card-body">
         <div class="stat-label">Răspunsuri primite</div>
-        <div class="stat-value">{{ nr_experti_care_au_raspuns }}</div>
-        <div class="small text-muted">experți unici</div>
+        <div class="stat-value">{{ nr_raspunsuri_primite }}</div>
+        <div class="small text-muted">chestionare trimise</div>
       </div>
     </div>
   </div>
@@ -47,8 +47,8 @@
   <div class="col-md-3">
     <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
       <div class="card-body">
-        <div class="stat-label">Rată de răspuns</div>
-        <div class="stat-value">{{ rata_raspuns }}%</div>
+        <div class="stat-label">Rată medie de răspuns</div>
+        <div class="stat-value">{{ rata_medie_raspuns }}%</div>
       </div>
     </div>
   </div>
@@ -67,6 +67,7 @@
           <th>Chestionar</th>
           <th class="text-nowrap">Termen limită</th>
           <th>Status</th>
+          <th class="text-end">Experți</th>
           <th class="text-end">Au răspuns</th>
           <th class="text-end">%</th>
           <th class="text-end"></th>
@@ -105,6 +106,7 @@
               <span class="badge text-bg-primary ms-1"><i class="bi bi-megaphone me-1"></i>General</span>
             </td>
 
+            <td class="text-end">{{ q.nr_experti_alocati }}</td>
             <td class="text-end">{{ q.nr_respondenti }}</td>
             <td class="text-end">{{ q.proc_respondenti }}%</td>
 
@@ -116,7 +118,7 @@
           </tr>
         {% empty %}
           <tr>
-            <td colspan="6" class="text-muted p-3">Nu există chestionare din categoria «General» încă.</td>
+            <td colspan="7" class="text-muted p-3">Nu există chestionare din categoria «General» încă.</td>
           </tr>
         {% endfor %}
       </tbody>

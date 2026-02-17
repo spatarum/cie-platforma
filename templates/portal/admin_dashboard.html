@@ -54,6 +54,110 @@
   </div>
 </div>
 
+<div class="card shadow-sm gov-card mt-4">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <strong><i class="bi bi-bar-chart-line me-1"></i>Capitole & foi de parcurs — statistică</strong>
+    <a class="btn btn-sm btn-light" href="{% url 'admin_referinte' %}"><i class="bi bi-journal-bookmark me-1"></i>Deschide pagina</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="min-width: 420px;">Foaia de parcurs / Capitolul</th>
+            <th class="text-end" style="width: 140px;">Experți alocați</th>
+            <th class="text-end" style="width: 120px;">Chestionare</th>
+            <th class="text-end" style="width: 170px;">Răspunsuri primite</th>
+            <th class="text-end" style="width: 180px;">Rată medie de răspuns</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="table-secondary">
+            <td colspan="5" class="fw-semibold"><i class="bi bi-flag me-1"></i>Foi de parcurs</td>
+          </tr>
+          {% if criterii_stats %}
+            {% for r in criterii_stats %}
+              <tr>
+                <td>
+                  <a class="text-decoration-none" href="{% url 'admin_criteriu_dashboard' r.obj.pk %}">
+                    <span class="me-2" style="color: {{ r.obj.culoare_ui }};"><i class="bi {{ r.obj.pictograma|default:'bi-flag' }}"></i></span>
+                    <span class="fw-semibold">{{ r.obj.cod }}</span> – {{ r.obj.denumire }}
+                  </a>
+                </td>
+                <td class="text-end fw-semibold">{{ r.nr_experti }}</td>
+                <td class="text-end">{{ r.nr_chestionare }}</td>
+                <td class="text-end">{{ r.nr_raspunsuri }}</td>
+                <td class="text-end">
+                  <div class="d-flex flex-column align-items-end gap-1">
+                    <div class="fw-semibold">{{ r.rata_medie_raspuns }}%</div>
+                    <div class="progress w-100" style="height: 6px; max-width: 160px;">
+                      <div class="progress-bar" role="progressbar" style="width: {{ r.rata_medie_raspuns }}%" aria-valuenow="{{ r.rata_medie_raspuns }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-muted">Nu există foi de parcurs definite.</td>
+            </tr>
+          {% endif %}
+
+          <tr class="table-secondary">
+            <td colspan="5" class="fw-semibold"><i class="bi bi-journal-text me-1"></i>Capitole (grupate pe clustere)</td>
+          </tr>
+
+          {% for cl, rows in grouped_chapter_stats %}
+            <tr class="table-light">
+              <td colspan="5" class="fw-semibold">
+                {% if cl %}
+                  <i class="bi {{ cl.pictograma|default:'bi-grid' }} me-1"></i>{{ cl.cod }}. {{ cl.denumire }}
+                {% else %}
+                  Capitole în afara clusterelor
+                {% endif %}
+              </td>
+            </tr>
+
+            {% for r in rows %}
+              <tr>
+                <td>
+                  <a class="text-decoration-none" href="{% url 'admin_capitol_dashboard' r.obj.pk %}">
+                    <span class="me-2" style="color: {{ r.obj.culoare_ui }};"><i class="bi {{ r.obj.pictograma|default:'bi-journal-text' }}"></i></span>
+                    <span class="fw-semibold">Cap. {{ r.obj.numar }}</span> – {{ r.obj.denumire }}
+                  </a>
+                </td>
+                <td class="text-end fw-semibold">{{ r.nr_experti }}</td>
+                <td class="text-end">{{ r.nr_chestionare }}</td>
+                <td class="text-end">{{ r.nr_raspunsuri }}</td>
+                <td class="text-end">
+                  <div class="d-flex flex-column align-items-end gap-1">
+                    <div class="fw-semibold">{{ r.rata_medie_raspuns }}%</div>
+                    <div class="progress w-100" style="height: 6px; max-width: 160px;">
+                      <div class="progress-bar" role="progressbar" style="width: {{ r.rata_medie_raspuns }}%" aria-valuenow="{{ r.rata_medie_raspuns }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-muted">Nu există capitole în acest cluster.</td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer bg-white small text-muted">
+    <strong>Notă:</strong>
+    „Răspunsuri primite” reprezintă numărul de <em>chestionare trimise</em> (submisii cu status <code>TRIMIS</code>) asociate capitolului / foii de parcurs.
+    Dacă același expert trimite 2 chestionare, acestea sunt numărate ca 2 răspunsuri.
+    „Rată medie de răspuns” este media ratelor de răspuns ale chestionarelor din capitol / foaie de parcurs.
+    Pentru chestionarele închise, procentul rămâne înghețat la termenul limită.
+    Ciornele nu sunt incluse.
+  </div>
+</div>
+
 <div class="mt-4 small text-muted">
   Pentru administrare avansată (utilizatori, modele, etc.) poți folosi și interfața Django Admin: <a href="/django-admin/" target="_blank">/django-admin/</a>
 </div>
