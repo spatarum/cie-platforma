@@ -5,7 +5,11 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
   <div class="d-flex align-items-center gap-2">
-    <a class="btn btn-light btn-sm" href="{% url 'expert_newsletters' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    {% if request.user.is_staff %}
+      <a class="btn btn-light btn-sm" href="{% url 'staff_newsletters' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    {% else %}
+      <a class="btn btn-light btn-sm" href="{% url 'expert_newsletters' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+    {% endif %}
     <div>
       <div class="text-muted small">Newsletter</div>
       <h1 class="h5 mb-0">{{ nl.subiect }}</h1>

@@ -13,6 +13,12 @@
 
 <div class="card shadow-sm gov-card">
   <div class="card-body">
+    {% if not request.user.is_superuser %}
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-1"></i>
+        Ești logat ca <strong>Staff</strong>. Profilul expertului este disponibil doar pentru vizualizare (nu poate fi editat).
+      </div>
+    {% endif %}
     <form method="post" autocomplete="off">
       {% csrf_token %}
       {{ form.non_field_errors }}
@@ -56,7 +62,7 @@
             {{ form.sumar_expertiza.errors }}
           </div>
 
-          {% if form.parola %}
+          {% if request.user.is_superuser and form.parola %}
             <div class="mb-3">
               <label class="form-label fw-semibold">{{ form.parola.label }}</label>
               {{ form.parola }}
@@ -70,7 +76,7 @@
             </div>
           {% endif %}
 
-          {% if form.schimba_parola %}
+          {% if request.user.is_superuser and form.schimba_parola %}
             <div class="border rounded p-3 mt-3">
               <div class="d-flex align-items-start justify-content-between">
                 <div>
@@ -136,8 +142,12 @@
       </div>
 
       <div class="d-flex flex-wrap gap-2 mt-3">
-        <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
-        <a class="btn btn-light" href="{% url 'admin_experti_list' %}">Anulează</a>
+        {% if request.user.is_superuser %}
+          <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
+          <a class="btn btn-light" href="{% url 'admin_experti_list' %}">Anulează</a>
+        {% else %}
+          <a class="btn btn-light" href="{% url 'admin_experti_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -146,6 +156,8 @@
 
 {% block scripts %}
 <script>
+  const canEdit = {{ request.user.is_superuser|yesno:"true,false" }};
+
   document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"], textarea').forEach((el) => {
     el.classList.add('form-control');
   });
@@ -175,7 +187,7 @@
       if (!enabled) el.value = '';
     });
   };
-  if (chk && pwdWrap) {
+  if (canEdit && chk && pwdWrap) {
     setPwdEnabled(chk.checked);
     chk.addEventListener('change', () => setPwdEnabled(chk.checked));
   }

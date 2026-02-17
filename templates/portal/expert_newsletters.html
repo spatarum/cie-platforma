@@ -15,7 +15,11 @@
     {% if newsletters %}
       <div class="list-group">
         {% for n in newsletters %}
-          <a class="list-group-item list-group-item-action" href="{% url 'expert_newsletter_detail' n.pk %}">
+          {% if request.user.is_staff %}
+            <a class="list-group-item list-group-item-action" href="{% url 'staff_newsletter_detail' n.pk %}">
+          {% else %}
+            <a class="list-group-item list-group-item-action" href="{% url 'expert_newsletter_detail' n.pk %}">
+          {% endif %}
             <div class="d-flex justify-content-between align-items-start">
               <div>
                 <div class="fw-semibold">{{ n.subiect }}</div>

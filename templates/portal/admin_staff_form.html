@@ -1,0 +1,76 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}{{ titlu_pagina }} | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
+    <div class="text-muted small">Creează un utilizator de tip <strong>Staff</strong> (doar vizualizare în platformă).</div>
+  </div>
+  <a class="btn btn-light" href="{% url 'admin_staff_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.prenume.label }}</label>
+            {{ form.prenume }}
+            {{ form.prenume.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.nume.label }}</label>
+            {{ form.nume }}
+            {{ form.nume.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.email.label }}</label>
+            {{ form.email }}
+            {{ form.email.errors }}
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="alert alert-light border">
+            <div class="small text-muted">
+              <i class="bi bi-shield-lock me-1"></i>
+              Utilizatorii Staff pot vedea chestionare, răspunsuri și profilurile experților, dar <strong>nu pot modifica</strong> datele.
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.parola.label }}</label>
+            {{ form.parola }}
+            {{ form.parola.errors }}
+            <div class="form-text">Dacă lași gol, platforma generează automat o parolă.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.confirma_parola.label }}</label>
+            {{ form.confirma_parola }}
+            {{ form.confirma_parola.errors }}
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
+        <a class="btn btn-light" href="{% url 'admin_staff_list' %}">Anulează</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"]').forEach((el) => {
+    el.classList.add('form-control');
+  });
+</script>
+{% endblock %}

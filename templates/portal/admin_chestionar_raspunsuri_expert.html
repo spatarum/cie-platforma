@@ -14,7 +14,11 @@
     {% else %}
       <a class="btn btn-light btn-sm" href="{% url 'admin_chestionar_raspunsuri' chestionar.pk %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
     {% endif %}
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_chestionar_edit' chestionar.pk %}"><i class="bi bi-pencil me-1"></i>Editează chestionar</a>
+    {% if request.user.is_superuser %}
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_chestionar_edit' chestionar.pk %}"><i class="bi bi-pencil me-1"></i>Editează chestionar</a>
+    {% else %}
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_chestionar_edit' chestionar.pk %}"><i class="bi bi-eye me-1"></i>Detalii chestionar</a>
+    {% endif %}
   </div>
 </div>
 

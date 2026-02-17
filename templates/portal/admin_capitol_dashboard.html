@@ -16,9 +16,11 @@
     </div>
   </div>
 
-  <a class="btn btn-outline-secondary btn-sm" href="/django-admin/portal/chapter/{{ capitol.pk }}/change/">
-    <i class="bi bi-pencil-square me-1"></i>Editează capitol
-  </a>
+  {% if request.user.is_superuser %}
+    <a class="btn btn-outline-secondary btn-sm" href="/django-admin/portal/chapter/{{ capitol.pk }}/change/">
+      <i class="bi bi-pencil-square me-1"></i>Editează capitol
+    </a>
+  {% endif %}
 </div>
 
 <div class="row g-3 mb-3">
@@ -116,9 +118,15 @@
             <td class="text-end">{{ q.proc_respondenti }}%</td>
 
             <td class="text-end">
-              <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_chestionar_edit' q.pk %}">
-                <i class="bi bi-pencil me-1"></i>Editează
-              </a>
+              {% if request.user.is_superuser %}
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_chestionar_edit' q.pk %}">
+                  <i class="bi bi-pencil me-1"></i>Editează
+                </a>
+              {% else %}
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_chestionar_edit' q.pk %}">
+                  <i class="bi bi-eye me-1"></i>Detalii
+                </a>
+              {% endif %}
             </td>
           </tr>
         {% empty %}

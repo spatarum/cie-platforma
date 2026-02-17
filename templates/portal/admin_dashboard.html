@@ -1,14 +1,17 @@
 {% extends 'portal/base.html' %}
 
-{% block title %}Panou administrator | Platforma experți CIE{% endblock %}
+{% block title %}Panou | Platforma experți CIE{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <h1 class="h5 mb-0">Panou administrator</h1>
-  <div class="d-flex gap-2">
-    <a class="btn btn-primary btn-sm" href="{% url 'admin_chestionar_create' %}"><i class="bi bi-plus-lg me-1"></i>Chestionar nou</a>
-    <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_expert_create' %}"><i class="bi bi-person-plus me-1"></i>Expert nou</a>
-  </div>
+  <h1 class="h5 mb-0">{% if request.user.is_superuser %}Panou administrator{% else %}Panou staff{% endif %}</h1>
+  {% if request.user.is_superuser %}
+    <div class="d-flex gap-2">
+      <a class="btn btn-primary btn-sm" href="{% url 'admin_chestionar_create' %}"><i class="bi bi-plus-lg me-1"></i>Chestionar nou</a>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_expert_create' %}"><i class="bi bi-person-plus me-1"></i>Expert nou</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_staff_create' %}"><i class="bi bi-person-badge me-1"></i>Staff nou</a>
+    </div>
+  {% endif %}
 </div>
 
 <div class="card shadow-sm gov-card mb-4">
@@ -175,7 +178,9 @@
   </div>
 </div>
 
-<div class="mt-4 small text-muted">
-  Pentru administrare avansată (utilizatori, modele, etc.) poți folosi și interfața Django Admin: <a href="/django-admin/" target="_blank">/django-admin/</a>
-</div>
+{% if request.user.is_superuser %}
+  <div class="mt-4 small text-muted">
+    Pentru administrare avansată (utilizatori, modele, etc.) poți folosi și interfața Django Admin: <a href="/django-admin/" target="_blank">/django-admin/</a>
+  </div>
+{% endif %}
 {% endblock %}
