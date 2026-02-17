@@ -142,7 +142,38 @@ class ExpertUpdateForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3}),
     )
 
-    parola_noua = forms.CharField(label="Parolă nouă (opțional)", required=False, widget=forms.PasswordInput)
+    # Schimbarea parolei trebuie să fie explicită (opt-in). Administratorii trebuie
+    # să poată actualiza datele expertului fără să fie obligați să completeze o parolă.
+    # În plus, unele password-managers pot completa automat câmpurile de tip password;
+    # de aceea folosim un toggle + validare doar când e bifat.
+    schimba_parola = forms.BooleanField(
+        label="Schimbă parola",
+        required=False,
+        help_text="Bifează doar dacă vrei să setezi o parolă nouă pentru acest expert.",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    parola_noua = forms.CharField(
+        label="Parolă nouă",
+        required=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "new-password",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+            }
+        ),
+    )
+    confirma_parola_noua = forms.CharField(
+        label="Confirmă parola nouă",
+        required=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "new-password",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+            }
+        ),
+    )
 
     capitole = forms.ModelMultipleChoiceField(
         label="Capitole (domenii de expertiză)",
@@ -175,6 +206,23 @@ class ExpertUpdateForm(forms.Form):
             }
         )
 
+    def clean(self):
+        cleaned = super().clean()
+        change = bool(cleaned.get("schimba_parola"))
+        p1 = (cleaned.get("parola_noua") or "").strip()
+        p2 = (cleaned.get("confirma_parola_noua") or "").strip()
+
+        if change:
+            if not p1:
+                self.add_error("parola_noua", "Introdu parola nouă.")
+            if p1 and p1 != p2:
+                self.add_error("confirma_parola_noua", "Parolele nu coincid.")
+        else:
+            # Dacă nu se schimbă parola, ignorăm complet câmpurile (inclusiv autofill).
+            cleaned["parola_noua"] = ""
+            cleaned["confirma_parola_noua"] = ""
+        return cleaned
+
     def save(self) -> None:
         user = self.user
         user.first_name = self.cleaned_data.get("prenume", "").strip()
@@ -195,7 +243,7 @@ class ExpertUpdateForm(forms.Form):
         profil.criterii.set(self.cleaned_data.get("criterii"))
 
         parola_noua = (self.cleaned_data.get("parola_noua") or "").strip()
-        if parola_noua:
+        if self.cleaned_data.get("schimba_parola") and parola_noua:
             user.set_password(parola_noua)
             user.save()
 

@@ -28,8 +28,20 @@ from .forms import (
     ExpertPreferinteForm,
     NewsletterForm,
 )
-from .models import Answer, Chapter, Criterion, ExpertProfile, ImportRun, Question, Questionnaire, Submission, Newsletter
+from .models import (
+    Answer,
+    Chapter,
+    Criterion,
+    ExpertProfile,
+    ImportRun,
+    Question,
+    Questionnaire,
+    Submission,
+    Newsletter,
+    QuestionnaireScopeSnapshot,
+)
 from .notifications import send_new_questionnaire_emails, send_newsletter_emails
+from .stats import get_questionnaire_rate_and_counts, ensure_scope_snapshot
 from .utils import group_chapters_by_cluster
 
 
@@ -348,11 +360,236 @@ def expert_questionnaire(request, pk: int):
 @user_passes_test(is_admin)
 def admin_dashboard(request):
     chestionare = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")[:10]
-    experti = User.objects.filter(is_staff=False, is_active=True).count()
+    nr_experti = User.objects.filter(is_staff=False, is_active=True).count()
+
+    # ------------------------------
+    # Statistici sintetice: Capitole & foi de parcurs
+    # ------------------------------
+    criterii = list(Criterion.objects.all().order_by("cod"))
+    grouped_chapters = group_chapters_by_cluster()
+
+    # 1) Alocări (doar experți activi, non-admin)
+    profiles = (
+        ExpertProfile.objects.select_related("user")
+        .filter(user__is_active=True, user__is_staff=False)
+        .prefetch_related("capitole", "criterii")
+    )
+
+    chapter_alloc: dict[int, set[int]] = {}
+    criterion_alloc: dict[int, set[int]] = {}
+    for p in profiles:
+        uid = p.user_id
+        for ch in p.capitole.all():
+            chapter_alloc.setdefault(ch.id, set()).add(uid)
+        for cr in p.criterii.all():
+            criterion_alloc.setdefault(cr.id, set()).add(uid)
+
+    # 2) Chestionare (doar nearhivate)
+    q_all = (
+        Questionnaire.objects.filter(arhivat=False)
+        .prefetch_related("capitole", "criterii")
+        .only("id", "termen_limita")
+    )
+    q_by_id: dict[int, Questionnaire] = {q.id: q for q in q_all}
+
+    chapter_q: dict[int, set[int]] = {}
+    criterion_q: dict[int, set[int]] = {}
+    for q in q_all:
+        qid = q.id
+        for ch in q.capitole.all():
+            chapter_q.setdefault(ch.id, set()).add(qid)
+        for cr in q.criterii.all():
+            criterion_q.setdefault(cr.id, set()).add(qid)
+
+    now = timezone.now()
+
+    def _avg(vals: list[float]) -> float:
+        return round(sum(vals) / len(vals), 1) if vals else 0.0
+
+    # ---- Foi de parcurs (criterii) ----
+    criterii_stats = []
+    for cr in criterii:
+        alloc = criterion_alloc.get(cr.id, set())
+        nr_experti_cr = len(alloc)
+
+        qids = list(criterion_q.get(cr.id, set()))
+        nr_chestionare_cr = len(qids)
+        if nr_chestionare_cr == 0:
+            criterii_stats.append(
+                {
+                    "obj": cr,
+                    "nr_experti": nr_experti_cr,
+                    "nr_chestionare": 0,
+                    "nr_raspunsuri": 0,
+                    "rata_medie_raspuns": 0.0,
+                }
+            )
+            continue
+
+        open_ids = [qid for qid in qids if q_by_id.get(qid) and q_by_id[qid].termen_limita >= now]
+        closed_ids = [qid for qid in qids if q_by_id.get(qid) and q_by_id[qid].termen_limita < now]
+
+        # Open: număr submisii TRIMIS per chestionar (în cadrul criteriului)
+        open_counts: dict[int, int] = {}
+        if open_ids:
+            rows = (
+                Submission.objects.filter(
+                    status=Submission.STATUS_TRIMIS,
+                    questionnaire_id__in=open_ids,
+                    questionnaire__arhivat=False,
+                    expert__is_active=True,
+                    expert__is_staff=False,
+                    expert__profil_expert__criterii=cr,
+                )
+                .values("questionnaire_id")
+                .annotate(cnt=Count("id", distinct=True))
+            )
+            open_counts = {r["questionnaire_id"]: r["cnt"] for r in rows}
+
+        # Closed: snapshot-uri înghețate
+        scope_key = QuestionnaireScopeSnapshot.make_scope_key(
+            QuestionnaireScopeSnapshot.SCOPE_CRITERION, criterion_id=cr.id
+        )
+        snap_map: dict[int, QuestionnaireScopeSnapshot] = {
+            s.questionnaire_id: s
+            for s in QuestionnaireScopeSnapshot.objects.filter(
+                questionnaire_id__in=closed_ids,
+                scope_key=scope_key,
+            )
+        }
+        for qid in closed_ids:
+            if qid not in snap_map and q_by_id.get(qid):
+                snap_map[qid] = ensure_scope_snapshot(
+                    q_by_id[qid],
+                    scope=QuestionnaireScopeSnapshot.SCOPE_CRITERION,
+                    criterion=cr,
+                )
+
+        # Agregare
+        total_responses = 0
+        rates: list[float] = []
+
+        for qid in open_ids:
+            num = int(open_counts.get(qid, 0))
+            total_responses += num
+            den = nr_experti_cr
+            rates.append(round((num / den) * 100, 1) if den else 0.0)
+
+        for qid in closed_ids:
+            snap = snap_map.get(qid)
+            if snap:
+                total_responses += int(snap.nr_raspunsuri or 0)
+                rates.append(float(snap.rata or 0.0))
+            else:
+                rates.append(0.0)
+
+        criterii_stats.append(
+            {
+                "obj": cr,
+                "nr_experti": nr_experti_cr,
+                "nr_chestionare": nr_chestionare_cr,
+                "nr_raspunsuri": total_responses,
+                "rata_medie_raspuns": _avg(rates),
+            }
+        )
+
+    # ---- Capitole (grupate pe clustere) ----
+    grouped_chapter_stats = []
+    for cl, chapters in grouped_chapters:
+        chapter_rows = []
+        for ch in chapters:
+            alloc = chapter_alloc.get(ch.id, set())
+            nr_experti_ch = len(alloc)
+
+            qids = list(chapter_q.get(ch.id, set()))
+            nr_chestionare_ch = len(qids)
+            if nr_chestionare_ch == 0:
+                chapter_rows.append(
+                    {
+                        "obj": ch,
+                        "nr_experti": nr_experti_ch,
+                        "nr_chestionare": 0,
+                        "nr_raspunsuri": 0,
+                        "rata_medie_raspuns": 0.0,
+                    }
+                )
+                continue
+
+            open_ids = [qid for qid in qids if q_by_id.get(qid) and q_by_id[qid].termen_limita >= now]
+            closed_ids = [qid for qid in qids if q_by_id.get(qid) and q_by_id[qid].termen_limita < now]
+
+            open_counts: dict[int, int] = {}
+            if open_ids:
+                rows = (
+                    Submission.objects.filter(
+                        status=Submission.STATUS_TRIMIS,
+                        questionnaire_id__in=open_ids,
+                        questionnaire__arhivat=False,
+                        expert__is_active=True,
+                        expert__is_staff=False,
+                        expert__profil_expert__capitole=ch,
+                    )
+                    .values("questionnaire_id")
+                    .annotate(cnt=Count("id", distinct=True))
+                )
+                open_counts = {r["questionnaire_id"]: r["cnt"] for r in rows}
+
+            scope_key = QuestionnaireScopeSnapshot.make_scope_key(
+                QuestionnaireScopeSnapshot.SCOPE_CHAPTER, chapter_id=ch.id
+            )
+            snap_map: dict[int, QuestionnaireScopeSnapshot] = {
+                s.questionnaire_id: s
+                for s in QuestionnaireScopeSnapshot.objects.filter(
+                    questionnaire_id__in=closed_ids,
+                    scope_key=scope_key,
+                )
+            }
+            for qid in closed_ids:
+                if qid not in snap_map and q_by_id.get(qid):
+                    snap_map[qid] = ensure_scope_snapshot(
+                        q_by_id[qid],
+                        scope=QuestionnaireScopeSnapshot.SCOPE_CHAPTER,
+                        chapter=ch,
+                    )
+
+            total_responses = 0
+            rates: list[float] = []
+
+            for qid in open_ids:
+                num = int(open_counts.get(qid, 0))
+                total_responses += num
+                den = nr_experti_ch
+                rates.append(round((num / den) * 100, 1) if den else 0.0)
+
+            for qid in closed_ids:
+                snap = snap_map.get(qid)
+                if snap:
+                    total_responses += int(snap.nr_raspunsuri or 0)
+                    rates.append(float(snap.rata or 0.0))
+                else:
+                    rates.append(0.0)
+
+            chapter_rows.append(
+                {
+                    "obj": ch,
+                    "nr_experti": nr_experti_ch,
+                    "nr_chestionare": nr_chestionare_ch,
+                    "nr_raspunsuri": total_responses,
+                    "rata_medie_raspuns": _avg(rates),
+                }
+            )
+
+        grouped_chapter_stats.append((cl, chapter_rows))
+
     return render(
         request,
         "portal/admin_dashboard.html",
-        {"chestionare": chestionare, "nr_experti": experti},
+        {
+            "chestionare": chestionare,
+            "nr_experti": nr_experti,
+            "criterii_stats": criterii_stats,
+            "grouped_chapter_stats": grouped_chapter_stats,
+        },
     )
 
 
@@ -1223,6 +1460,7 @@ def admin_expert_edit(request, pk: int):
 
 
 @user_passes_test(is_admin)
+@user_passes_test(is_admin)
 def admin_referinte(request):
     grouped = group_chapters_by_cluster()
     criterii = Criterion.objects.all().order_by("cod")
@@ -1253,36 +1491,24 @@ def admin_general_dashboard(request):
     chestionare = list(chestionare_qs)
     nr_chestionare = len(chestionare)
 
-    for q in chestionare:
-        if nr_experti == 0:
-            q.nr_respondenti = 0
-            q.proc_respondenti = 0
-            q.respondenti = []
-            continue
+    total_raspunsuri_primite = 0
+    rates: list[float] = []
 
-        resp_ids_qs = (
-            Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
-            .filter(status=Submission.STATUS_TRIMIS)
-            .values_list("expert_id", flat=True)
-            .distinct()
+    for q in chestionare:
+        nr_experti_q, nr_raspunsuri_q, rata_q, resp_ids = get_questionnaire_rate_and_counts(
+            questionnaire=q,
+            scope=QuestionnaireScopeSnapshot.SCOPE_GENERAL,
         )
-        resp_ids = list(resp_ids_qs)
-        q.nr_respondenti = len(resp_ids)
-        q.proc_respondenti = round((q.nr_respondenti / nr_experti) * 100, 1)
+
+        q.nr_experti_alocati = nr_experti_q
+        q.nr_respondenti = nr_raspunsuri_q
+        q.proc_respondenti = rata_q
         q.respondenti = list(User.objects.filter(id__in=resp_ids).order_by("last_name", "first_name"))
 
-    if nr_experti and nr_chestionare:
-        nr_experti_care_au_raspuns = (
-            Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
-            .filter(status=Submission.STATUS_TRIMIS)
-            .values("expert_id")
-            .distinct()
-            .count()
-        )
-    else:
-        nr_experti_care_au_raspuns = 0
+        total_raspunsuri_primite += int(nr_raspunsuri_q or 0)
+        rates.append(float(rata_q or 0.0))
 
-    rata_raspuns = round((nr_experti_care_au_raspuns / nr_experti) * 100, 1) if nr_experti else 0
+    rata_medie_raspuns = round((sum(rates) / len(rates)), 1) if rates else 0.0
 
     return render(
         request,
@@ -1290,8 +1516,8 @@ def admin_general_dashboard(request):
         {
             "nr_experti": nr_experti,
             "nr_chestionare": nr_chestionare,
-            "nr_experti_care_au_raspuns": nr_experti_care_au_raspuns,
-            "rata_raspuns": rata_raspuns,
+            "nr_raspunsuri_primite": total_raspunsuri_primite,
+            "rata_medie_raspuns": rata_medie_raspuns,
             "chestionare": chestionare,
         },
     )
@@ -1319,38 +1545,30 @@ def admin_capitol_dashboard(request, pk: int):
     chestionare = list(chestionare_qs)
     nr_chestionare = len(chestionare)
 
-    # Per chestionar: respondenti + procent
-    for q in chestionare:
-        if nr_experti == 0:
-            q.nr_respondenti = 0
-            q.proc_respondenti = 0
-            q.respondenti = []
-            continue
+    # Per chestionar:
+    # - "Au răspuns" = nr. submisii TRIMIS (un chestionar trimis = 1 răspuns)
+    # - "%" = rata de răspuns pentru acel chestionar
+    # Pentru chestionarele închise folosim snapshot (înghețat la termen).
+    total_raspunsuri_primite = 0
+    rates: list[float] = []
 
-        resp_ids_qs = (
-            Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
-            .filter(status=Submission.STATUS_TRIMIS)
-            .values_list("expert_id", flat=True)
-            .distinct()
+    for q in chestionare:
+        nr_experti_q, nr_raspunsuri_q, rata_q, resp_ids = get_questionnaire_rate_and_counts(
+            questionnaire=q,
+            scope=QuestionnaireScopeSnapshot.SCOPE_CHAPTER,
+            chapter=capitol,
         )
-        resp_ids = list(resp_ids_qs)
-        q.nr_respondenti = len(resp_ids)
-        q.proc_respondenti = round((q.nr_respondenti / nr_experti) * 100, 1)
+
+        # UI
+        q.nr_experti_alocati = nr_experti_q
+        q.nr_respondenti = nr_raspunsuri_q
+        q.proc_respondenti = rata_q
         q.respondenti = list(User.objects.filter(id__in=resp_ids).order_by("last_name", "first_name"))
 
-    # La nivel de capitol: experți unici care au răspuns la cel puțin un chestionar din acest capitol
-    if nr_experti and nr_chestionare:
-        nr_experti_care_au_raspuns = (
-            Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
-            .filter(status=Submission.STATUS_TRIMIS)
-            .values("expert_id")
-            .distinct()
-            .count()
-        )
-    else:
-        nr_experti_care_au_raspuns = 0
+        total_raspunsuri_primite += int(nr_raspunsuri_q or 0)
+        rates.append(float(rata_q or 0.0))
 
-    rata_raspuns = round((nr_experti_care_au_raspuns / nr_experti) * 100, 1) if nr_experti else 0
+    rata_medie_raspuns = round((sum(rates) / len(rates)), 1) if rates else 0.0
 
     return render(
         request,
@@ -1359,8 +1577,8 @@ def admin_capitol_dashboard(request, pk: int):
             "capitol": capitol,
             "nr_experti": nr_experti,
             "nr_chestionare": nr_chestionare,
-            "nr_experti_care_au_raspuns": nr_experti_care_au_raspuns,
-            "rata_raspuns": rata_raspuns,
+            "nr_raspunsuri_primite": total_raspunsuri_primite,
+            "rata_medie_raspuns": rata_medie_raspuns,
             "chestionare": chestionare,
         },
     )
@@ -1387,36 +1605,25 @@ def admin_criteriu_dashboard(request, pk: int):
     chestionare = list(chestionare_qs)
     nr_chestionare = len(chestionare)
 
-    for q in chestionare:
-        if nr_experti == 0:
-            q.nr_respondenti = 0
-            q.proc_respondenti = 0
-            q.respondenti = []
-            continue
+    total_raspunsuri_primite = 0
+    rates: list[float] = []
 
-        resp_ids_qs = (
-            Submission.objects.filter(questionnaire=q, expert_id__in=expert_ids)
-            .filter(status=Submission.STATUS_TRIMIS)
-            .values_list("expert_id", flat=True)
-            .distinct()
+    for q in chestionare:
+        nr_experti_q, nr_raspunsuri_q, rata_q, resp_ids = get_questionnaire_rate_and_counts(
+            questionnaire=q,
+            scope=QuestionnaireScopeSnapshot.SCOPE_CRITERION,
+            criterion=criteriu,
         )
-        resp_ids = list(resp_ids_qs)
-        q.nr_respondenti = len(resp_ids)
-        q.proc_respondenti = round((q.nr_respondenti / nr_experti) * 100, 1)
+
+        q.nr_experti_alocati = nr_experti_q
+        q.nr_respondenti = nr_raspunsuri_q
+        q.proc_respondenti = rata_q
         q.respondenti = list(User.objects.filter(id__in=resp_ids).order_by("last_name", "first_name"))
 
-    if nr_experti and nr_chestionare:
-        nr_experti_care_au_raspuns = (
-            Submission.objects.filter(questionnaire__in=chestionare, expert_id__in=expert_ids)
-            .filter(status=Submission.STATUS_TRIMIS)
-            .values("expert_id")
-            .distinct()
-            .count()
-        )
-    else:
-        nr_experti_care_au_raspuns = 0
+        total_raspunsuri_primite += int(nr_raspunsuri_q or 0)
+        rates.append(float(rata_q or 0.0))
 
-    rata_raspuns = round((nr_experti_care_au_raspuns / nr_experti) * 100, 1) if nr_experti else 0
+    rata_medie_raspuns = round((sum(rates) / len(rates)), 1) if rates else 0.0
 
     return render(
         request,
@@ -1425,8 +1632,8 @@ def admin_criteriu_dashboard(request, pk: int):
             "criteriu": criteriu,
             "nr_experti": nr_experti,
             "nr_chestionare": nr_chestionare,
-            "nr_experti_care_au_raspuns": nr_experti_care_au_raspuns,
-            "rata_raspuns": rata_raspuns,
+            "nr_raspunsuri_primite": total_raspunsuri_primite,
+            "rata_medie_raspuns": rata_medie_raspuns,
             "chestionare": chestionare,
         },
     )

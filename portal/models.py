@@ -165,6 +165,111 @@ class Questionnaire(models.Model):
         return timezone.now() <= self.termen_limita
 
 
+class QuestionnaireScopeSnapshot(models.Model):
+    """Snapshot (înghețare) pentru rata de răspuns la închiderea unui chestionar.
+
+    De ce există:
+    - Pentru chestionarele închise, rata de răspuns NU trebuie să se modifice dacă ulterior apar
+      experți noi (sau se modifică alocările).
+    - Pentru paginile de capitol / foaie de parcurs (criteriu) și statistica sintetică din Panou,
+      avem nevoie de un număr de experți (denominator) "înghețat" la termenul limită.
+
+    Snapshot-urile sunt pe "scope":
+      - GENERAL: pentru chestionare generale
+      - CHAPTER: pentru un capitol
+      - CRITERION: pentru o foaie de parcurs
+    """
+
+    SCOPE_GENERAL = "GENERAL"
+    SCOPE_CHAPTER = "CHAPTER"
+    SCOPE_CRITERION = "CRITERION"
+
+    SCOPE_CHOICES = [
+        (SCOPE_GENERAL, "General"),
+        (SCOPE_CHAPTER, "Capitol"),
+        (SCOPE_CRITERION, "Foaie de parcurs"),
+    ]
+
+    questionnaire = models.ForeignKey(
+        Questionnaire,
+        on_delete=models.CASCADE,
+        related_name="scope_snapshots",
+    )
+
+    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, db_index=True)
+    # Cheie stabilă (evită problemele de unicitate cu NULL):
+    #   GENERAL
+    #   CH:<chapter_id>
+    #   CR:<criterion_id>
+    scope_key = models.CharField(max_length=64, db_index=True)
+
+    chapter = models.ForeignKey(
+        Chapter,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="questionnaire_scope_snapshots",
+    )
+    criterion = models.ForeignKey(
+        Criterion,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="questionnaire_scope_snapshots",
+    )
+
+    frozen_for_deadline = models.DateTimeField(
+        help_text="Termenul limită al chestionarului pentru care au fost înghețate valorile.",
+    )
+    frozen_la = models.DateTimeField(auto_now_add=True)
+
+    # Denominator / numerator înghețate la termen:
+    nr_experti = models.PositiveIntegerField(default=0)
+    nr_raspunsuri = models.PositiveIntegerField(default=0)
+
+    # Pentru afișare comodă (badge-uri), păstrăm și ID-urile experților care au trimis.
+    # (Lista poate fi goală; nu e folosită pentru calcule, ci pentru UI.)
+    respondent_ids = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        verbose_name = "Snapshot rată răspuns"
+        verbose_name_plural = "Snapshot-uri rată răspuns"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["questionnaire", "scope_key"],
+                name="uniq_questionnaire_scope_snapshot",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Snapshot {self.scope_key} – Q{self.questionnaire_id}"
+
+    @staticmethod
+    def make_scope_key(scope: str, chapter_id: int | None = None, criterion_id: int | None = None) -> str:
+        if scope == QuestionnaireScopeSnapshot.SCOPE_GENERAL:
+            return "GENERAL"
+        if scope == QuestionnaireScopeSnapshot.SCOPE_CHAPTER:
+            return f"CH:{int(chapter_id)}"
+        if scope == QuestionnaireScopeSnapshot.SCOPE_CRITERION:
+            return f"CR:{int(criterion_id)}"
+        raise ValueError("Scope invalid")
+
+    @property
+    def rata(self) -> float:
+        return round((self.nr_raspunsuri / self.nr_experti) * 100, 1) if self.nr_experti else 0.0
+
+    def save(self, *args, **kwargs):
+        if not self.scope_key:
+            self.scope_key = self.make_scope_key(
+                self.scope,
+                chapter_id=self.chapter_id,
+                criterion_id=self.criterion_id,
+            )
+        if not self.frozen_for_deadline:
+            self.frozen_for_deadline = self.questionnaire.termen_limita
+        return super().save(*args, **kwargs)
+
+
 class Newsletter(models.Model):
     """Newsletter trimis către toți experții."""
 
