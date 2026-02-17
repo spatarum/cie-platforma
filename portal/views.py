@@ -11,6 +11,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q, Count
 from django.http import Http404, HttpResponse
@@ -22,6 +23,7 @@ from .forms import (
     ChestionarForm,
     ExpertCreateForm,
     ExpertUpdateForm,
+    StaffCreateForm,
     ExpertImportCSVForm,
     QuestionnaireImportCSVForm,
     RaspunsChestionarForm,
@@ -46,7 +48,27 @@ from .utils import group_chapters_by_cluster
 
 
 def is_admin(user: User) -> bool:
-    return user.is_authenticated and user.is_staff
+    """Administrator (platformă).
+
+    În platformă distingem 3 tipuri:
+      - Expert: user.is_staff == False
+      - Staff: user.is_staff == True și user.is_superuser == False (doar vizualizare)
+      - Administrator: user.is_staff == True și user.is_superuser == True (editare)
+
+    NOTĂ: păstrăm user.is_staff pentru Django Admin. Pentru a nu permite accesul staff-ului
+    la /django-admin/, restricționăm Django Admin la superuser (vezi cie_platform/urls.py).
+    """
+    return bool(user.is_authenticated and user.is_staff and user.is_superuser)
+
+
+def is_internal(user: User) -> bool:
+    """Utilizator intern (Administrator sau Staff)."""
+    return bool(user.is_authenticated and user.is_staff)
+
+
+def is_staff_user(user: User) -> bool:
+    """Staff (doar vizualizare)."""
+    return bool(user.is_authenticated and user.is_staff and not user.is_superuser)
 
 
 def is_expert(user: User) -> bool:
@@ -306,6 +328,22 @@ def expert_newsletter_detail(request, pk: int):
     return render(request, "portal/expert_newsletter_detail.html", {"nl": nl})
 
 
+# -------------------- STAFF (read-only) --------------------
+
+
+@user_passes_test(is_internal)
+def staff_newsletters(request):
+    """Vizualizare newslettere (doar cele trimise), la fel ca la experți."""
+    newsletters = Newsletter.objects.filter(trimis_la__isnull=False).order_by("-trimis_la", "-creat_la")
+    return render(request, "portal/expert_newsletters.html", {"newsletters": newsletters})
+
+
+@user_passes_test(is_internal)
+def staff_newsletter_detail(request, pk: int):
+    nl = get_object_or_404(Newsletter, pk=pk, trimis_la__isnull=False)
+    return render(request, "portal/expert_newsletter_detail.html", {"nl": nl})
+
+
 @user_passes_test(is_expert)
 def expert_questionnaire(request, pk: int):
     chestionar = get_object_or_404(Questionnaire, pk=pk)
@@ -357,7 +395,7 @@ def expert_questionnaire(request, pk: int):
 # -------------------- ADMIN --------------------
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_dashboard(request):
     chestionare = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")[:10]
     nr_experti = User.objects.filter(is_staff=False, is_active=True).count()
@@ -698,7 +736,7 @@ def admin_newsletter_send(request, pk: int):
         {"nl": nl, "nr_destinatari": nr_destinatari},
     )
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_questionnaire_list(request):
     # Număr de răspunsuri = doar submisiile TRIMIS (nu includem ciornele)
     chestionare = (
@@ -750,9 +788,15 @@ def admin_questionnaire_create(request):
     )
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_questionnaire_edit(request, pk: int):
     chestionar = get_object_or_404(Questionnaire, pk=pk)
+
+    can_edit = is_admin(request.user)
+
+    # Staff = doar vizualizare (fără editare).
+    if request.method == "POST" and not can_edit:
+        raise PermissionDenied
 
     if request.method == "POST":
         form = ChestionarForm(request.POST, instance=chestionar)
@@ -762,6 +806,10 @@ def admin_questionnaire_edit(request, pk: int):
             return redirect("admin_chestionar_edit", pk=pk)
     else:
         form = ChestionarForm(instance=chestionar)
+
+    if not can_edit:
+        for f in form.fields.values():
+            f.disabled = True
 
     question_fields = [form[f"intrebare_{i}"] for i in range(1, 21)]
 
@@ -776,7 +824,8 @@ def admin_questionnaire_edit(request, pk: int):
         {
             "form": form,
             "chestionar": chestionar,
-            "titlu_pagina": "Editare chestionar",
+            "titlu_pagina": "Editare chestionar" if can_edit else "Detalii chestionar",
+            "can_edit": can_edit,
             "total_raspunsuri": total_raspunsuri,
             "ciorne": ciorne,
             "trimise": trimise,
@@ -785,10 +834,42 @@ def admin_questionnaire_edit(request, pk: int):
     )
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_expert_list(request):
     experti = User.objects.filter(is_staff=False, is_active=True).order_by("last_name", "first_name")
     return render(request, "portal/admin_experti_list.html", {"experti": experti})
+
+
+# -------------------- STAFF users (administrare) --------------------
+
+
+@user_passes_test(is_admin)
+def admin_staff_list(request):
+    """Listă utilizatori de tip Staff (doar admin)."""
+    staff_users = (
+        User.objects.filter(is_staff=True, is_superuser=False)
+        .order_by("last_name", "first_name", "username")
+    )
+    return render(request, "portal/admin_staff_list.html", {"staff_users": staff_users})
+
+
+@user_passes_test(is_admin)
+def admin_staff_create(request):
+    """Creează utilizator Staff (doar admin)."""
+    if request.method == "POST":
+        form = StaffCreateForm(request.POST)
+        if form.is_valid():
+            user, parola_generata = form.save()
+            messages.success(request, f"Utilizatorul Staff a fost creat. Parolă: {parola_generata}")
+            return redirect("admin_staff_list")
+    else:
+        form = StaffCreateForm()
+
+    return render(
+        request,
+        "portal/admin_staff_form.html",
+        {"form": form, "titlu_pagina": "Staff nou"},
+    )
 
 
 # -------------------- IMPORT experți (CSV) --------------------
@@ -1446,12 +1527,18 @@ def admin_expert_create(request):
     )
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_expert_edit(request, pk: int):
     user = get_object_or_404(User, pk=pk)
     if user.is_staff:
-        messages.error(request, "Acest utilizator este administrator.")
+        messages.error(request, "Acest utilizator este intern (Administrator/Staff), nu expert.")
         return redirect("admin_experti_list")
+
+    can_edit = is_admin(request.user)
+
+    # Staff = doar vizualizare (fără editare).
+    if request.method == "POST" and not can_edit:
+        raise PermissionDenied
 
     if request.method == "POST":
         form = ExpertUpdateForm(request.POST, user=user)
@@ -1462,17 +1549,26 @@ def admin_expert_edit(request, pk: int):
     else:
         form = ExpertUpdateForm(user=user)
 
+    if not can_edit:
+        for f in form.fields.values():
+            f.disabled = True
+
     profil = _get_or_create_profile(user)
 
     return render(
         request,
         "portal/admin_expert_form.html",
-        {"form": form, "titlu_pagina": "Editare expert", "expert_user": user, "profil": profil},
+        {
+            "form": form,
+            "titlu_pagina": "Editare expert" if can_edit else "Detalii expert",
+            "expert_user": user,
+            "profil": profil,
+            "can_edit": can_edit,
+        },
     )
 
 
-@user_passes_test(is_admin)
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_referinte(request):
     grouped = group_chapters_by_cluster()
     criterii = Criterion.objects.all().order_by("cod")
@@ -1483,7 +1579,7 @@ def admin_referinte(request):
     )
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_general_dashboard(request):
     """Dashboard pentru categoria «General» (chestionare pentru toți experții)."""
 
@@ -1537,7 +1633,7 @@ def admin_general_dashboard(request):
 
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_capitol_dashboard(request, pk: int):
     capitol = get_object_or_404(Chapter, pk=pk)
 
@@ -1597,7 +1693,7 @@ def admin_capitol_dashboard(request, pk: int):
 
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_criteriu_dashboard(request, pk: int):
     criteriu = get_object_or_404(Criterion, pk=pk)
 
@@ -1652,7 +1748,7 @@ def admin_criteriu_dashboard(request, pk: int):
 
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_export(request):
     chestionare_all = Questionnaire.objects.filter(arhivat=False).order_by("-creat_la")
     chapters_all = Chapter.objects.all().order_by("numar")
@@ -1840,7 +1936,7 @@ def admin_chestionar_restabilire(request, pk: int):
 # -------------------- RĂSPUNSURI (dashboard avansat) --------------------
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_chestionar_raspunsuri(request, pk: int):
     chestionar = get_object_or_404(Questionnaire, pk=pk)
 
@@ -1879,7 +1975,7 @@ def admin_chestionar_raspunsuri(request, pk: int):
     )
 
 
-@user_passes_test(is_admin)
+@user_passes_test(is_internal)
 def admin_chestionar_raspunsuri_expert(request, pk: int, expert_id: int):
     chestionar = get_object_or_404(Questionnaire, pk=pk)
     expert = get_object_or_404(User, pk=expert_id)

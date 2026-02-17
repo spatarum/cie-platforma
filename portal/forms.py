@@ -115,6 +115,64 @@ class ExpertCreateForm(forms.Form):
         return user, parola
 
 
+class StaffCreateForm(forms.Form):
+    """Creează utilizatori de tip Staff (doar vizualizare în platformă).
+
+    Implementare:
+      - user.is_staff = True (pentru acces la interfața internă a platformei)
+      - user.is_superuser = False (nu este Administrator)
+
+    Accesul la /django-admin/ este restricționat la superuser (vezi cie_platform/urls.py),
+    astfel încât Staff să nu poată accesa Django Admin.
+    """
+
+    prenume = forms.CharField(label="Prenume", max_length=150)
+    nume = forms.CharField(label="Nume", max_length=150)
+    email = forms.EmailField(label="Email", max_length=254)
+
+    parola = forms.CharField(
+        label="Parolă (opțional – dacă o lași goală, se generează automat)",
+        required=False,
+        widget=forms.PasswordInput,
+    )
+    confirma_parola = forms.CharField(label="Confirmă parola", required=False, widget=forms.PasswordInput)
+
+    def clean_email(self):
+        email = (self.cleaned_data["email"] or "").lower().strip()
+        if User.objects.filter(username=email).exists() or User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Există deja un utilizator cu acest email.")
+        return email
+
+    def clean(self):
+        cleaned = super().clean()
+        parola = (cleaned.get("parola") or "").strip()
+        confirma = (cleaned.get("confirma_parola") or "").strip()
+        if parola or confirma:
+            if parola != confirma:
+                self.add_error("confirma_parola", "Parolele nu coincid.")
+        return cleaned
+
+    def save(self) -> Tuple[User, str]:
+        email = (self.cleaned_data.get("email") or "").lower().strip()
+        parola = (self.cleaned_data.get("parola") or "").strip()
+        if not parola:
+            parola = secrets.token_urlsafe(10)
+
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=parola,
+            first_name=(self.cleaned_data.get("prenume") or "").strip(),
+            last_name=(self.cleaned_data.get("nume") or "").strip(),
+        )
+        user.is_staff = True
+        user.is_superuser = False
+        user.is_active = True
+        user.save()
+
+        return user, parola
+
+
 class ExpertUpdateForm(forms.Form):
     prenume = forms.CharField(label="Prenume", max_length=150)
     nume = forms.CharField(label="Nume", max_length=150)

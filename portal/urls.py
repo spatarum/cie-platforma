@@ -18,6 +18,14 @@ urlpatterns = [
     path("expert/newslettere/<int:pk>/", views.expert_newsletter_detail, name="expert_newsletter_detail"),
     path("expert/chestionar/<int:pk>/", views.expert_questionnaire, name="expert_chestionar"),
 
+    # Staff (read-only)
+    path("administrare/newslettere-publicate/", views.staff_newsletters, name="staff_newsletters"),
+    path(
+        "administrare/newslettere-publicate/<int:pk>/",
+        views.staff_newsletter_detail,
+        name="staff_newsletter_detail",
+    ),
+
     # Admin
     path("administrare/", views.admin_dashboard, name="admin_dashboard"),
 
@@ -43,6 +51,10 @@ urlpatterns = [
     path("administrare/experti/<int:pk>/editare/", views.admin_expert_edit, name="admin_expert_edit"),
     path("administrare/experti/<int:pk>/arhivare/", views.admin_expert_arhivare, name="admin_expert_arhivare"),
     path("administrare/experti/<int:pk>/restabilire/", views.admin_expert_restabilire, name="admin_expert_restabilire"),
+
+    # Staff users (doar admin)
+    path("administrare/staff/", views.admin_staff_list, name="admin_staff_list"),
+    path("administrare/staff/nou/", views.admin_staff_create, name="admin_staff_create"),
 
     # Import experți (CSV)
     path("administrare/import/experti/", views.admin_expert_import, name="admin_expert_import"),
