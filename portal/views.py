@@ -24,6 +24,7 @@ from .forms import (
     ExpertCreateForm,
     ExpertUpdateForm,
     StaffCreateForm,
+    StaffUpdateForm,
     ExpertImportCSVForm,
     QuestionnaireImportCSVForm,
     RaspunsChestionarForm,
@@ -342,6 +343,60 @@ def staff_newsletters(request):
 def staff_newsletter_detail(request, pk: int):
     nl = get_object_or_404(Newsletter, pk=pk, trimis_la__isnull=False)
     return render(request, "portal/expert_newsletter_detail.html", {"nl": nl})
+
+
+@user_passes_test(is_staff_user)
+def staff_preferinte(request):
+    """Preferințe pentru utilizatori Staff.
+
+    Similar cu preferințele experților:
+      - Text mare (accesibilitate)
+      - Schimbare parolă
+    """
+
+    profil = _get_or_create_profile(request.user)
+
+    pref_form = ExpertPreferinteForm(initial={"text_mare": profil.pref_text_mare})
+    pwd_form = PasswordChangeForm(user=request.user)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "prefs":
+            pref_form = ExpertPreferinteForm(request.POST)
+            pwd_form = PasswordChangeForm(user=request.user)
+            if pref_form.is_valid():
+                profil.pref_text_mare = pref_form.cleaned_data.get("text_mare", False)
+                profil.save(update_fields=["pref_text_mare"])
+                messages.success(request, "Preferințele au fost salvate.")
+                return redirect("staff_preferinte")
+
+        elif action == "pwd":
+            pwd_form = PasswordChangeForm(user=request.user, data=request.POST)
+            pref_form = ExpertPreferinteForm(initial={"text_mare": profil.pref_text_mare})
+            if pwd_form.is_valid():
+                user = pwd_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, "Parola a fost schimbată.")
+                return redirect("staff_preferinte")
+
+    # Stilizare inputuri
+    for f in [
+        pwd_form.fields.get("old_password"),
+        pwd_form.fields.get("new_password1"),
+        pwd_form.fields.get("new_password2"),
+    ]:
+        if f and "widget" in dir(f):
+            try:
+                f.widget.attrs.update({"class": "form-control"})
+            except Exception:
+                pass
+
+    return render(
+        request,
+        "portal/expert_preferinte.html",
+        {"pref_form": pref_form, "pwd_form": pwd_form},
+    )
 
 
 @user_passes_test(is_expert)
@@ -869,6 +924,31 @@ def admin_staff_create(request):
         request,
         "portal/admin_staff_form.html",
         {"form": form, "titlu_pagina": "Staff nou"},
+    )
+
+
+@user_passes_test(is_admin)
+def admin_staff_edit(request, pk: int):
+    """Editează un utilizator Staff (doar admin)."""
+    staff_user = get_object_or_404(User, pk=pk, is_staff=True, is_superuser=False)
+
+    if request.method == "POST":
+        form = StaffUpdateForm(request.POST, user=staff_user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Utilizatorul Staff a fost actualizat.")
+            return redirect("admin_staff_list")
+    else:
+        form = StaffUpdateForm(user=staff_user)
+
+    return render(
+        request,
+        "portal/admin_staff_edit.html",
+        {
+            "form": form,
+            "staff_user": staff_user,
+            "titlu_pagina": "Editare Staff",
+        },
     )
 
 

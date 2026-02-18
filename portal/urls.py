@@ -25,6 +25,7 @@ urlpatterns = [
         views.staff_newsletter_detail,
         name="staff_newsletter_detail",
     ),
+    path("administrare/preferinte/", views.staff_preferinte, name="staff_preferinte"),
 
     # Admin
     path("administrare/", views.admin_dashboard, name="admin_dashboard"),
@@ -55,6 +56,7 @@ urlpatterns = [
     # Staff users (doar admin)
     path("administrare/staff/", views.admin_staff_list, name="admin_staff_list"),
     path("administrare/staff/nou/", views.admin_staff_create, name="admin_staff_create"),
+    path("administrare/staff/<int:pk>/editare/", views.admin_staff_edit, name="admin_staff_edit"),
 
     # Import experți (CSV)
     path("administrare/import/experti/", views.admin_expert_import, name="admin_expert_import"),

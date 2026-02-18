@@ -1,0 +1,127 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}{{ titlu_pagina }} | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
+    <div class="text-muted small">Editează datele unui utilizator de tip <strong>Staff</strong> (doar vizualizare în platformă).</div>
+  </div>
+  <a class="btn btn-light" href="{% url 'admin_staff_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <form method="post" autocomplete="off">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.prenume.label }}</label>
+            {{ form.prenume }}
+            {{ form.prenume.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.nume.label }}</label>
+            {{ form.nume }}
+            {{ form.nume.errors }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.email.label }}</label>
+            {{ form.email }}
+            {{ form.email.errors }}
+            <div class="form-text">Email-ul este folosit și ca nume de utilizator (login).</div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="alert alert-light border">
+            <div class="small text-muted">
+              <i class="bi bi-shield-lock me-1"></i>
+              Staff poate vedea chestionare, răspunsuri și profilurile experților, dar <strong>nu poate modifica</strong> datele.
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              {{ form.este_activ }}
+              <label class="form-check-label ms-2" for="{{ form.este_activ.id_for_label }}">{{ form.este_activ.label }}</label>
+              {{ form.este_activ.errors }}
+            </div>
+            <div class="form-text">Dacă debifezi, utilizatorul nu se mai poate autentifica.</div>
+          </div>
+
+          <div class="border rounded p-3 mt-3">
+            <div class="fw-semibold mb-1"><i class="bi bi-key me-1"></i>Parolă</div>
+            {% if form.schimba_parola.help_text %}
+              <div class="form-text">{{ form.schimba_parola.help_text }}</div>
+            {% endif %}
+
+            <div class="form-check form-switch mt-2">
+              {{ form.schimba_parola }}
+              <label class="form-check-label" for="{{ form.schimba_parola.id_for_label }}">{{ form.schimba_parola.label }}</label>
+              {{ form.schimba_parola.errors }}
+            </div>
+
+            <div id="password-fields" class="mt-3" style="display:none;">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ form.parola_noua.label }}</label>
+                {{ form.parola_noua }}
+                {{ form.parola_noua.errors }}
+              </div>
+              <div class="mb-0">
+                <label class="form-label fw-semibold">{{ form.confirma_parola_noua.label }}</label>
+                {{ form.confirma_parola_noua }}
+                {{ form.confirma_parola_noua.errors }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
+        <a class="btn btn-light" href="{% url 'admin_staff_list' %}">Anulează</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Bootstrap styling (siguranță, în caz că se schimbă form widgets)
+  document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"], textarea, select').forEach((el) => {
+    el.classList.add('form-control');
+  });
+  document.querySelectorAll('input[type="checkbox"]').forEach((el) => {
+    if (el.classList && !el.classList.contains('form-check-input')) {
+      el.classList.add('form-check-input');
+    }
+  });
+
+  // Toggle schimbare parolă
+  const chk = document.querySelector('#{{ form.schimba_parola.id_for_label }}');
+  const pwdWrap = document.querySelector('#password-fields');
+  const pwd1 = document.querySelector('#id_parola_noua');
+  const pwd2 = document.querySelector('#id_confirma_parola_noua');
+
+  const setPwdEnabled = (enabled) => {
+    if (!pwdWrap) return;
+    pwdWrap.style.display = enabled ? '' : 'none';
+    [pwd1, pwd2].forEach((el) => {
+      if (!el) return;
+      el.disabled = !enabled;
+      if (!enabled) el.value = '';
+    });
+  };
+
+  if (chk && pwdWrap) {
+    setPwdEnabled(chk.checked);
+    chk.addEventListener('change', () => setPwdEnabled(chk.checked));
+  }
+</script>
+{% endblock %}

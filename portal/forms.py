@@ -3,6 +3,7 @@ from typing import Dict, Tuple
 
 from django import forms
 from django.contrib.auth.models import User
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import (
@@ -171,6 +172,118 @@ class StaffCreateForm(forms.Form):
         user.save()
 
         return user, parola
+
+
+class StaffUpdateForm(forms.Form):
+    """Editare utilizator de tip Staff (doar admin).
+
+    Permite modificarea datelor de contact și activarea/dezactivarea contului.
+    Schimbarea parolei este explicită (opt-in), pentru a evita autofill accidental.
+    """
+
+    prenume = forms.CharField(label="Prenume", max_length=150)
+    nume = forms.CharField(label="Nume", max_length=150)
+    email = forms.EmailField(label="Email", max_length=254)
+
+    este_activ = forms.BooleanField(
+        label="Activ",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
+    schimba_parola = forms.BooleanField(
+        label="Schimbă parola",
+        required=False,
+        help_text="Bifează doar dacă vrei să setezi o parolă nouă pentru acest utilizator.",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    parola_noua = forms.CharField(
+        label="Parolă nouă",
+        required=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "new-password",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+            }
+        ),
+    )
+    confirma_parola_noua = forms.CharField(
+        label="Confirmă parola nouă",
+        required=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "new-password",
+                "data-lpignore": "true",
+                "data-1p-ignore": "true",
+            }
+        ),
+    )
+
+    def __init__(self, *args, user: User, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.initial.update(
+            {
+                "prenume": user.first_name,
+                "nume": user.last_name,
+                "email": user.email or user.username,
+                "este_activ": bool(user.is_active),
+            }
+        )
+
+        # Bootstrap styling
+        for name in ["prenume", "nume", "email", "parola_noua", "confirma_parola_noua"]:
+            try:
+                self.fields[name].widget.attrs.setdefault("class", "form-control")
+            except Exception:
+                pass
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").lower().strip()
+        if not email:
+            raise forms.ValidationError("Email-ul este obligatoriu.")
+
+        # username este email în platformă; păstrăm unicitatea.
+        if User.objects.exclude(pk=self.user.pk).filter(Q(username=email) | Q(email=email)).exists():
+            raise forms.ValidationError("Există deja un utilizator cu acest email.")
+        return email
+
+    def clean(self):
+        cleaned = super().clean()
+        change = bool(cleaned.get("schimba_parola"))
+        p1 = (cleaned.get("parola_noua") or "").strip()
+        p2 = (cleaned.get("confirma_parola_noua") or "").strip()
+
+        if change:
+            if not p1 or not p2:
+                self.add_error("parola_noua", "Completează parola nouă și confirmarea.")
+            elif p1 != p2:
+                self.add_error("confirma_parola_noua", "Parolele nu coincid.")
+        else:
+            # ignorăm complet (inclusiv autofill)
+            cleaned["parola_noua"] = ""
+            cleaned["confirma_parola_noua"] = ""
+        return cleaned
+
+    def save(self) -> User:
+        u = self.user
+        u.first_name = (self.cleaned_data.get("prenume") or "").strip()
+        u.last_name = (self.cleaned_data.get("nume") or "").strip()
+        email = (self.cleaned_data.get("email") or "").lower().strip()
+        u.email = email
+        u.username = email
+        u.is_active = bool(self.cleaned_data.get("este_activ"))
+
+        # Rol fix
+        u.is_staff = True
+        u.is_superuser = False
+
+        if self.cleaned_data.get("schimba_parola"):
+            u.set_password(self.cleaned_data.get("parola_noua"))
+
+        u.save()
+        return u
 
 
 class ExpertUpdateForm(forms.Form):

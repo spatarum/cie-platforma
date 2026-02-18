@@ -24,6 +24,7 @@
             <th>Email</th>
             <th class="text-nowrap">Activ</th>
             <th class="text-nowrap">Ultima autentificare</th>
+            <th class="text-end">Acțiuni</th>
           </tr>
         </thead>
         <tbody>
@@ -39,10 +40,13 @@
                 {% endif %}
               </td>
               <td class="text-muted small">{% if u.last_login %}{{ u.last_login|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_staff_edit' u.pk %}"><i class="bi bi-pencil me-1"></i>Editează</a>
+              </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="4" class="text-muted p-3">Nu există utilizatori Staff încă.</td>
+              <td colspan="5" class="text-muted p-3">Nu există utilizatori Staff încă.</td>
             </tr>
           {% endfor %}
         </tbody>
