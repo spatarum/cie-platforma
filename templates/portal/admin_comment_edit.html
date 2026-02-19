@@ -1,0 +1,45 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Editează comentariu | Administrare{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h5 mb-1">Editează comentariu</h1>
+    <div class="text-muted small">
+      Chestionar: {{ comment.answer.submission.questionnaire.titlu }} •
+      Expert: {{ comment.answer.submission.expert.get_full_name|default:comment.answer.submission.expert.username }} •
+      Întrebarea {{ comment.answer.question.ord }}
+    </div>
+  </div>
+  <div>
+    <a class="btn btn-light btn-sm" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <div class="alert alert-info small">
+      <i class="bi bi-eye me-1"></i>Acest comentariu este <strong>vizibil expertului</strong>.
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ back_url }}">
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Comentariu</label>
+        <textarea name="text" class="form-control" rows="5" maxlength="2000">{{ comment.text }}</textarea>
+        <div class="small text-muted">Maxim 2000 caractere.</div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save me-1"></i>Salvează
+        </button>
+        <a class="btn btn-outline-secondary" href="{{ back_url }}">Renunță</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -597,8 +597,11 @@ class RaspunsChestionarForm(forms.Form):
             field_name = f"q_{q.id}"
             text = (self.cleaned_data.get(field_name) or "").strip()
             answer, _ = Answer.objects.get_or_create(submission=self.submission, question=q)
-            answer.text = text[:3000]
-            answer.save()
+            new_text = text[:3000]
+            # Nu salva dacă nu s-a schimbat textul (evită actualizări inutile ale updated_at).
+            if (answer.text or "") != new_text:
+                answer.text = new_text
+                answer.save(update_fields=["text", "updated_at"])
 
 
 class ExpertImportCSVForm(forms.Form):

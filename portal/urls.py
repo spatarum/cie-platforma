@@ -47,6 +47,28 @@ urlpatterns = [
         name="admin_chestionar_raspunsuri_expert",
     ),
 
+    # Comentarii staff/admin pe răspunsuri (per întrebare)
+    path(
+        "administrare/raspunsuri/<int:answer_id>/comentarii/nou/",
+        views.answer_comment_create,
+        name="answer_comment_create",
+    ),
+    path(
+        "administrare/comentarii/<int:pk>/editare/",
+        views.answer_comment_edit,
+        name="answer_comment_edit",
+    ),
+    path(
+        "administrare/comentarii/<int:pk>/sterge/",
+        views.answer_comment_delete,
+        name="answer_comment_delete",
+    ),
+    path(
+        "administrare/raspunsuri/<int:answer_id>/thread/rezolvat/",
+        views.answer_thread_toggle_resolved,
+        name="answer_thread_toggle_resolved",
+    ),
+
     path("administrare/experti/", views.admin_expert_list, name="admin_experti_list"),
     path("administrare/experti/nou/", views.admin_expert_create, name="admin_expert_create"),
     path("administrare/experti/<int:pk>/editare/", views.admin_expert_edit, name="admin_expert_edit"),

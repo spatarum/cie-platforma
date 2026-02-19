@@ -1,4 +1,5 @@
 {% extends 'portal/base.html' %}
+{% load portal_extras %}
 
 {% block title %}{{ chestionar.titlu }} | Platforma experți CIE{% endblock %}
 
@@ -51,6 +52,46 @@
             <span>Maxim 3000 caractere.</span>
             <span class="char-counter" data-for="{{ field.id_for_label }}"></span>
           </div>
+
+          {# Comentarii staff/admin pe răspuns (vizibile expertului) #}
+          {% with cd=comentarii_map|get_item:field.name %}
+            {% if cd and cd.comments and cd.comments|length > 0 %}
+              <div class="mt-2 p-2 border rounded bg-light">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <div class="small fw-semibold">
+                    <i class="bi bi-chat-left-text me-1"></i>Comentarii staff ({{ cd.comments|length }})
+                  </div>
+                  {% if cd.thread_rezolvat %}
+                    <span class="badge text-bg-success"><i class="bi bi-check2-circle me-1"></i>Rezolvat</span>
+                  {% else %}
+                    <span class="badge text-bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>În lucru</span>
+                  {% endif %}
+                </div>
+
+                {% if cd.answer_modified_after_last_comment %}
+                  <div class="small text-muted mb-2">
+                    <i class="bi bi-info-circle me-1"></i>Răspunsul a fost modificat după ultimul comentariu.
+                  </div>
+                {% endif %}
+
+                <ul class="list-unstyled mb-0">
+                  {% for c in cd.comments %}
+                    <li class="mb-2">
+                      <div class="small text-muted">
+                        {% if c.author %}
+                          {{ c.author.get_full_name|default:c.author.username }}
+                        {% else %}
+                          Utilizator
+                        {% endif %}
+                        • {{ c.created_at|date:"d.m.Y H:i" }}
+                      </div>
+                      <div>{{ c.text|linebreaksbr }}</div>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+          {% endwith %}
         </div>
       {% endfor %}
 

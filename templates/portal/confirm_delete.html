@@ -1,0 +1,45 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}{{ titlu }} | Administrare{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <h1 class="h5 mb-2">{{ titlu }}</h1>
+    <div class="mb-2"><span class="fw-semibold">Element:</span> {{ obiect }}</div>
+    <div class="text-muted mb-3">{{ mesaj }}</div>
+
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" value="1" id="confirmCheck">
+        <label class="form-check-label" for="confirmCheck">
+          Confirm că vreau să continui.
+        </label>
+      </div>
+
+      <input type="hidden" name="next" value="{{ cancel_url }}">
+
+      <div class="d-flex gap-2">
+        <button id="confirmBtn" type="submit" class="btn {{ confirm_class|default:'btn-danger' }}" disabled>
+          {{ confirm_text|default:'Confirmă' }}
+        </button>
+        <a class="btn btn-outline-secondary" href="{{ cancel_url|default:'/' }}">Renunță</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const check = document.getElementById('confirmCheck');
+  const btn = document.getElementById('confirmBtn');
+  if (check && btn) {
+    check.addEventListener('change', () => {
+      btn.disabled = !check.checked;
+    });
+  }
+</script>
+{% endblock %}

@@ -424,6 +424,21 @@ class Answer(models.Model):
     # Răspunsuri tip text scurt (max. 3000 caractere)
     text = models.CharField(max_length=3000, blank=True)
 
+    # Pentru workflow-ul de comentarii (staff/admin) este util să știm când s-a modificat răspunsul.
+    # (Auto-update la fiecare salvare a răspunsului.)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Status thread comentarii (per răspuns / per întrebare)
+    comentarii_rezolvat = models.BooleanField(default=False)
+    comentarii_rezolvat_la = models.DateTimeField(null=True, blank=True)
+    comentarii_rezolvat_de = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="answer_threads_rezolvat",
+    )
+
     class Meta:
         verbose_name = "Răspuns"
         verbose_name_plural = "Răspunsuri"
@@ -431,3 +446,48 @@ class Answer(models.Model):
 
     def __str__(self) -> str:
         return f"{self.submission_id}:{self.question_id}"
+
+
+class AnswerComment(models.Model):
+    """Comentarii (staff/admin) pe fiecare răspuns (Answer).
+
+    Comentariile sunt vizibile și pentru experți (în pagina chestionarului),
+    însă doar utilizatorii interni (Staff/Admin) pot crea / edita / șterge.
+    """
+
+    answer = models.ForeignKey(
+        Answer,
+        on_delete=models.CASCADE,
+        related_name="comentarii",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="answer_comments",
+    )
+    text = models.TextField(max_length=2000)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Pentru a detecta dacă răspunsul a fost modificat după comentariu.
+    answer_updated_at_snapshot = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Comentariu la răspuns"
+        verbose_name_plural = "Comentarii la răspunsuri"
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        who = "(anonim)" if not self.author_id else (self.author.get_full_name() or self.author.username)
+        return f"Comentariu {self.id} de {who}"
+
+    def save(self, *args, **kwargs):
+        if self.answer_updated_at_snapshot is None and self.answer_id:
+            try:
+                self.answer_updated_at_snapshot = self.answer.updated_at
+            except Exception:
+                pass
+        return super().save(*args, **kwargs)

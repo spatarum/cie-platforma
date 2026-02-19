@@ -37,17 +37,108 @@
       </thead>
       <tbody>
         {% for r in rows %}
-          <tr>
+          <tr id="q{{ r.question.ord }}">
             <td>
               <div class="fw-semibold">Întrebarea {{ r.question.ord }}</div>
               <div class="text-muted small">{{ r.question.text }}</div>
             </td>
             <td>
-              {% if r.text %}
-                {{ r.text }}
-              {% else %}
-                <span class="text-muted">—</span>
-              {% endif %}
+              <div>
+                {% if r.text %}
+                  {{ r.text|linebreaksbr }}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </div>
+
+              <div class="mt-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <div class="small fw-semibold">
+                    <i class="bi bi-chat-left-text me-1"></i>Comentarii (vizibile expertului)
+                    {% if r.comments %}
+                      <span class="text-muted">({{ r.comments|length }})</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="d-flex align-items-center gap-2">
+                    {% if r.thread_rezolvat %}
+                      <span class="badge text-bg-success"><i class="bi bi-check2-circle me-1"></i>Rezolvat</span>
+                    {% else %}
+                      <span class="badge text-bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>În lucru</span>
+                    {% endif %}
+
+                    <form method="post" action="{% url 'answer_thread_toggle_resolved' r.answer.id %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="{{ request.get_full_path }}#q{{ r.question.ord }}">
+                      {% if r.thread_rezolvat %}
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">
+                          <i class="bi bi-arrow-counterclockwise me-1"></i>Redeschide
+                        </button>
+                      {% else %}
+                        <button type="submit" class="btn btn-outline-success btn-sm">
+                          <i class="bi bi-check2 me-1"></i>Marchează rezolvat
+                        </button>
+                      {% endif %}
+                    </form>
+                  </div>
+                </div>
+
+                {% if r.answer_modified_after_last_comment %}
+                  <div class="small text-muted mb-2">
+                    <i class="bi bi-info-circle me-1"></i>Răspunsul a fost modificat după ultimul comentariu.
+                  </div>
+                {% endif %}
+
+                <div class="border rounded p-2 bg-light">
+                  {% if r.comments and r.comments|length > 0 %}
+                    <ul class="list-unstyled mb-0">
+                      {% for c in r.comments %}
+                        <li class="mb-2">
+                          <div class="d-flex align-items-start justify-content-between gap-2">
+                            <div class="flex-grow-1">
+                              <div class="small text-muted">
+                                {% if c.author %}
+                                  {{ c.author.get_full_name|default:c.author.username }}
+                                {% else %}
+                                  Utilizator
+                                {% endif %}
+                                • {{ c.created_at|date:"d.m.Y H:i" }}
+                                {% if c.updated_at and c.updated_at != c.created_at %}
+                                  <span class="text-muted">(editat)</span>
+                                {% endif %}
+                              </div>
+                              <div>{{ c.text|linebreaksbr }}</div>
+                            </div>
+                            <div class="text-nowrap">
+                              {% if request.user.is_superuser or c.author_id == request.user.id %}
+                                <a class="btn btn-outline-secondary btn-sm" href="{% url 'answer_comment_edit' c.id %}?next={{ request.get_full_path|urlencode }}%23q{{ r.question.ord }}">
+                                  <i class="bi bi-pencil"></i>
+                                </a>
+                                <a class="btn btn-outline-danger btn-sm" href="{% url 'answer_comment_delete' c.id %}?next={{ request.get_full_path|urlencode }}%23q{{ r.question.ord }}">
+                                  <i class="bi bi-trash"></i>
+                                </a>
+                              {% endif %}
+                            </div>
+                          </div>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  {% else %}
+                    <div class="text-muted small">Nu există comentarii pentru această întrebare.</div>
+                  {% endif %}
+                </div>
+
+                <form method="post" action="{% url 'answer_comment_create' r.answer.id %}" class="mt-2">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}#q{{ r.question.ord }}">
+                  <div class="mb-2">
+                    <textarea name="text" class="form-control form-control-sm" rows="2" maxlength="2000" placeholder="Adaugă un comentariu (va fi vizibil expertului)..."></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle me-1"></i>Adaugă comentariu
+                  </button>
+                </form>
+              </div>
             </td>
           </tr>
         {% endfor %}

@@ -33,6 +33,7 @@ from .forms import (
 )
 from .models import (
     Answer,
+    AnswerComment,
     Chapter,
     Criterion,
     ExpertProfile,
@@ -435,6 +436,33 @@ def expert_questionnaire(request, pk: int):
     else:
         form = RaspunsChestionarForm(questionnaire=chestionar, submission=submission)
 
+    # Comentarii (staff/admin) pe fiecare răspuns – vizibile expertului.
+    # Cheie: numele câmpului din form (q_<question_id>)
+    answers_qs = (
+        Answer.objects.filter(submission=submission)
+        .select_related("question", "comentarii_rezolvat_de")
+        .prefetch_related("comentarii", "comentarii__author")
+    )
+    comentarii_map = {}
+    for a in answers_qs:
+        comms = list(a.comentarii.all())
+        last = comms[-1] if comms else None
+        modified_after_last_comment = False
+        if last:
+            if last.answer_updated_at_snapshot and a.updated_at:
+                modified_after_last_comment = a.updated_at > last.answer_updated_at_snapshot
+            elif a.updated_at:
+                modified_after_last_comment = a.updated_at > last.updated_at
+
+        comentarii_map[f"q_{a.question_id}"] = {
+            "answer": a,
+            "comments": comms,
+            "thread_rezolvat": bool(a.comentarii_rezolvat),
+            "thread_rezolvat_la": a.comentarii_rezolvat_la,
+            "thread_rezolvat_de": a.comentarii_rezolvat_de,
+            "answer_modified_after_last_comment": modified_after_last_comment,
+        }
+
     return render(
         request,
         "portal/expert_chestionar.html",
@@ -443,6 +471,7 @@ def expert_questionnaire(request, pk: int):
             "form": form,
             "submission": submission,
             "editabil": editabil,
+            "comentarii_map": comentarii_map,
         },
     )
 
@@ -2062,15 +2091,41 @@ def admin_chestionar_raspunsuri_expert(request, pk: int, expert_id: int):
 
     submission = get_object_or_404(Submission, questionnaire=chestionar, expert=expert, status=Submission.STATUS_TRIMIS)
 
-    # Map question_id -> answer
-    ans_map = {
-        a.question_id: a.text
-        for a in Answer.objects.filter(submission=submission).select_related("question")
-    }
+    answers_qs = (
+        Answer.objects.filter(submission=submission)
+        .select_related("question", "comentarii_rezolvat_de")
+        .prefetch_related("comentarii", "comentarii__author")
+    )
+    ans_by_qid = {a.question_id: a for a in answers_qs}
 
     rows = []
     for q in chestionar.intrebari.all().order_by("ord"):
-        rows.append({"question": q, "text": ans_map.get(q.id, "")})
+        a = ans_by_qid.get(q.id)
+        if not a:
+            # Siguranță pentru date vechi/incomplete: asigură existența Answer.
+            a, _ = Answer.objects.get_or_create(submission=submission, question=q)
+
+        comms = list(getattr(a, "comentarii", []).all()) if hasattr(a, "comentarii") else []
+        last = comms[-1] if comms else None
+        modified_after_last_comment = False
+        if last:
+            if last.answer_updated_at_snapshot and a.updated_at:
+                modified_after_last_comment = a.updated_at > last.answer_updated_at_snapshot
+            elif a.updated_at:
+                modified_after_last_comment = a.updated_at > last.updated_at
+
+        rows.append(
+            {
+                "question": q,
+                "answer": a,
+                "text": a.text,
+                "comments": comms,
+                "thread_rezolvat": bool(getattr(a, "comentarii_rezolvat", False)),
+                "thread_rezolvat_la": getattr(a, "comentarii_rezolvat_la", None),
+                "thread_rezolvat_de": getattr(a, "comentarii_rezolvat_de", None),
+                "answer_modified_after_last_comment": modified_after_last_comment,
+            }
+        )
 
     back_url = request.GET.get("back")
 
@@ -2085,3 +2140,202 @@ def admin_chestionar_raspunsuri_expert(request, pk: int, expert_id: int):
             "back_url": back_url,
         },
     )
+
+
+def _can_manage_comment(user: User, comment: AnswerComment) -> bool:
+    """Permisiuni editare/ștergere comentariu.
+
+    - Admin: poate gestiona orice comentariu
+    - Staff: doar propriile comentarii
+    """
+    if is_admin(user):
+        return True
+    if is_staff_user(user) and comment.author_id == user.id:
+        return True
+    return False
+
+
+@user_passes_test(is_internal)
+def answer_comment_create(request, answer_id: int):
+    if request.method != "POST":
+        raise Http404()
+
+    answer = get_object_or_404(
+        Answer.objects.select_related(
+            "submission",
+            "submission__questionnaire",
+            "submission__expert",
+            "question",
+        ),
+        pk=answer_id,
+    )
+
+    # Comentăm doar pe răspunsuri trimise (nu pe ciorne).
+    if answer.submission.status != Submission.STATUS_TRIMIS:
+        raise PermissionDenied("Nu poți comenta pe o ciornă.")
+
+    text = (request.POST.get("text") or "").strip()
+    if not text:
+        messages.error(request, "Comentariul nu poate fi gol.")
+    else:
+        AnswerComment.objects.create(
+            answer=answer,
+            author=request.user,
+            text=text[:2000],
+        )
+
+        # Orice comentariu nou redeschide thread-ul.
+        if getattr(answer, "comentarii_rezolvat", False):
+            answer.comentarii_rezolvat = False
+            answer.comentarii_rezolvat_la = None
+            answer.comentarii_rezolvat_de = None
+            answer.save(update_fields=["comentarii_rezolvat", "comentarii_rezolvat_la", "comentarii_rezolvat_de"])
+
+        messages.success(request, "Comentariul a fost adăugat (vizibil expertului).")
+
+    next_url = (
+        request.POST.get("next")
+        or request.GET.get("next")
+        or request.META.get("HTTP_REFERER")
+        or "/administrare/"
+    )
+    return redirect(next_url)
+
+
+@user_passes_test(is_internal)
+def answer_comment_edit(request, pk: int):
+    comment = get_object_or_404(
+        AnswerComment.objects.select_related(
+            "author",
+            "answer",
+            "answer__question",
+            "answer__submission",
+            "answer__submission__questionnaire",
+            "answer__submission__expert",
+        ),
+        pk=pk,
+    )
+
+    if not _can_manage_comment(request.user, comment):
+        raise PermissionDenied("Nu ai dreptul să editezi acest comentariu.")
+
+    if request.method == "POST":
+        text = (request.POST.get("text") or "").strip()
+        if not text:
+            messages.error(request, "Comentariul nu poate fi gol.")
+        else:
+            comment.text = text[:2000]
+            comment.save(update_fields=["text", "updated_at"])
+            messages.success(request, "Comentariul a fost actualizat.")
+            next_url = (
+                request.POST.get("next")
+                or request.GET.get("next")
+                or request.META.get("HTTP_REFERER")
+                or "/administrare/"
+            )
+            return redirect(next_url)
+
+    back_url = request.GET.get("next") or request.META.get("HTTP_REFERER") or "/administrare/"
+    return render(
+        request,
+        "portal/admin_comment_edit.html",
+        {
+            "comment": comment,
+            "back_url": back_url,
+        },
+    )
+
+
+@user_passes_test(is_internal)
+def answer_comment_delete(request, pk: int):
+    comment = get_object_or_404(
+        AnswerComment.objects.select_related(
+            "author",
+            "answer",
+            "answer__question",
+            "answer__submission",
+            "answer__submission__questionnaire",
+            "answer__submission__expert",
+        ),
+        pk=pk,
+    )
+
+    if not _can_manage_comment(request.user, comment):
+        raise PermissionDenied("Nu ai dreptul să ștergi acest comentariu.")
+
+    if request.method == "POST":
+        answer = comment.answer
+        comment.delete()
+
+        # Dacă nu mai există comentarii, resetăm status-ul thread-ului (opțional, dar util).
+        if not AnswerComment.objects.filter(answer=answer).exists():
+            if getattr(answer, "comentarii_rezolvat", False):
+                answer.comentarii_rezolvat = False
+                answer.comentarii_rezolvat_la = None
+                answer.comentarii_rezolvat_de = None
+                answer.save(update_fields=["comentarii_rezolvat", "comentarii_rezolvat_la", "comentarii_rezolvat_de"])
+
+        messages.success(request, "Comentariul a fost șters.")
+        next_url = (
+            request.POST.get("next")
+            or request.GET.get("next")
+            or request.META.get("HTTP_REFERER")
+            or "/administrare/"
+        )
+        return redirect(next_url)
+
+    cancel_url = request.GET.get("next") or request.META.get("HTTP_REFERER") or "/administrare/"
+    obiect = f"{comment.answer.submission.expert.get_full_name() or comment.answer.submission.expert.username} – Întrebarea {comment.answer.question.ord}"
+    mesaj = "Comentariul va fi șters definitiv. Această acțiune nu poate fi anulată."
+    return render(
+        request,
+        "portal/confirm_delete.html",
+        {
+            "titlu": "Șterge comentariu",
+            "obiect": obiect,
+            "mesaj": mesaj,
+            "confirm_text": "Șterge",
+            "confirm_class": "btn-danger",
+            "cancel_url": cancel_url,
+        },
+    )
+
+
+@user_passes_test(is_internal)
+def answer_thread_toggle_resolved(request, answer_id: int):
+    if request.method != "POST":
+        raise Http404()
+
+    answer = get_object_or_404(
+        Answer.objects.select_related(
+            "submission",
+            "submission__questionnaire",
+            "submission__expert",
+            "question",
+        ),
+        pk=answer_id,
+    )
+
+    if answer.submission.status != Submission.STATUS_TRIMIS:
+        raise PermissionDenied("Nu poți marca rezolvat pentru o ciornă.")
+
+    if getattr(answer, "comentarii_rezolvat", False):
+        answer.comentarii_rezolvat = False
+        answer.comentarii_rezolvat_la = None
+        answer.comentarii_rezolvat_de = None
+        answer.save(update_fields=["comentarii_rezolvat", "comentarii_rezolvat_la", "comentarii_rezolvat_de"])
+        messages.info(request, "Thread-ul a fost redeschis.")
+    else:
+        answer.comentarii_rezolvat = True
+        answer.comentarii_rezolvat_la = timezone.now()
+        answer.comentarii_rezolvat_de = request.user
+        answer.save(update_fields=["comentarii_rezolvat", "comentarii_rezolvat_la", "comentarii_rezolvat_de"])
+        messages.success(request, "Thread-ul a fost marcat ca rezolvat.")
+
+    next_url = (
+        request.POST.get("next")
+        or request.GET.get("next")
+        or request.META.get("HTTP_REFERER")
+        or "/administrare/"
+    )
+    return redirect(next_url)
