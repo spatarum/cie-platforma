@@ -1,0 +1,178 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}{{ titlu_pagina }} | PNA{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
+    <div class="text-muted small">Completează câmpurile principale. Poți reveni ulterior pentru detalii și acte UE.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'admin_pna_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
+    {% if obj %}
+      <a href="{% url 'admin_pna_detail' obj.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-eye me-1"></i>Vezi fișa</a>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" class="card shadow-sm gov-card">
+  {% csrf_token %}
+  <div class="card-body">
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <h2 class="h6">Identificare & atașare</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <label class="form-label">{{ form.titlu.label }}</label>
+        {{ form.titlu }}
+        {% if form.titlu.errors %}<div class="text-danger small">{{ form.titlu.errors }}</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.chapter.label }}</label>
+        {{ form.chapter }}
+        {% if form.chapter.errors %}<div class="text-danger small">{{ form.chapter.errors }}</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.criterion.label }}</label>
+        {{ form.criterion }}
+        {% if form.criterion.errors %}<div class="text-danger small">{{ form.criterion.errors }}</div>{% endif %}
+      </div>
+    </div>
+
+    <h2 class="h6">Instituții & contact</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.institutie_principala.label }}</label>
+        {{ form.institutie_principala }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.institutie_coreponsabila.label }}</label>
+        {{ form.institutie_coreponsabila }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.contact_responsabil.label }}</label>
+        {{ form.contact_responsabil }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.contact_responsabil_email.label }}</label>
+        {{ form.contact_responsabil_email }}
+      </div>
+    </div>
+
+    <h2 class="h6">Termene</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.termen_aprobare_guvern.label }}</label>
+        {{ form.termen_aprobare_guvern }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.termen_aprobare_parlament.label }}</label>
+        {{ form.termen_aprobare_parlament }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.termen_actualizat_aprobare_guvern.label }}</label>
+        {{ form.termen_actualizat_aprobare_guvern }}
+        <div class="text-muted small">Dacă este completat, acesta este considerat termenul efectiv pentru Guvern.</div>
+      </div>
+    </div>
+
+    <h2 class="h6">Evaluare</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.complexitate.label }}</label>
+        {{ form.complexitate }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.prioritate.label }}</label>
+        {{ form.prioritate }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.expertiza_interna.label }}</label>
+        {{ form.expertiza_interna }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.volum_munca_zile.label }}</label>
+        {{ form.volum_munca_zile }}
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="form-check mt-4">
+          {{ form.necesita_expertiza_externa }}
+          <label class="form-check-label" for="{{ form.necesita_expertiza_externa.id_for_label }}">{{ form.necesita_expertiza_externa.label }}</label>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="h6">Expertiză externă / consultări</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <label class="form-label">{{ form.disponibilitate_expertiza_externa.label }}</label>
+        {{ form.disponibilitate_expertiza_externa }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ form.parteneri_societate_civila.label }}</label>
+        {{ form.parteneri_societate_civila }}
+      </div>
+    </div>
+
+    <h2 class="h6">Costuri de implementare (lei)</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <label class="form-label">2026</label>
+        {{ form.cost_2026 }}
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">2027</label>
+        {{ form.cost_2027 }}
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">2028</label>
+        {{ form.cost_2028 }}
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">2029</label>
+        {{ form.cost_2029 }}
+      </div>
+    </div>
+
+    <h2 class="h6">Riscuri & descriere</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <label class="form-label">{{ form.riscuri.label }}</label>
+        {{ form.riscuri }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ form.descriere.label }}</label>
+        {{ form.descriere }}
+      </div>
+    </div>
+
+    <h2 class="h6">Criterii de analiză (etapa 2: experți)</h2>
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label">{{ form.analiza_flexibilitate.label }}</label>
+        {{ form.analiza_flexibilitate }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ form.analiza_gestiunea_impactului.label }}</label>
+        {{ form.analiza_gestiunea_impactului }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ form.analiza_potential_negociere.label }}</label>
+        {{ form.analiza_potential_negociere }}
+      </div>
+    </div>
+
+  </div>
+  <div class="card-footer bg-white d-flex justify-content-end gap-2">
+    <a href="{% url 'admin_pna_list' %}" class="btn btn-light">Anulează</a>
+    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salvează</button>
+  </div>
+</form>
+
+{% endblock %}
