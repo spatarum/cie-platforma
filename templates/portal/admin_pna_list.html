@@ -80,7 +80,9 @@
           <div class="accordion-item">
             <h2 class="accordion-header" id="crHead{{ g.criteriu.id }}">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#crBody{{ g.criteriu.id }}" aria-expanded="false" aria-controls="crBody{{ g.criteriu.id }}">
-                <span class="me-2">{% if g.criteriu.pictograma %}{{ g.criteriu.pictograma }}{% else %}🧭{% endif %}</span>
+                <span class="me-2" style="color: {{ g.criteriu.culoare_ui }};">
+                  <i class="bi {{ g.criteriu.pictograma|default:'bi-flag' }}"></i>
+                </span>
                 <span><strong>{{ g.criteriu.cod }}</strong> — {{ g.criteriu.denumire }}</span>
                 <span class="badge text-bg-light ms-2">{{ g.proiecte|length }}</span>
               </button>
@@ -157,7 +159,9 @@
               <div>
                 <strong>
                   {% if cl.cluster %}
-                    {% if cl.cluster.pictograma %}{{ cl.cluster.pictograma }}{% else %}🧩{% endif %}
+                    <span class="me-1" style="color: {{ cl.cluster.culoare_ui }};">
+                      <i class="bi {{ cl.cluster.pictograma|default:'bi-grid' }}"></i>
+                    </span>
                     {{ cl.cluster.cod }} — {{ cl.cluster.denumire }}
                   {% else %}
                     Alte capitole
@@ -171,7 +175,9 @@
               <div class="accordion-item">
                 <h2 class="accordion-header" id="chHead{{ chg.capitol.id }}">
                   <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#chBody{{ chg.capitol.id }}" aria-expanded="false" aria-controls="chBody{{ chg.capitol.id }}">
-                    <span class="me-2">{% if chg.capitol.pictograma %}{{ chg.capitol.pictograma }}{% else %}📘{% endif %}</span>
+                    <span class="me-2" style="color: {{ chg.capitol.culoare_ui }};">
+                      <i class="bi {{ chg.capitol.pictograma|default:'bi-journal-text' }}"></i>
+                    </span>
                     <span><strong>Cap. {{ chg.capitol.numar }}</strong> — {{ chg.capitol.denumire }}</span>
                     <span class="badge text-bg-light ms-2">{{ chg.proiecte|length }}</span>
                   </button>

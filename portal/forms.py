@@ -717,7 +717,8 @@ class PnaProjectForm(forms.ModelForm):
             "criterion": forms.Select(attrs={"class": "form-select"}),
             "status_implementare": forms.Select(attrs={"class": "form-select"}),
             "institutie_principala_ref": forms.Select(attrs={"class": "form-select"}),
-            "institutii_responsabile": forms.SelectMultiple(attrs={"class": "form-select", "size": "6"}),
+            # Afișăm instituțiile ca listă de bife (mai ușor de selectat decât multi-select).
+            "institutii_responsabile": forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
             "contact_responsabil": forms.TextInput(attrs={"class": "form-control"}),
             "contact_responsabil_email": forms.EmailInput(attrs={"class": "form-control"}),
             "complexitate": forms.Select(attrs={"class": "form-select"}),
@@ -812,6 +813,22 @@ class PnaInstitutionForm(forms.ModelForm):
 class PnaEUActInlineForm(forms.Form):
     """Form simplu pentru adăugare acte UE direct din pagina de creare/editare proiect."""
 
+    EU_ACT_TYPE_CHOICES = [
+        ("", "—"),
+        ("Alt", "Alt"),
+        ("Comunicare", "Comunicare"),
+        ("Concluzii", "Concluzii"),
+        ("Convenție / Protocol", "Convenție / Protocol"),
+        ("Decizie", "Decizie"),
+        ("Directivă", "Directivă"),
+        ("Recomandare", "Recomandare"),
+        ("Regulament", "Regulament"),
+        ("Rezoluție", "Rezoluție"),
+        ("Tratat", "Tratat"),
+    ]
+
+    link_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+
     link_celex = forms.CharField(
         label="Link CELEX (sau cod CELEX)",
         max_length=400,
@@ -824,19 +841,45 @@ class PnaEUActInlineForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
-    tip_document = forms.CharField(
+    tip_document = forms.ChoiceField(
         label="Tip act UE",
-        max_length=200,
         required=False,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
+        choices=EU_ACT_TYPE_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
+
+    tip_transpunere = forms.ChoiceField(
+        label="Tip transpunere",
+        required=False,
+        choices=[
+            ("", "—"),
+            (PnaProjectEUAct.TIP_TRANSPUNERE_TOTAL, "Transpus total"),
+            (PnaProjectEUAct.TIP_TRANSPUNERE_PARTIAL, "Transpus parțial"),
+        ],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Dacă avem un tip_document preexistent care nu e în listă (date legacy), îl adăugăm
+        # ca opțiune, ca să nu rupem editarea.
+        tip_val = None
+        if self.is_bound:
+            tip_val = (self.data.get(self.add_prefix("tip_document")) or "").strip()
+        else:
+            tip_val = (self.initial or {}).get("tip_document")
+
+        if tip_val and tip_val not in [c[0] for c in self.EU_ACT_TYPE_CHOICES]:
+            self.fields["tip_document"].choices = list(self.fields["tip_document"].choices) + [(tip_val, tip_val)]
 
     def clean(self):
         cleaned = super().clean()
         link = (cleaned.get("link_celex") or "").strip()
         den = (cleaned.get("denumire") or "").strip()
         tip = (cleaned.get("tip_document") or "").strip()
-        if not link and not den and not tip:
+        tip_tr = (cleaned.get("tip_transpunere") or "").strip()
+        if not link and not den and not tip and not tip_tr:
             # rând gol
             cleaned["_empty"] = True
             return cleaned
@@ -850,7 +893,12 @@ class PnaEUActAttachForm(forms.Form):
 
     celex = forms.CharField(label="Link CELEX (sau cod CELEX)", max_length=400)
     denumire = forms.CharField(label="Denumire act UE", max_length=700, required=False)
-    tip_document = forms.CharField(label="Tip document UE", max_length=200, required=False)
+    tip_document = forms.ChoiceField(
+        label="Tip act UE",
+        required=False,
+        choices=PnaEUActInlineForm.EU_ACT_TYPE_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
     url = forms.URLField(label="Link (opțional)", required=False)
 
     tip_transpunere = forms.ChoiceField(
@@ -868,7 +916,6 @@ class PnaEUActAttachForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["celex"].widget.attrs.update({"class": "form-control", "placeholder": "ex: 32014L0041"})
         self.fields["denumire"].widget.attrs.update({"class": "form-control"})
-        self.fields["tip_document"].widget.attrs.update({"class": "form-control"})
         self.fields["url"].widget.attrs.update({"class": "form-control"})
 
     def clean_celex(self):

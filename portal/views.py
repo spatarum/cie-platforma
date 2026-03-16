@@ -2130,6 +2130,7 @@ def admin_pna_create(request):
                     continue
                 den = (cd.get("denumire") or "").strip()
                 tip_doc = (cd.get("tip_document") or "").strip()
+                tip_tr = (cd.get("tip_transpunere") or "").strip()
                 act, _ = EUAct.objects.get_or_create(
                     celex=celex,
                     defaults={
@@ -2150,7 +2151,11 @@ def admin_pna_create(request):
                     changed = True
                 if changed:
                     act.save()
-                PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+
+                link_obj, _created = PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+                if link_obj.tip_transpunere != (tip_tr or ""):
+                    link_obj.tip_transpunere = tip_tr or ""
+                    link_obj.save(update_fields=["tip_transpunere"])
 
             messages.success(request, "Proiectul PNA a fost creat.")
             return redirect("admin_pna_detail", pk=obj.pk)
@@ -2175,6 +2180,10 @@ def admin_pna_edit(request, pk: int):
 
     ActeFormSet = formset_factory(PnaEUActInlineForm, extra=1, can_delete=True)
 
+    # Legături existente (pentru pre-populare și update/delete)
+    existing_links = list(obj.acte_ue_legaturi.select_related("eu_act").all())
+    existing_by_id = {l.id: l for l in existing_links}
+
     if request.method == "POST":
         form = PnaProjectForm(request.POST, instance=obj)
         acte_formset = ActeFormSet(request.POST, prefix="acts")
@@ -2183,13 +2192,31 @@ def admin_pna_edit(request, pk: int):
             form.sync_institution_legacy_fields(obj)
 
             for cd in acte_formset.cleaned_data:
-                if not cd or cd.get("DELETE") or cd.get("_empty"):
+                if not cd or cd.get("_empty"):
                     continue
+
+                link_id = cd.get("link_id")
+                is_delete = bool(cd.get("DELETE"))
+
+                # Ștergere legătură existentă
+                if link_id and is_delete:
+                    link_obj = existing_by_id.get(int(link_id))
+                    if link_obj:
+                        link_obj.delete()
+                    continue
+
+                # rând nou șters → ignorăm
+                if (not link_id) and is_delete:
+                    continue
+
                 celex, url = _extract_celex_from_link_or_code(cd.get("link_celex") or "")
                 if not celex:
                     continue
+
                 den = (cd.get("denumire") or "").strip()
                 tip_doc = (cd.get("tip_document") or "").strip()
+                tip_tr = (cd.get("tip_transpunere") or "").strip()
+
                 act, _ = EUAct.objects.get_or_create(
                     celex=celex,
                     defaults={
@@ -2202,21 +2229,60 @@ def admin_pna_edit(request, pk: int):
                 if den and act.denumire != den:
                     act.denumire = den
                     changed = True
-                if tip_doc and act.tip_document != tip_doc:
-                    act.tip_document = tip_doc
+                # permitem actualizarea tipului chiar dacă e gol (admin poate să îl golească)
+                if act.tip_document != (tip_doc or ""):
+                    act.tip_document = tip_doc or ""
                     changed = True
                 if url and act.url != url:
                     act.url = url
                     changed = True
                 if changed:
                     act.save()
-                PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+
+                if link_id:
+                    link_obj = existing_by_id.get(int(link_id))
+                    if not link_obj:
+                        # fallback: dacă între timp a dispărut, tratăm ca rând nou
+                        link_obj, _ = PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+                    else:
+                        # dacă admin a schimbat CELEX-ul pe un act deja existent în proiect,
+                        # evităm încălcarea unique_together prin merge.
+                        if link_obj.eu_act_id != act.id:
+                            other = PnaProjectEUAct.objects.filter(project=obj, eu_act=act).first()
+                            if other:
+                                if other.tip_transpunere != (tip_tr or ""):
+                                    other.tip_transpunere = tip_tr or ""
+                                    other.save(update_fields=["tip_transpunere"])
+                                link_obj.delete()
+                                continue
+                            link_obj.eu_act = act
+                        # tip transpunere poate fi setat/șters
+                        if link_obj.tip_transpunere != (tip_tr or ""):
+                            link_obj.tip_transpunere = tip_tr or ""
+                        link_obj.save()
+                else:
+                    # rând nou
+                    link_obj, _ = PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+                    if link_obj.tip_transpunere != (tip_tr or ""):
+                        link_obj.tip_transpunere = tip_tr or ""
+                        link_obj.save(update_fields=["tip_transpunere"])
 
             messages.success(request, "Proiectul PNA a fost actualizat.")
             return redirect("admin_pna_detail", pk=obj.pk)
     else:
         form = PnaProjectForm(instance=obj)
-        acte_formset = ActeFormSet(prefix="acts")
+
+        initial = [
+            {
+                "link_id": link.id,
+                "link_celex": link.eu_act.celex,
+                "denumire": link.eu_act.denumire,
+                "tip_document": link.eu_act.tip_document,
+                "tip_transpunere": link.tip_transpunere,
+            }
+            for link in existing_links
+        ]
+        acte_formset = ActeFormSet(prefix="acts", initial=initial)
 
     return render(
         request,

@@ -65,7 +65,18 @@
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">{{ form.institutii_responsabile.label }}</label>
-        {{ form.institutii_responsabile }}
+        <div class="border rounded p-2" style="max-height: 260px; overflow: auto;">
+          <div class="row g-1">
+            {% for cb in form.institutii_responsabile %}
+              <div class="col-12 col-md-6">
+                <div class="form-check">
+                  {{ cb.tag }}
+                  <label class="form-check-label" for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
         {% if form.institutii_responsabile.errors %}<div class="text-danger small">{{ form.institutii_responsabile.errors }}</div>{% endif %}
       </div>
       <div class="col-12 col-md-6">
@@ -213,7 +224,8 @@
             <div class="text-danger small mb-2">{{ f.non_field_errors }}</div>
           {% endif %}
           <div class="row g-2 align-items-end mb-2 eu-act-row">
-            <div class="col-12 col-md-5">
+            {{ f.link_id }}
+            <div class="col-12 col-md-4">
               <label class="form-label">{{ f.link_celex.label }}</label>
               {{ f.link_celex }}
             </div>
@@ -221,15 +233,19 @@
               <label class="form-label">{{ f.denumire.label }}</label>
               {{ f.denumire }}
             </div>
-            <div class="col-12 col-md-3">
+            <div class="col-6 col-md-2">
               <label class="form-label">{{ f.tip_document.label }}</label>
               {{ f.tip_document }}
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">{{ f.tip_transpunere.label }}</label>
+              {{ f.tip_transpunere }}
             </div>
             {% if f.DELETE %}
               <div class="col-12">
                 <div class="form-check">
                   {{ f.DELETE }}
-                  <label class="form-check-label" for="{{ f.DELETE.id_for_label }}">Șterge acest rând</label>
+                  <label class="form-check-label" for="{{ f.DELETE.id_for_label }}">Scoate acest act din proiect</label>
                 </div>
               </div>
             {% endif %}
@@ -239,7 +255,8 @@
 
       <template id="euActEmptyFormTemplate">
         <div class="row g-2 align-items-end mb-2 eu-act-row">
-          <div class="col-12 col-md-5">
+          {{ acte_formset.empty_form.link_id }}
+          <div class="col-12 col-md-4">
             <label class="form-label">{{ acte_formset.empty_form.link_celex.label }}</label>
             {{ acte_formset.empty_form.link_celex }}
           </div>
@@ -247,15 +264,19 @@
             <label class="form-label">{{ acte_formset.empty_form.denumire.label }}</label>
             {{ acte_formset.empty_form.denumire }}
           </div>
-          <div class="col-12 col-md-3">
+          <div class="col-6 col-md-2">
             <label class="form-label">{{ acte_formset.empty_form.tip_document.label }}</label>
             {{ acte_formset.empty_form.tip_document }}
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label">{{ acte_formset.empty_form.tip_transpunere.label }}</label>
+            {{ acte_formset.empty_form.tip_transpunere }}
           </div>
           {% if acte_formset.empty_form.DELETE %}
             <div class="col-12">
               <div class="form-check">
                 {{ acte_formset.empty_form.DELETE }}
-                <label class="form-check-label">Șterge acest rând</label>
+                <label class="form-check-label">Scoate acest act din proiect</label>
               </div>
             </div>
           {% endif %}
