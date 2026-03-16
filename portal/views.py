@@ -16,6 +16,8 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q, Count
+from django.db.models.functions import Coalesce
+from django.forms import formset_factory
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -33,6 +35,8 @@ from .forms import (
     ExpertPreferinteForm,
     NewsletterForm,
     PnaProjectForm,
+    PnaInstitutionForm,
+    PnaEUActInlineForm,
     PnaEUActAttachForm,
     PnaImportXLSXForm,
 )
@@ -49,6 +53,7 @@ from .models import (
     Newsletter,
     QuestionnaireScopeSnapshot,
     PnaProject,
+    PnaInstitution,
     EUAct,
     PnaProjectEUAct,
 )
@@ -1257,6 +1262,43 @@ def _parse_primary_criterion_code(raw: str):
     return "RoL" if token == "ROL" else token[:10]
 
 
+def _extract_celex_from_link_or_code(raw: str) -> tuple[str, str]:
+    """Extrage codul CELEX dintr-un link EUR-Lex sau dintr-un cod introdus manual.
+
+    Returnează (celex, url).
+    - `url` este păstrat doar dacă input-ul arată ca un URL.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "", ""
+
+    # păstrăm URL dacă e URL
+    url = s if s.lower().startswith("http") else ""
+
+    # încercăm să găsim CELEX:xxxxx în string
+    m = re.search(r"CELEX:([0-9A-Za-z]+)", s, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).strip(), url
+
+    # dacă e parametru uri=CELEX:...
+    m = re.search(r"uri=CELEX:([0-9A-Za-z]+)", s, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).strip(), url
+
+    # altfel tratăm ca "cod" (și curățăm prefixul)
+    celex = s.replace("CELEX:", "").replace("celex:", "").strip()
+    # lăsăm doar caracterele alfanumerice (ca protecție)
+    celex = re.sub(r"[^0-9A-Za-z]", "", celex)
+    return celex, url
+
+
+def _norm_inst_name(s: str) -> str:
+    s0 = (s or "").strip()
+    s0 = s0.replace("—", "-").replace("–", "-")
+    s0 = re.sub(r"\s+", " ", s0)
+    return s0.lower()
+
+
 @user_passes_test(is_admin)
 def admin_expert_import(request):
     """Importă experți din CSV.
@@ -1473,6 +1515,26 @@ def admin_questionnaire_import(request):
 
             report_rows = []
             nr_create = nr_update = nr_error = 0
+
+            # map instituții (pentru selectare + creare automată dacă lipsesc)
+            inst_map = {_norm_inst_name(i.nume): i for i in PnaInstitution.objects.all()}
+
+            def get_inst(name: str):
+                name0 = (name or "").strip()
+                if not name0:
+                    return None
+                key = _norm_inst_name(name0)
+                obj = inst_map.get(key)
+                if obj:
+                    return obj
+                obj = PnaInstitution.objects.create(nume=name0[:400])
+                inst_map[key] = obj
+                return obj
+
+            def split_insts(raw: str):
+                # separatori comuni: virgulă, ;, /, newline
+                parts = [p.strip() for p in re.split(r"[;,/\n]+", raw or "") if p and str(p).strip()]
+                return [p for p in parts if p]
 
             base_url = request.build_absolute_uri("/").rstrip("/")
 
@@ -1833,12 +1895,18 @@ def admin_pna_list(request):
 
     proiecte_qs = (
         PnaProject.objects.filter(arhivat=False)
-        .select_related("chapter", "criterion")
+        .select_related("chapter", "criterion", "institutie_principala_ref")
         .prefetch_related("acte_ue_legaturi__eu_act")
+        .prefetch_related("institutii_responsabile")
         .order_by("titlu")
     )
     if q:
-        proiecte_qs = proiecte_qs.filter(Q(titlu__icontains=q) | Q(institutie_principala__icontains=q))
+        proiecte_qs = proiecte_qs.filter(
+            Q(titlu__icontains=q)
+            | Q(institutie_principala__icontains=q)
+            | Q(institutie_principala_ref__nume__icontains=q)
+            | Q(institutii_responsabile__nume__icontains=q)
+        ).distinct()
 
     proiecte = list(proiecte_qs)
 
@@ -1916,89 +1984,185 @@ def admin_pna_list(request):
 
 @user_passes_test(is_admin)
 def admin_pna_dashboard(request):
-    """Dashboard PNA (admin) – overview rapid + termene apropiate."""
+    """Dashboard PNA (admin).
+
+    Cerințe:
+      - total proiecte în sistem + distribuție pe status (nr + %), afișat ca grafic tip coloane
+      - matrice: pe rânduri (foi de parcurs + capitole), pe coloane luni (pentru anul selectat)
+        – în celule: număr proiecte cu deadline în luna respectivă.
+
+    Deadline pentru matrice: termen actualizat Guvern (dacă există), altfel termen Parlament.
+    """
 
     proiecte = list(
         PnaProject.objects.filter(arhivat=False)
-        .select_related("chapter", "criterion")
+        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .prefetch_related("institutii_responsabile")
         .order_by("-actualizat_la")
     )
 
-    today = timezone.localdate()
-
-    def _next_deadline(p: PnaProject):
-        cands = [d for d in [p.termen_guvern_efectiv, p.termen_aprobare_parlament] if d]
-        return min(cands) if cands else None
-
     total = len(proiecte)
-    overdue = [p for p in proiecte if (_next_deadline(p) and _next_deadline(p) < today)]
-    upcoming = [p for p in proiecte if (_next_deadline(p) and today <= _next_deadline(p) <= (today + timedelta(days=90)))]
 
-    overdue.sort(key=lambda p: (_next_deadline(p) or datetime.max.date(), p.titlu))
-    upcoming.sort(key=lambda p: (_next_deadline(p) or datetime.max.date(), p.titlu))
-
-    # Distribuție pe capitole/foi de parcurs
-    by_scope = {
-        "capitole": {},
-        "criterii": {},
-    }
+    # -------------------- distribuție pe status --------------------
+    counts = {code: 0 for code, _ in PnaProject.STATUS_IMPLEMENTARE_CHOICES}
     for p in proiecte:
-        if p.chapter_id:
-            by_scope["capitole"].setdefault(p.chapter_id, 0)
-            by_scope["capitole"][p.chapter_id] += 1
+        counts[p.status_implementare] = counts.get(p.status_implementare, 0) + 1
+
+    status_rows = []
+    for code, label in PnaProject.STATUS_IMPLEMENTARE_CHOICES:
+        nr = counts.get(code, 0)
+        pct = round((nr / total) * 100, 1) if total else 0.0
+        status_rows.append({"code": code, "label": label, "nr": nr, "pct": pct, "pct_int": int(round(pct))})
+
+    # -------------------- matrice pe luni --------------------
+    today = timezone.localdate()
+    years = sorted({p.termen_deadline.year for p in proiecte if p.termen_deadline})
+    selected_year = None
+    try:
+        selected_year = int(request.GET.get("year") or 0)
+    except Exception:
+        selected_year = None
+    if not selected_year:
+        selected_year = today.year
+    if years and selected_year not in years:
+        # dacă anul nu există în date, alegem cel mai apropiat (ultimul)
+        selected_year = years[-1]
+
+    months = [
+        (1, "Ianuarie"),
+        (2, "Februarie"),
+        (3, "Martie"),
+        (4, "Aprilie"),
+        (5, "Mai"),
+        (6, "Iunie"),
+        (7, "Iulie"),
+        (8, "August"),
+        (9, "Septembrie"),
+        (10, "Octombrie"),
+        (11, "Noiembrie"),
+        (12, "Decembrie"),
+    ]
+
+    from collections import defaultdict
+
+    matrix = defaultdict(lambda: defaultdict(int))
+    for p in proiecte:
+        d = p.termen_deadline
+        if not d or d.year != selected_year:
+            continue
         if p.criterion_id:
-            by_scope["criterii"].setdefault(p.criterion_id, 0)
-            by_scope["criterii"][p.criterion_id] += 1
+            key = ("CR", p.criterion_id)
+        else:
+            key = ("CH", p.chapter_id)
+        if key[1]:
+            matrix[key][d.month] += 1
 
-    chapters = list(Chapter.objects.all().order_by("numar"))
+    criterii_rows = []
     criterii = list(Criterion.objects.all().order_by("cod"))
+    for cr in criterii:
+        counts_by_month = [matrix[("CR", cr.id)].get(m, 0) for m, _ in months]
+        if sum(counts_by_month) == 0:
+            continue
+        criterii_rows.append({"obj": cr, "counts": counts_by_month, "total": sum(counts_by_month)})
 
-    top_chapters = [
-        {"obj": ch, "nr": by_scope["capitole"].get(ch.id, 0)}
-        for ch in chapters
-        if by_scope["capitole"].get(ch.id, 0)
+    chapter_cluster_rows = []
+    grouped_chapters = group_chapters_by_cluster()
+    for cl, chapters in grouped_chapters:
+        rows = []
+        for ch in chapters:
+            counts_by_month = [matrix[("CH", ch.id)].get(m, 0) for m, _ in months]
+            if sum(counts_by_month) == 0:
+                continue
+            rows.append({"obj": ch, "counts": counts_by_month, "total": sum(counts_by_month)})
+        if rows:
+            chapter_cluster_rows.append({"cluster": cl, "rows": rows})
+
+    # -------------------- liste utile (opțional) --------------------
+    overdue = [p for p in proiecte if (p.termen_deadline and p.termen_deadline < today)]
+    upcoming = [
+        p
+        for p in proiecte
+        if (p.termen_deadline and today <= p.termen_deadline <= (today + timedelta(days=90)))
     ]
-    top_criterii = [
-        {"obj": cr, "nr": by_scope["criterii"].get(cr.id, 0)}
-        for cr in criterii
-        if by_scope["criterii"].get(cr.id, 0)
-    ]
-    top_chapters.sort(key=lambda r: (-r["nr"], r["obj"].numar))
-    top_criterii.sort(key=lambda r: (-r["nr"], r["obj"].cod))
+    overdue.sort(key=lambda p: (p.termen_deadline or datetime.max.date(), p.titlu))
+    upcoming.sort(key=lambda p: (p.termen_deadline or datetime.max.date(), p.titlu))
 
     return render(
         request,
         "portal/admin_pna_dashboard.html",
         {
             "total": total,
+            "status_rows": status_rows,
+            "years": years or [selected_year],
+            "selected_year": selected_year,
+            "months": months,
+            "criterii_rows": criterii_rows,
+            "chapter_cluster_rows": chapter_cluster_rows,
             "nr_overdue": len(overdue),
             "nr_upcoming_90": len(upcoming),
             "overdue": overdue[:50],
             "upcoming": upcoming[:50],
-            "top_chapters": top_chapters[:15],
-            "top_criterii": top_criterii[:15],
         },
     )
 
 
 @user_passes_test(is_admin)
 def admin_pna_create(request):
+    ActeFormSet = formset_factory(PnaEUActInlineForm, extra=1, can_delete=True)
+
     if request.method == "POST":
         form = PnaProjectForm(request.POST)
-        if form.is_valid():
+        acte_formset = ActeFormSet(request.POST, prefix="acts")
+        if form.is_valid() and acte_formset.is_valid():
             obj = form.save(commit=False)
             obj.creat_de = request.user
             obj.save()
+            form.save_m2m()
+            form.sync_institution_legacy_fields(obj)
+
+            # Salvare acte UE din formset
+            for cd in acte_formset.cleaned_data:
+                if not cd or cd.get("DELETE") or cd.get("_empty"):
+                    continue
+                celex, url = _extract_celex_from_link_or_code(cd.get("link_celex") or "")
+                if not celex:
+                    continue
+                den = (cd.get("denumire") or "").strip()
+                tip_doc = (cd.get("tip_document") or "").strip()
+                act, _ = EUAct.objects.get_or_create(
+                    celex=celex,
+                    defaults={
+                        "denumire": den or celex,
+                        "tip_document": tip_doc,
+                        "url": url,
+                    },
+                )
+                changed = False
+                if den and act.denumire != den:
+                    act.denumire = den
+                    changed = True
+                if tip_doc and act.tip_document != tip_doc:
+                    act.tip_document = tip_doc
+                    changed = True
+                if url and act.url != url:
+                    act.url = url
+                    changed = True
+                if changed:
+                    act.save()
+                PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+
             messages.success(request, "Proiectul PNA a fost creat.")
             return redirect("admin_pna_detail", pk=obj.pk)
     else:
         form = PnaProjectForm()
+        acte_formset = ActeFormSet(prefix="acts")
 
     return render(
         request,
         "portal/admin_pna_form.html",
         {
             "form": form,
+            "acte_formset": acte_formset,
             "titlu_pagina": "Proiect PNA nou",
         },
     )
@@ -2008,20 +2172,57 @@ def admin_pna_create(request):
 def admin_pna_edit(request, pk: int):
     obj = get_object_or_404(PnaProject, pk=pk)
 
+    ActeFormSet = formset_factory(PnaEUActInlineForm, extra=1, can_delete=True)
+
     if request.method == "POST":
         form = PnaProjectForm(request.POST, instance=obj)
-        if form.is_valid():
+        acte_formset = ActeFormSet(request.POST, prefix="acts")
+        if form.is_valid() and acte_formset.is_valid():
             obj = form.save()
+            form.sync_institution_legacy_fields(obj)
+
+            for cd in acte_formset.cleaned_data:
+                if not cd or cd.get("DELETE") or cd.get("_empty"):
+                    continue
+                celex, url = _extract_celex_from_link_or_code(cd.get("link_celex") or "")
+                if not celex:
+                    continue
+                den = (cd.get("denumire") or "").strip()
+                tip_doc = (cd.get("tip_document") or "").strip()
+                act, _ = EUAct.objects.get_or_create(
+                    celex=celex,
+                    defaults={
+                        "denumire": den or celex,
+                        "tip_document": tip_doc,
+                        "url": url,
+                    },
+                )
+                changed = False
+                if den and act.denumire != den:
+                    act.denumire = den
+                    changed = True
+                if tip_doc and act.tip_document != tip_doc:
+                    act.tip_document = tip_doc
+                    changed = True
+                if url and act.url != url:
+                    act.url = url
+                    changed = True
+                if changed:
+                    act.save()
+                PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+
             messages.success(request, "Proiectul PNA a fost actualizat.")
             return redirect("admin_pna_detail", pk=obj.pk)
     else:
         form = PnaProjectForm(instance=obj)
+        acte_formset = ActeFormSet(prefix="acts")
 
     return render(
         request,
         "portal/admin_pna_form.html",
         {
             "form": form,
+            "acte_formset": acte_formset,
             "titlu_pagina": "Editare proiect PNA",
             "obj": obj,
         },
@@ -2031,7 +2232,9 @@ def admin_pna_edit(request, pk: int):
 @user_passes_test(is_admin)
 def admin_pna_detail(request, pk: int):
     obj = get_object_or_404(
-        PnaProject.objects.select_related("chapter", "criterion").prefetch_related("acte_ue_legaturi__eu_act"),
+        PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref")
+        .prefetch_related("acte_ue_legaturi__eu_act")
+        .prefetch_related("institutii_responsabile"),
         pk=pk,
     )
 
@@ -2114,6 +2317,132 @@ def admin_pna_restabilire(request, pk: int):
         messages.success(request, "Proiectul PNA a fost restabilit.")
         return redirect("admin_pna_detail", pk=obj.pk)
     return redirect("admin_pna_detail", pk=obj.pk)
+
+
+@user_passes_test(is_admin)
+def admin_pna_institution_list(request):
+    q = (request.GET.get("q") or "").strip()
+    qs = PnaInstitution.objects.all().order_by("nume")
+    if q:
+        qs = qs.filter(nume__icontains=q)
+
+    return render(
+        request,
+        "portal/admin_pna_institutions_list.html",
+        {
+            "q": q,
+            "institutii": list(qs),
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_institution_create(request):
+    if request.method == "POST":
+        form = PnaInstitutionForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Instituția a fost adăugată.")
+            return redirect("admin_pna_institution_list")
+    else:
+        form = PnaInstitutionForm()
+
+    return render(
+        request,
+        "portal/admin_pna_institution_form.html",
+        {
+            "form": form,
+            "titlu_pagina": "Instituție PNA nouă",
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_institution_edit(request, pk: int):
+    obj = get_object_or_404(PnaInstitution, pk=pk)
+    if request.method == "POST":
+        form = PnaInstitutionForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Instituția a fost actualizată.")
+            return redirect("admin_pna_institution_list")
+    else:
+        form = PnaInstitutionForm(instance=obj)
+
+    return render(
+        request,
+        "portal/admin_pna_institution_form.html",
+        {
+            "form": form,
+            "titlu_pagina": "Editare instituție PNA",
+            "obj": obj,
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_scope_list(request):
+    """Listă proiecte filtrată (folosită din dashboard – click pe matrice)."""
+
+    chapter_id = request.GET.get("chapter")
+    criterion_id = request.GET.get("criterion")
+    year = request.GET.get("year")
+    month = request.GET.get("month")
+
+    if not chapter_id and not criterion_id:
+        raise Http404("Lipsește filtrul (chapter/criterion).")
+
+    qs = (
+        PnaProject.objects.filter(arhivat=False)
+        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .prefetch_related("institutii_responsabile")
+    )
+
+    scope_label = ""
+    if chapter_id:
+        ch = get_object_or_404(Chapter, pk=int(chapter_id))
+        qs = qs.filter(chapter=ch)
+        scope_label = f"Cap. {ch.numar} — {ch.denumire}"
+    else:
+        cr = get_object_or_404(Criterion, pk=int(criterion_id))
+        qs = qs.filter(criterion=cr)
+        scope_label = f"{cr.cod} — {cr.denumire}"
+
+    deadline_expr = Coalesce(
+        "termen_actualizat_aprobare_guvern",
+        "termen_aprobare_parlament",
+        "termen_aprobare_guvern",
+    )
+    qs = qs.annotate(deadline=deadline_expr)
+
+    year_i = None
+    month_i = None
+    try:
+        year_i = int(year) if year else None
+    except Exception:
+        year_i = None
+    try:
+        month_i = int(month) if month else None
+    except Exception:
+        month_i = None
+
+    if year_i:
+        qs = qs.filter(deadline__year=year_i)
+    if month_i:
+        qs = qs.filter(deadline__month=month_i)
+
+    projects = list(qs.order_by("deadline", "titlu"))
+
+    return render(
+        request,
+        "portal/admin_pna_scope_list.html",
+        {
+            "scope_label": scope_label,
+            "projects": projects,
+            "year": year_i,
+            "month": month_i,
+        },
+    )
 
 
 @user_passes_test(is_admin)
@@ -2264,8 +2593,34 @@ def admin_pna_import(request):
                         report_rows.append((row_idx, title, "ERROR", "Lipsește capitol/foaie de parcurs"))
                         continue
 
-                    inst = (str(row[col_inst]).strip() if col_inst is not None and row[col_inst] is not None else "")[:300]
-                    inst2 = (str(row[col_inst2]).strip() if col_inst2 is not None and row[col_inst2] is not None else "")[:300]
+                    inst_raw = str(row[col_inst]).strip() if col_inst is not None and row[col_inst] is not None else ""
+                    inst2_raw = str(row[col_inst2]).strip() if col_inst2 is not None and row[col_inst2] is not None else ""
+
+                    inst_parts = split_insts(inst_raw)
+                    inst_main = (inst_parts[0] if inst_parts else inst_raw).strip()
+                    inst_obj = get_inst(inst_main) if inst_main else None
+
+                    others_names = []
+                    if len(inst_parts) > 1:
+                        others_names.extend(inst_parts[1:])
+                    others_names.extend(split_insts(inst2_raw))
+                    # dedupe, scoatem instituția principală
+                    seen = set()
+                    others_objs = []
+                    for nm in others_names:
+                        if not nm:
+                            continue
+                        key = _norm_inst_name(nm)
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        o = get_inst(nm)
+                        if o and (not inst_obj or o.id != inst_obj.id):
+                            others_objs.append(o)
+
+                    # câmpuri legacy (text)
+                    inst = (inst_main or "")[:300]
+                    inst2 = (", ".join([o.nume for o in others_objs]) or "")[:300]
 
                     year = None
                     if col_year is not None:
@@ -2289,11 +2644,16 @@ def admin_pna_import(request):
                             obj.arhivat = False
                             obj.arhivat_la = None
                             changed = True
-                        if inst and obj.institutie_principala != inst:
+                        if col_inst is not None and obj.institutie_principala != inst:
                             obj.institutie_principala = inst
                             changed = True
-                        if inst2 and obj.institutie_coreponsabila != inst2:
+                        if col_inst2 is not None and obj.institutie_coreponsabila != inst2:
                             obj.institutie_coreponsabila = inst2
+                            changed = True
+
+                        # instituții (model nou)
+                        if inst_obj and obj.institutie_principala_ref_id != inst_obj.id:
+                            obj.institutie_principala_ref = inst_obj
                             changed = True
                         if gov_date and obj.termen_aprobare_guvern != gov_date:
                             obj.termen_aprobare_guvern = gov_date
@@ -2402,12 +2762,22 @@ def admin_pna_import(request):
                                     obj.acte_normative_transpunere_existente = joined
                                     changed = True
 
+                        m2m_should_update = bool(col_inst2 is not None or (len(inst_parts) > 1))
+                        m2m_changed = False
+                        if m2m_should_update:
+                            new_ids = sorted([o.id for o in others_objs if o])
+                            old_ids = sorted(list(obj.institutii_responsabile.values_list("id", flat=True)))
+                            if new_ids != old_ids:
+                                obj.institutii_responsabile.set(others_objs)
+                                m2m_changed = True
+
                         if changed:
                             obj.save()
+
+                        if changed or m2m_changed:
                             nr_update += 1
                             report_rows.append((row_idx, title, "UPDATED", "Actualizat"))
                         else:
-                            # nimic de schimbat (dar nu e eroare)
                             report_rows.append((row_idx, title, "OK", "Neschimbat"))
                     else:
                         obj = PnaProject.objects.create(
@@ -2416,6 +2786,7 @@ def admin_pna_import(request):
                             criterion=criterion,
                             institutie_principala=inst,
                             institutie_coreponsabila=inst2,
+                            institutie_principala_ref=inst_obj,
                             termen_aprobare_guvern=gov_date,
                             termen_aprobare_parlament=parl_date,
                             pna_cluster=(str(row[col_cluster]).strip()[:300] if col_cluster is not None and row[col_cluster] is not None else ""),
@@ -2447,6 +2818,8 @@ def admin_pna_import(request):
                             else "",
                             creat_de=request.user,
                         )
+                        if others_objs:
+                            obj.institutii_responsabile.set(others_objs)
                         nr_create += 1
                         report_rows.append((row_idx, title, "CREATED", "Creat"))
 

@@ -499,6 +499,30 @@ class AnswerComment(models.Model):
 # -------------------- PNA (Programul Național de Aderare) --------------------
 
 
+class PnaInstitution(models.Model):
+    """Instituție responsabilă în PNA.
+
+    În etapa 1 este administrată doar de Administrator (fără Django Admin).
+    """
+
+    nume = models.CharField(max_length=400, unique=True)
+    creat_la = models.DateTimeField(auto_now_add=True)
+    actualizat_la = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Instituție PNA"
+        verbose_name_plural = "Instituții PNA"
+        ordering = ["nume"]
+
+    def __str__(self) -> str:
+        return self.nume
+
+    def save(self, *args, **kwargs):
+        if self.nume:
+            self.nume = self.nume.strip()
+        return super().save(*args, **kwargs)
+
+
 class EUAct(models.Model):
     """Act UE (ex: Directivă / Regulament) care trebuie transpus/implementat."""
 
@@ -559,6 +583,24 @@ class PnaProject(models.Model):
         (3, "Disponibilă"),
     ]
 
+    STATUS_NEINCEPUT = "NEINCEPUT"
+    STATUS_IN_LUCRU_GUVERN = "IN_LUCRU_GUVERN"
+    STATUS_IN_AVIZARE_GUVERN = "IN_AVIZARE_GUVERN"
+    STATUS_ADOPTAT_GUVERN = "ADOPTAT_GUVERN"
+    STATUS_IN_AVIZARE_CE = "IN_AVIZARE_CE"
+    STATUS_IN_PROCEDURA_PARLAMENT = "IN_PROCEDURA_PARLAMENT"
+    STATUS_ADOPTAT_PARLAMENT = "ADOPTAT_PARLAMENT"
+
+    STATUS_IMPLEMENTARE_CHOICES = [
+        (STATUS_NEINCEPUT, "Neînceput"),
+        (STATUS_IN_LUCRU_GUVERN, "În lucru la Guvern"),
+        (STATUS_IN_AVIZARE_GUVERN, "În avizare la Guvern"),
+        (STATUS_ADOPTAT_GUVERN, "Adoptat de Guvern"),
+        (STATUS_IN_AVIZARE_CE, "În avizare la Comisia Europeană"),
+        (STATUS_IN_PROCEDURA_PARLAMENT, "În procedură legislativă la Parlament"),
+        (STATUS_ADOPTAT_PARLAMENT, "Adoptat de Parlament"),
+    ]
+
     titlu = models.CharField(max_length=700)
 
     # Fiecare proiect este atașat fie la un capitol, fie la o foaie de parcurs.
@@ -585,17 +627,47 @@ class PnaProject(models.Model):
     )
 
     # Elemente de bază (tabel PNA)
+    # Legacy text (păstrat pentru compatibilitate / import). În UI folosim referințe la instituții.
     institutie_principala = models.CharField(max_length=300, blank=True)
     institutie_coreponsabila = models.CharField(max_length=300, blank=True)
+
+    institutie_principala_ref = models.ForeignKey(
+        PnaInstitution,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="proiecte_principale",
+    )
+    institutii_responsabile = models.ManyToManyField(
+        PnaInstitution,
+        blank=True,
+        related_name="proiecte_responsabile",
+    )
 
     termen_aprobare_guvern = models.DateField(null=True, blank=True)
     termen_aprobare_parlament = models.DateField(null=True, blank=True)
     termen_actualizat_aprobare_guvern = models.DateField(null=True, blank=True)
 
+    status_implementare = models.CharField(
+        max_length=40,
+        choices=STATUS_IMPLEMENTARE_CHOICES,
+        default=STATUS_NEINCEPUT,
+    )
+
     # Detalii / meta
     descriere = models.TextField(blank=True)
     contact_responsabil = models.CharField(max_length=300, blank=True)
     contact_responsabil_email = models.EmailField(blank=True)
+
+    # Referințe / condiționalități
+    raport_extindere_2023 = models.BooleanField(default=False)
+    raport_extindere_2024 = models.BooleanField(default=False)
+    raport_extindere_2025 = models.BooleanField(default=False)
+    raport_extindere_2026 = models.BooleanField(default=False)
+    raport_extindere_2027 = models.BooleanField(default=False)
+
+    plan_crestere_economica = models.BooleanField(default=False)
+    necesita_avizare_comisia_europeana = models.BooleanField(default=False)
 
     # Evaluări (etapa 1: introduse manual de admin)
     complexitate = models.PositiveSmallIntegerField(null=True, blank=True, choices=COMPLEXITATE_CHOICES)
@@ -673,6 +745,21 @@ class PnaProject(models.Model):
     def termen_guvern_efectiv(self):
         """Termenul de guvern folosit în practică (actualizat dacă există)."""
         return self.termen_actualizat_aprobare_guvern or self.termen_aprobare_guvern
+
+    @property
+    def termen_deadline(self):
+        """Deadline-ul folosit în dashboard/matrice.
+
+        Regulă cerută:
+        - dacă există termen actualizat (Guvern) → se folosește acesta
+        - altfel → termenul de Parlament (din PNA)
+        - fallback: termenul inițial de Guvern
+        """
+        return (
+            self.termen_actualizat_aprobare_guvern
+            or self.termen_aprobare_parlament
+            or self.termen_aprobare_guvern
+        )
 
     def clean(self):
         # exact un scope

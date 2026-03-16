@@ -108,6 +108,10 @@ urlpatterns = [
     # PNA (etapa 1 – doar admin)
     path("administrare/pna/", views.admin_pna_list, name="admin_pna_list"),
     path("administrare/pna/dashboard/", views.admin_pna_dashboard, name="admin_pna_dashboard"),
+    path("administrare/pna/scop/", views.admin_pna_scope_list, name="admin_pna_scope_list"),
+    path("administrare/pna/institutii/", views.admin_pna_institution_list, name="admin_pna_institution_list"),
+    path("administrare/pna/institutii/nou/", views.admin_pna_institution_create, name="admin_pna_institution_create"),
+    path("administrare/pna/institutii/<int:pk>/edit/", views.admin_pna_institution_edit, name="admin_pna_institution_edit"),
     path("administrare/pna/nou/", views.admin_pna_create, name="admin_pna_create"),
     path("administrare/pna/import/", views.admin_pna_import, name="admin_pna_import"),
     path("administrare/pna/<int:pk>/", views.admin_pna_detail, name="admin_pna_detail"),
