@@ -15,6 +15,9 @@ from .models import (
     Questionnaire,
     Submission,
     Newsletter,
+    PnaProject,
+    EUAct,
+    PnaProjectEUAct,
 )
 
 
@@ -648,3 +651,142 @@ class NewsletterForm(forms.ModelForm):
             "subiect": "Subiect",
             "continut": "Conținut (poți include linkuri: [text](https://exemplu.md))",
         }
+
+
+# -------------------- PNA --------------------
+
+
+class PnaProjectForm(forms.ModelForm):
+    class Meta:
+        model = PnaProject
+        fields = [
+            "titlu",
+            "chapter",
+            "criterion",
+            "institutie_principala",
+            "institutie_coreponsabila",
+            "contact_responsabil",
+            "contact_responsabil_email",
+            "termen_aprobare_guvern",
+            "termen_aprobare_parlament",
+            "termen_actualizat_aprobare_guvern",
+            "complexitate",
+            "prioritate",
+            "expertiza_interna",
+            "volum_munca_zile",
+            "necesita_expertiza_externa",
+            "disponibilitate_expertiza_externa",
+            "parteneri_societate_civila",
+            "cost_2026",
+            "cost_2027",
+            "cost_2028",
+            "cost_2029",
+            "riscuri",
+            "analiza_flexibilitate",
+            "analiza_gestiunea_impactului",
+            "analiza_potential_negociere",
+            "descriere",
+        ]
+        widgets = {
+            "titlu": forms.TextInput(attrs={"class": "form-control"}),
+            "chapter": forms.Select(attrs={"class": "form-select"}),
+            "criterion": forms.Select(attrs={"class": "form-select"}),
+            "institutie_principala": forms.TextInput(attrs={"class": "form-control"}),
+            "institutie_coreponsabila": forms.TextInput(attrs={"class": "form-control"}),
+            "contact_responsabil": forms.TextInput(attrs={"class": "form-control"}),
+            "contact_responsabil_email": forms.EmailInput(attrs={"class": "form-control"}),
+            "termen_aprobare_guvern": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "termen_aprobare_parlament": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "termen_actualizat_aprobare_guvern": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "complexitate": forms.Select(attrs={"class": "form-select"}),
+            "prioritate": forms.Select(attrs={"class": "form-select"}),
+            "expertiza_interna": forms.Select(attrs={"class": "form-select"}),
+            "volum_munca_zile": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
+            "necesita_expertiza_externa": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "disponibilitate_expertiza_externa": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "parteneri_societate_civila": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "cost_2026": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "cost_2027": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "cost_2028": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "cost_2029": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "riscuri": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "analiza_flexibilitate": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "analiza_gestiunea_impactului": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "analiza_potential_negociere": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "descriere": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+        labels = {
+            "titlu": "Denumire proiect",
+            "chapter": "Capitol (dacă este cazul)",
+            "criterion": "Foaie de parcurs (dacă este cazul)",
+            "institutie_principala": "Instituția principală responsabilă",
+            "institutie_coreponsabila": "Instituția co-responsabilă (opțional)",
+            "contact_responsabil": "Contact persoană responsabilă (nume, funcție)",
+            "contact_responsabil_email": "Email contact (opțional)",
+            "termen_aprobare_guvern": "Termen aprobare în Guvern",
+            "termen_aprobare_parlament": "Termen aprobare în Parlament",
+            "termen_actualizat_aprobare_guvern": "Termen actualizat aprobare în Guvern",
+            "complexitate": "Complexitate (1–5)",
+            "prioritate": "Prioritate (1–3)",
+            "expertiza_interna": "Disponibilitate expertiză internă (1–3)",
+            "volum_munca_zile": "Volum de muncă (zile de lucru)",
+            "necesita_expertiza_externa": "Necesită expertiză externă",
+            "disponibilitate_expertiza_externa": "Disponibilitate expertiză externă (cine livrează) ",
+            "parteneri_societate_civila": "Parteneri societate civilă de consultat",
+            "riscuri": "Riscuri / observații",
+            "analiza_flexibilitate": "Flexibilitate (comentarii / opțiuni)",
+            "analiza_gestiunea_impactului": "Gestiunea impactului (comentarii / măsuri)",
+            "analiza_potential_negociere": "Potențial de negociere (argumente)",
+            "descriere": "Descriere (opțional)",
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        ch = cleaned.get("chapter")
+        cr = cleaned.get("criterion")
+        if ch and cr:
+            self.add_error("criterion", "Alege fie un capitol, fie o foaie de parcurs (nu ambele).")
+        if not ch and not cr:
+            self.add_error("chapter", "Alege un capitol sau o foaie de parcurs.")
+        return cleaned
+
+
+class PnaEUActAttachForm(forms.Form):
+    """Adaugă (sau actualizează) un act UE la un proiect PNA."""
+
+    celex = forms.CharField(label="CELEX", max_length=32)
+    denumire = forms.CharField(label="Denumire act UE", max_length=700, required=False)
+    tip_document = forms.CharField(label="Tip document UE", max_length=200, required=False)
+    url = forms.URLField(label="Link (opțional)", required=False)
+
+    tip_transpunere = forms.ChoiceField(
+        label="Tip transpunere",
+        required=False,
+        choices=[
+            ("", "—"),
+            (PnaProjectEUAct.TIP_TRANSPUNERE_TOTAL, "Transpus total"),
+            (PnaProjectEUAct.TIP_TRANSPUNERE_PARTIAL, "Transpus parțial"),
+        ],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["celex"].widget.attrs.update({"class": "form-control", "placeholder": "ex: 32014L0041"})
+        self.fields["denumire"].widget.attrs.update({"class": "form-control"})
+        self.fields["tip_document"].widget.attrs.update({"class": "form-control"})
+        self.fields["url"].widget.attrs.update({"class": "form-control"})
+
+    def clean_celex(self):
+        celex = (self.cleaned_data.get("celex") or "").strip()
+        celex = celex.replace("CELEX:", "").replace("celex:", "").strip()
+        if not celex:
+            raise forms.ValidationError("CELEX este obligatoriu.")
+        return celex
+
+
+class PnaImportXLSXForm(forms.Form):
+    fisier = forms.FileField(
+        label="Fișier Excel PNA (.xlsx)",
+        help_text="Încarcă fișierul PNA (de ex. sheet: Acțiuni_PNA).",
+    )

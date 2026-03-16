@@ -104,4 +104,15 @@ urlpatterns = [
     path("administrare/arhiva/", views.admin_arhiva, name="admin_arhiva"),
 
     path("administrare/export/", views.admin_export, name="admin_export"),
+
+    # PNA (etapa 1 – doar admin)
+    path("administrare/pna/", views.admin_pna_list, name="admin_pna_list"),
+    path("administrare/pna/dashboard/", views.admin_pna_dashboard, name="admin_pna_dashboard"),
+    path("administrare/pna/nou/", views.admin_pna_create, name="admin_pna_create"),
+    path("administrare/pna/import/", views.admin_pna_import, name="admin_pna_import"),
+    path("administrare/pna/<int:pk>/", views.admin_pna_detail, name="admin_pna_detail"),
+    path("administrare/pna/<int:pk>/edit/", views.admin_pna_edit, name="admin_pna_edit"),
+    path("administrare/pna/acte/<int:pk>/sterge/", views.admin_pna_detach_act, name="admin_pna_detach_act"),
+    path("administrare/pna/<int:pk>/arhiveaza/", views.admin_pna_arhivare, name="admin_pna_arhivare"),
+    path("administrare/pna/<int:pk>/restabileste/", views.admin_pna_restabilire, name="admin_pna_restabilire"),
 ]

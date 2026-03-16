@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -339,10 +340,12 @@ class Newsletter(models.Model):
 class ImportRun(models.Model):
     KIND_EXPERTI = "EXPERTI"
     KIND_CHESTIONARE = "CHESTIONARE"
+    KIND_PNA = "PNA"
 
     KIND_CHOICES = [
         (KIND_EXPERTI, "Import experți"),
         (KIND_CHESTIONARE, "Import chestionare"),
+        (KIND_PNA, "Import PNA"),
     ]
 
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_EXPERTI)
@@ -491,3 +494,214 @@ class AnswerComment(models.Model):
             except Exception:
                 pass
         return super().save(*args, **kwargs)
+
+
+# -------------------- PNA (Programul Național de Aderare) --------------------
+
+
+class EUAct(models.Model):
+    """Act UE (ex: Directivă / Regulament) care trebuie transpus/implementat."""
+
+    celex = models.CharField(max_length=32, unique=True)
+    denumire = models.CharField(max_length=700)
+    tip_document = models.CharField(max_length=200, blank=True)
+    url = models.URLField(blank=True)
+
+    class Meta:
+        verbose_name = "Act UE"
+        verbose_name_plural = "Acte UE"
+        ordering = ["celex"]
+
+    def __str__(self) -> str:
+        return f"{self.celex} – {self.denumire[:60]}" if self.denumire else self.celex
+
+    @property
+    def celex_curat(self) -> str:
+        raw = (self.celex or "").strip()
+        raw = raw.replace("CELEX:", "").replace("celex:", "").strip()
+        return raw
+
+    @property
+    def url_final(self) -> str:
+        if self.url:
+            return self.url
+        # Link standard către EUR-Lex. În practică, EUR-Lex acceptă URI=CELEX:<cod>
+        # și redirecționează la pagina actului.
+        if not self.celex_curat:
+            return ""
+        return f"https://eur-lex.europa.eu/legal-content/RO/TXT/?uri=CELEX:{self.celex_curat}"
+
+
+class PnaProject(models.Model):
+    """Unitate logică din PNA monitorizată în platformă ("proiect de lege").
+
+    NOTĂ: aici "proiect de lege" NU înseamnă redactarea textului de lege, ci o acțiune
+    normativă ce trebuie monitorizată și analizată.
+
+    În etapa 1 implementăm doar în profilul administratorului.
+    """
+
+    COMPLEXITATE_CHOICES = [
+        (1, "Foarte redusă"),
+        (2, "Redusă"),
+        (3, "Medie"),
+        (4, "Ridicată"),
+        (5, "Foarte ridicată"),
+    ]
+    PRIORITATE_CHOICES = [
+        (1, "Scăzută"),
+        (2, "Medie"),
+        (3, "Înaltă"),
+    ]
+    EXPERTIZA_INTERNA_CHOICES = [
+        (1, "Insuficientă"),
+        (2, "Parțială"),
+        (3, "Disponibilă"),
+    ]
+
+    titlu = models.CharField(max_length=700)
+
+    # Fiecare proiect este atașat fie la un capitol, fie la o foaie de parcurs.
+    chapter = models.ForeignKey(
+        Chapter,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pna_proiecte",
+    )
+    criterion = models.ForeignKey(
+        Criterion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pna_proiecte",
+    )
+
+    acte_ue = models.ManyToManyField(
+        EUAct,
+        through="PnaProjectEUAct",
+        related_name="proiecte_pna",
+        blank=True,
+    )
+
+    # Elemente de bază (tabel PNA)
+    institutie_principala = models.CharField(max_length=300, blank=True)
+    institutie_coreponsabila = models.CharField(max_length=300, blank=True)
+
+    termen_aprobare_guvern = models.DateField(null=True, blank=True)
+    termen_aprobare_parlament = models.DateField(null=True, blank=True)
+    termen_actualizat_aprobare_guvern = models.DateField(null=True, blank=True)
+
+    # Detalii / meta
+    descriere = models.TextField(blank=True)
+    contact_responsabil = models.CharField(max_length=300, blank=True)
+    contact_responsabil_email = models.EmailField(blank=True)
+
+    # Evaluări (etapa 1: introduse manual de admin)
+    complexitate = models.PositiveSmallIntegerField(null=True, blank=True, choices=COMPLEXITATE_CHOICES)
+    prioritate = models.PositiveSmallIntegerField(null=True, blank=True, choices=PRIORITATE_CHOICES)
+    expertiza_interna = models.PositiveSmallIntegerField(null=True, blank=True, choices=EXPERTIZA_INTERNA_CHOICES)
+
+    volum_munca_zile = models.PositiveIntegerField(null=True, blank=True)
+    necesita_expertiza_externa = models.BooleanField(default=False)
+    disponibilitate_expertiza_externa = models.TextField(blank=True)
+    parteneri_societate_civila = models.TextField(blank=True)
+
+    # Costuri pe ani (lei) – etapă 1
+    cost_2026 = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cost_2027 = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cost_2028 = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cost_2029 = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+
+    # Riscuri (etapa 1)
+    riscuri = models.TextField(blank=True)
+
+    # Criterii de analiză (comentarii vor fi completate ulterior de experți/staff – etapă 2)
+    analiza_flexibilitate = models.TextField(blank=True)
+    analiza_gestiunea_impactului = models.TextField(blank=True)
+    analiza_potential_negociere = models.TextField(blank=True)
+
+    # Elemente suplimentare utile din tabelul PNA (import)
+    pna_cluster = models.CharField(max_length=300, blank=True)
+    pna_prioritate_text = models.CharField(max_length=100, blank=True)
+    pna_nr_actiune = models.CharField(max_length=50, blank=True)
+    pna_cod_unic = models.CharField(max_length=255, blank=True)
+    indicator_monitorizare = models.TextField(blank=True)
+    comentariu_pna = models.TextField(blank=True)
+    intarziat_2025 = models.BooleanField(default=False)
+    note_explicative = models.TextField(blank=True)
+    partener_de_dezvoltare = models.CharField(max_length=300, blank=True)
+    executor_actiune = models.CharField(max_length=300, blank=True)
+
+    cost_total_mii_lei = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cost_buget_stat_mii_lei = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cost_asistenta_externa_mii_lei = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cost_neacoperite_mii_lei = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+
+    acte_normative_transpunere_existente = models.TextField(blank=True)
+
+    creat_de = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pna_proiecte_create",
+    )
+    creat_la = models.DateTimeField(auto_now_add=True)
+    actualizat_la = models.DateTimeField(auto_now=True)
+
+    arhivat = models.BooleanField(default=False)
+    arhivat_la = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Proiect PNA"
+        verbose_name_plural = "Proiecte PNA"
+        ordering = ["-actualizat_la", "titlu"]
+
+    def __str__(self) -> str:
+        return self.titlu
+
+    @property
+    def atasare_label(self) -> str:
+        if self.chapter_id:
+            return f"Cap. {self.chapter.numar} – {self.chapter.denumire}"
+        if self.criterion_id:
+            return f"{self.criterion.cod} – {self.criterion.denumire}"
+        return "(neatribuit)"
+
+    @property
+    def termen_guvern_efectiv(self):
+        """Termenul de guvern folosit în practică (actualizat dacă există)."""
+        return self.termen_actualizat_aprobare_guvern or self.termen_aprobare_guvern
+
+    def clean(self):
+        # exact un scope
+        has_ch = bool(self.chapter_id)
+        has_cr = bool(self.criterion_id)
+        if has_ch and has_cr:
+            raise ValidationError("Proiectul trebuie atașat fie la un capitol, fie la o foaie de parcurs (nu ambele).")
+        if not has_ch and not has_cr:
+            raise ValidationError("Proiectul trebuie atașat la un capitol sau la o foaie de parcurs.")
+
+
+class PnaProjectEUAct(models.Model):
+    """Legătura proiect PNA ↔ act UE, cu informații suplimentare per act."""
+
+    TIP_TRANSPUNERE_TOTAL = "TOTAL"
+    TIP_TRANSPUNERE_PARTIAL = "PARTIAL"
+    TIP_TRANSPUNERE_CHOICES = [
+        (TIP_TRANSPUNERE_TOTAL, "Transpus total"),
+        (TIP_TRANSPUNERE_PARTIAL, "Transpus parțial"),
+    ]
+
+    project = models.ForeignKey(PnaProject, on_delete=models.CASCADE, related_name="acte_ue_legaturi")
+    eu_act = models.ForeignKey(EUAct, on_delete=models.CASCADE, related_name="pna_legaturi")
+    tip_transpunere = models.CharField(max_length=20, blank=True, choices=TIP_TRANSPUNERE_CHOICES)
+
+    class Meta:
+        verbose_name = "Act UE în proiect"
+        verbose_name_plural = "Acte UE în proiecte"
+        unique_together = ("project", "eu_act")
+
+    def __str__(self) -> str:
+        return f"{self.project_id} ↔ {self.eu_act_id}"

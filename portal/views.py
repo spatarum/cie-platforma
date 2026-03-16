@@ -4,7 +4,9 @@ import csv
 import io
 import secrets
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+
+import openpyxl
 
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -30,6 +32,9 @@ from .forms import (
     RaspunsChestionarForm,
     ExpertPreferinteForm,
     NewsletterForm,
+    PnaProjectForm,
+    PnaEUActAttachForm,
+    PnaImportXLSXForm,
 )
 from .models import (
     Answer,
@@ -43,6 +48,9 @@ from .models import (
     Submission,
     Newsletter,
     QuestionnaireScopeSnapshot,
+    PnaProject,
+    EUAct,
+    PnaProjectEUAct,
 )
 from .notifications import send_new_questionnaire_emails, send_newsletter_emails
 from .stats import get_questionnaire_rate_and_counts, ensure_scope_snapshot
@@ -1141,6 +1149,114 @@ def _parse_deadline(raw: str) -> timezone.datetime:
     return dt
 
 
+# -------------------- PNA helpers --------------------
+
+
+_RO_MONTHS = {
+    "ianuarie": 1,
+    "februarie": 2,
+    "martie": 3,
+    "aprilie": 4,
+    "mai": 5,
+    "iunie": 6,
+    "iulie": 7,
+    "august": 8,
+    "septembrie": 9,
+    "octombrie": 10,
+    "noiembrie": 11,
+    "decembrie": 12,
+}
+
+
+def _to_date_from_pna_term(raw_value, fallback_year=None):
+    """Convertește termenul din Excel PNA în `date` (ziua=1).
+
+    Acceptă:
+      - datetime/date (openpyxl)
+      - string "Aprilie 2026"
+      - string "Iulie" + fallback_year
+      - string "2026-08-01" etc.
+    """
+    if raw_value is None:
+        return None
+
+    # Datetime / date (openpyxl)
+    try:
+        import datetime as _dt
+
+        if isinstance(raw_value, _dt.datetime):
+            return raw_value.date().replace(day=1)
+        if isinstance(raw_value, _dt.date):
+            return raw_value.replace(day=1)
+    except Exception:
+        pass
+
+    s = str(raw_value).strip()
+    if not s:
+        return None
+
+    # Dacă e format ISO date
+    for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"]:
+        try:
+            d = datetime.strptime(s, fmt).date()
+            return d.replace(day=1)
+        except Exception:
+            pass
+
+    # "Aprilie 2026" / "Octombrie 2026" etc.
+    m = re.match(r"^([A-Za-zăâîșțĂÂÎȘȚ]+)\s+(\d{4})$", s)
+    if m:
+        mon = m.group(1).strip().lower()
+        year = int(m.group(2))
+        if mon in _RO_MONTHS:
+            return datetime(year, _RO_MONTHS[mon], 1).date()
+
+    # Doar luna (folosim fallback_year)
+    mon2 = s.lower()
+    if mon2 in _RO_MONTHS and fallback_year:
+        return datetime(int(fallback_year), _RO_MONTHS[mon2], 1).date()
+
+    return None
+
+
+def _parse_chapter_from_label(label: str):
+    """Extrage numărul capitolului dintr-un text de tip "Capitolul 10 – ..."."""
+    if not label:
+        return None
+    m = re.search(r"Capitolul\s*(\d{1,2})", str(label))
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
+def _parse_primary_criterion_code(raw: str):
+    """Extrage un cod scurt de foaie de parcurs din celula PNA.
+
+    Exemplu valori în fișier: "RoL", "PAR", "CR - Criteriu de referință", "GP - Planul ...", combinații separate prin virgulă.
+    În etapa 1, proiectul este atașat la un singur criteriu (cel mai relevant / primul detectat).
+    """
+    s = (raw or "").strip()
+    if not s:
+        return None
+
+    s_up = s.upper()
+    # ordine: dacă sunt combinate, încercăm să detectăm explicit coduri cunoscute
+    for code in ["ROL", "PAR", "FDI", "GP", "CR"]:
+        if re.search(rf"\b{code}\b", s_up):
+            return "RoL" if code == "ROL" else code
+
+    # fallback: primul token înainte de spațiu / virgulă / "-"
+    token = re.split(r"[\s,–\-]+", s.strip(), maxsplit=1)[0]
+    token = token.strip().upper()
+    if not token:
+        return None
+    # păstrăm cazul preferat pentru RoL
+    return "RoL" if token == "ROL" else token[:10]
+
+
 @user_passes_test(is_admin)
 def admin_expert_import(request):
     """Importă experți din CSV.
@@ -1570,6 +1686,16 @@ def admin_import_run_detail(request, pk: int):
         create_label = "Chestionare create"
         update_label = "Chestionare actualizate"
         has_credentials = False
+    elif run.kind == ImportRun.KIND_PNA:
+        back_url = "admin_pna_list"
+        back_label = "Înapoi la PNA"
+        back_icon = "bi-journal-text"
+        new_url = "admin_pna_import"
+        new_label = "Import nou"
+        new_icon = "bi-upload"
+        create_label = "Proiecte create"
+        update_label = "Proiecte actualizate"
+        has_credentials = False
     else:
         back_url = "admin_dashboard"
         back_label = "Înapoi"
@@ -1605,7 +1731,15 @@ def admin_import_run_report_csv(request, pk: int):
     run = get_object_or_404(ImportRun, pk=pk)
     resp = HttpResponse(run.raport_csv or "", content_type="text/csv; charset=utf-8")
     ts = run.creat_la.strftime("%Y%m%d_%H%M")
-    kind_slug = "experti" if run.kind == ImportRun.KIND_EXPERTI else ("chestionare" if run.kind == ImportRun.KIND_CHESTIONARE else "import")
+    kind_slug = (
+        "experti"
+        if run.kind == ImportRun.KIND_EXPERTI
+        else (
+            "chestionare"
+            if run.kind == ImportRun.KIND_CHESTIONARE
+            else ("pna" if run.kind == ImportRun.KIND_PNA else "import")
+        )
+    )
     resp["Content-Disposition"] = f'attachment; filename="raport_{kind_slug}_{ts}.csv"'
     return resp
 
@@ -1686,6 +1820,710 @@ def admin_referinte(request):
         "portal/admin_referinte.html",
         {"grouped": grouped, "criterii": criterii},
     )
+
+
+# -------------------- PNA (admin) --------------------
+
+
+@user_passes_test(is_admin)
+def admin_pna_list(request):
+    """Pagina PNA (admin): listă + tabel structurat pe capitole/foi de parcurs."""
+
+    q = (request.GET.get("q") or "").strip()
+
+    proiecte_qs = (
+        PnaProject.objects.filter(arhivat=False)
+        .select_related("chapter", "criterion")
+        .prefetch_related("acte_ue_legaturi__eu_act")
+        .order_by("titlu")
+    )
+    if q:
+        proiecte_qs = proiecte_qs.filter(Q(titlu__icontains=q) | Q(institutie_principala__icontains=q))
+
+    proiecte = list(proiecte_qs)
+
+    # Statistici rapide (dashboard)
+    today = timezone.localdate()
+
+    def _gov_overdue(p: PnaProject) -> bool:
+        d = p.termen_guvern_efectiv
+        return bool(d and d < today)
+
+    def _parl_overdue(p: PnaProject) -> bool:
+        d = p.termen_aprobare_parlament
+        return bool(d and d < today)
+
+    total = len(proiecte)
+    nr_overdue = sum(1 for p in proiecte if (_gov_overdue(p) or _parl_overdue(p)))
+    nr_fara_termene = sum(
+        1
+        for p in proiecte
+        if not p.termen_guvern_efectiv and not p.termen_aprobare_parlament
+    )
+
+    # Upcoming (următoarele 60 zile) pe termenul "cel mai apropiat" dintre Guvern/Parlament
+    def _next_deadline(p: PnaProject):
+        cands = [d for d in [p.termen_guvern_efectiv, p.termen_aprobare_parlament] if d]
+        return min(cands) if cands else None
+
+    upcoming_60 = [p for p in proiecte if _next_deadline(p) and today <= _next_deadline(p) <= (today + timedelta(days=60))]
+    nr_upcoming_60 = len(upcoming_60)
+
+    # Grupare pe criterii (foi de parcurs)
+    by_criterion = {}
+    by_chapter = {}
+    for p in proiecte:
+        if p.criterion_id:
+            by_criterion.setdefault(p.criterion_id, []).append(p)
+        elif p.chapter_id:
+            by_chapter.setdefault(p.chapter_id, []).append(p)
+
+    criterii = list(Criterion.objects.all().order_by("cod"))
+    criterii_groups = []
+    for cr in criterii:
+        rows = by_criterion.get(cr.id, [])
+        if rows:
+            # sortare: după termenul apropiat
+            rows.sort(key=lambda p: (_next_deadline(p) or datetime.max.date(), p.titlu))
+            criterii_groups.append({"criteriu": cr, "proiecte": rows})
+
+    grouped_chapters = group_chapters_by_cluster()
+    chapter_groups = []
+    for cl, chapters in grouped_chapters:
+        ch_rows = []
+        for ch in chapters:
+            rows = by_chapter.get(ch.id, [])
+            if rows:
+                rows.sort(key=lambda p: (_next_deadline(p) or datetime.max.date(), p.titlu))
+                ch_rows.append({"capitol": ch, "proiecte": rows})
+        if ch_rows:
+            chapter_groups.append({"cluster": cl, "chapters": ch_rows})
+
+    return render(
+        request,
+        "portal/admin_pna_list.html",
+        {
+            "q": q,
+            "total": total,
+            "nr_overdue": nr_overdue,
+            "nr_upcoming_60": nr_upcoming_60,
+            "nr_fara_termene": nr_fara_termene,
+            "criterii_groups": criterii_groups,
+            "chapter_groups": chapter_groups,
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_dashboard(request):
+    """Dashboard PNA (admin) – overview rapid + termene apropiate."""
+
+    proiecte = list(
+        PnaProject.objects.filter(arhivat=False)
+        .select_related("chapter", "criterion")
+        .order_by("-actualizat_la")
+    )
+
+    today = timezone.localdate()
+
+    def _next_deadline(p: PnaProject):
+        cands = [d for d in [p.termen_guvern_efectiv, p.termen_aprobare_parlament] if d]
+        return min(cands) if cands else None
+
+    total = len(proiecte)
+    overdue = [p for p in proiecte if (_next_deadline(p) and _next_deadline(p) < today)]
+    upcoming = [p for p in proiecte if (_next_deadline(p) and today <= _next_deadline(p) <= (today + timedelta(days=90)))]
+
+    overdue.sort(key=lambda p: (_next_deadline(p) or datetime.max.date(), p.titlu))
+    upcoming.sort(key=lambda p: (_next_deadline(p) or datetime.max.date(), p.titlu))
+
+    # Distribuție pe capitole/foi de parcurs
+    by_scope = {
+        "capitole": {},
+        "criterii": {},
+    }
+    for p in proiecte:
+        if p.chapter_id:
+            by_scope["capitole"].setdefault(p.chapter_id, 0)
+            by_scope["capitole"][p.chapter_id] += 1
+        if p.criterion_id:
+            by_scope["criterii"].setdefault(p.criterion_id, 0)
+            by_scope["criterii"][p.criterion_id] += 1
+
+    chapters = list(Chapter.objects.all().order_by("numar"))
+    criterii = list(Criterion.objects.all().order_by("cod"))
+
+    top_chapters = [
+        {"obj": ch, "nr": by_scope["capitole"].get(ch.id, 0)}
+        for ch in chapters
+        if by_scope["capitole"].get(ch.id, 0)
+    ]
+    top_criterii = [
+        {"obj": cr, "nr": by_scope["criterii"].get(cr.id, 0)}
+        for cr in criterii
+        if by_scope["criterii"].get(cr.id, 0)
+    ]
+    top_chapters.sort(key=lambda r: (-r["nr"], r["obj"].numar))
+    top_criterii.sort(key=lambda r: (-r["nr"], r["obj"].cod))
+
+    return render(
+        request,
+        "portal/admin_pna_dashboard.html",
+        {
+            "total": total,
+            "nr_overdue": len(overdue),
+            "nr_upcoming_90": len(upcoming),
+            "overdue": overdue[:50],
+            "upcoming": upcoming[:50],
+            "top_chapters": top_chapters[:15],
+            "top_criterii": top_criterii[:15],
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_create(request):
+    if request.method == "POST":
+        form = PnaProjectForm(request.POST)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.creat_de = request.user
+            obj.save()
+            messages.success(request, "Proiectul PNA a fost creat.")
+            return redirect("admin_pna_detail", pk=obj.pk)
+    else:
+        form = PnaProjectForm()
+
+    return render(
+        request,
+        "portal/admin_pna_form.html",
+        {
+            "form": form,
+            "titlu_pagina": "Proiect PNA nou",
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_edit(request, pk: int):
+    obj = get_object_or_404(PnaProject, pk=pk)
+
+    if request.method == "POST":
+        form = PnaProjectForm(request.POST, instance=obj)
+        if form.is_valid():
+            obj = form.save()
+            messages.success(request, "Proiectul PNA a fost actualizat.")
+            return redirect("admin_pna_detail", pk=obj.pk)
+    else:
+        form = PnaProjectForm(instance=obj)
+
+    return render(
+        request,
+        "portal/admin_pna_form.html",
+        {
+            "form": form,
+            "titlu_pagina": "Editare proiect PNA",
+            "obj": obj,
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_detail(request, pk: int):
+    obj = get_object_or_404(
+        PnaProject.objects.select_related("chapter", "criterion").prefetch_related("acte_ue_legaturi__eu_act"),
+        pk=pk,
+    )
+
+    if request.method == "POST":
+        attach_form = PnaEUActAttachForm(request.POST)
+        if attach_form.is_valid():
+            celex = attach_form.cleaned_data["celex"]
+            den = (attach_form.cleaned_data.get("denumire") or "").strip()
+            tip_doc = (attach_form.cleaned_data.get("tip_document") or "").strip()
+            url = (attach_form.cleaned_data.get("url") or "").strip()
+            tip_transp = (attach_form.cleaned_data.get("tip_transpunere") or "").strip()
+
+            act, created = EUAct.objects.get_or_create(
+                celex=celex,
+                defaults={"denumire": den or celex, "tip_document": tip_doc, "url": url},
+            )
+            # update fields if provided
+            changed = False
+            if den and act.denumire != den:
+                act.denumire = den
+                changed = True
+            if tip_doc and act.tip_document != tip_doc:
+                act.tip_document = tip_doc
+                changed = True
+            if url and act.url != url:
+                act.url = url
+                changed = True
+            if changed:
+                act.save()
+
+            link, _ = PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+            if tip_transp and link.tip_transpunere != tip_transp:
+                link.tip_transpunere = tip_transp
+                link.save(update_fields=["tip_transpunere"])
+
+            messages.success(request, "Actul UE a fost atașat proiectului.")
+            return redirect("admin_pna_detail", pk=obj.pk)
+    else:
+        attach_form = PnaEUActAttachForm()
+
+    return render(
+        request,
+        "portal/admin_pna_detail.html",
+        {
+            "obj": obj,
+            "attach_form": attach_form,
+        },
+    )
+
+
+@user_passes_test(is_admin)
+def admin_pna_detach_act(request, pk: int):
+    link = get_object_or_404(PnaProjectEUAct, pk=pk)
+    project_id = link.project_id
+    if request.method == "POST":
+        link.delete()
+        messages.success(request, "Actul UE a fost scos din proiect.")
+    return redirect("admin_pna_detail", pk=project_id)
+
+
+@user_passes_test(is_admin)
+def admin_pna_arhivare(request, pk: int):
+    obj = get_object_or_404(PnaProject, pk=pk)
+    if request.method == "POST":
+        obj.arhivat = True
+        obj.arhivat_la = timezone.now()
+        obj.save(update_fields=["arhivat", "arhivat_la"])
+        messages.success(request, "Proiectul PNA a fost arhivat.")
+        return redirect("admin_pna_list")
+    return redirect("admin_pna_detail", pk=obj.pk)
+
+
+@user_passes_test(is_admin)
+def admin_pna_restabilire(request, pk: int):
+    obj = get_object_or_404(PnaProject, pk=pk)
+    if request.method == "POST":
+        obj.arhivat = False
+        obj.arhivat_la = None
+        obj.save(update_fields=["arhivat", "arhivat_la"])
+        messages.success(request, "Proiectul PNA a fost restabilit.")
+        return redirect("admin_pna_detail", pk=obj.pk)
+    return redirect("admin_pna_detail", pk=obj.pk)
+
+
+@user_passes_test(is_admin)
+def admin_pna_import(request):
+    """Import masiv din Excel (PNA).
+
+    Importă minim:
+      - titlu (ACȚIUNE NORMATIVĂ)
+      - capitol / foaie de parcurs
+      - instituția responsabilă
+      - termene (Guvern/Parlament)
+      - acte UE (CELEX + denumire) dacă există
+    """
+
+    if request.method == "POST":
+        form = PnaImportXLSXForm(request.POST, request.FILES)
+        if form.is_valid():
+            f = form.cleaned_data["fisier"]
+            filename = getattr(f, "name", "") or ""
+
+            try:
+                wb = openpyxl.load_workbook(f, data_only=True)
+            except Exception:
+                messages.error(request, "Fișierul nu poate fi citit. Asigură-te că este .xlsx valid.")
+                return redirect("admin_pna_import")
+
+            # găsim sheet-ul relevant
+            sheet = None
+            for nm in wb.sheetnames:
+                if (nm or "").strip().lower() in {"acțiuni_pna", "actiuni_pna"}:
+                    sheet = wb[nm]
+                    break
+            if sheet is None:
+                # fallback: primul sheet care conține "pna"
+                for nm in wb.sheetnames:
+                    if "pna" in (nm or "").lower():
+                        sheet = wb[nm]
+                        break
+            if sheet is None:
+                messages.error(request, "Nu am găsit sheet-ul «Acțiuni_PNA» în fișier.")
+                return redirect("admin_pna_import")
+
+            # headere
+            header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+            headers = [str(h).strip() if h is not None else "" for h in header_row]
+
+            def _idx(name: str):
+                try:
+                    return headers.index(name)
+                except Exception:
+                    return None
+
+            col_title = _idx("ACȚIUNE NORMATIVĂ")
+            col_cluster = _idx("Cluster")
+            col_capitol = _idx("Capitol")
+            col_foaie = _idx("FOAIE DE PARCURS")
+            col_inst = _idx("INSTITUȚIA RESPONSABILĂ")
+            col_inst2 = _idx("INSTITUȚIA CO-RESPONSABILĂ")
+            col_gov = _idx("TERMEN APROBARE ÎN GUVERN")
+            col_parl_month = _idx("LUNĂ")
+            col_year = _idx("ANUL ADOPTĂRII")
+            col_prior_txt = _idx("Prioritate")
+            col_nr_act = _idx("NR. D/O ACȚIUNE")
+            col_cod_unic = _idx("COD UNIC IDENTIFICABIL")
+            col_indicator = _idx("INDICATOR DE MONITORIZARE")
+            col_intarz = _idx("Întârziat 2025")
+            col_comment1 = _idx("Comentariu")
+            col_comment2 = _idx("COMENTARIU")
+            col_note = _idx("Note explicative")
+            col_partner = _idx("PARTENERUL DE DEZVOLTARE")
+            col_exec = _idx("EXECUTOR ACȚIUNE")
+
+            col_cost_total = _idx("COSTURI ESTIMATIVE (mii lei)")
+            col_cost_bs = _idx("ACOPERIT DIN BUGETUL DE STAT (mii lei)")
+            col_cost_ext = _idx("ACOPERIT DIN ASISTENȚĂ EXTERNĂ (mii lei)")
+            col_cost_neac = _idx("COSTURI NEACOPERITE (mii lei)")
+
+            col_celex = _idx("CELEX")
+            col_act_name = _idx("DENUMIRE ACT UE")
+            col_act_type = _idx("Tip document UE")
+
+            # Coloana lungă (întention), o căutăm prin "Intentia de transpunere"
+            col_intentie = None
+            for i, h in enumerate(headers):
+                if "Intentia de transpunere" in (h or ""):
+                    col_intentie = i
+                    break
+
+            # Acte normative existente – sunt 2-3 coloane cu nume foarte apropiate
+            col_existing_transp = [
+                i
+                for i, h in enumerate(headers)
+                if (h or "").startswith("Acte normative în vigoare de transpunere a actului UE")
+            ]
+
+            if col_title is None:
+                messages.error(request, "Fișier invalid: lipsește coloana «ACȚIUNE NORMATIVĂ». ")
+                return redirect("admin_pna_import")
+
+            report_rows = []
+            nr_create = nr_update = nr_error = 0
+
+            def _to_decimal(v):
+                if v is None or v == "":
+                    return None
+                try:
+                    # openpyxl poate returna float/int
+                    return float(v)
+                except Exception:
+                    try:
+                        s = str(v).strip().replace(" ", "").replace(",", ".")
+                        return float(s) if s else None
+                    except Exception:
+                        return None
+
+            for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    title_raw = row[col_title] if col_title is not None else None
+                    title = re.sub(r"\s+", " ", str(title_raw or "")).strip()
+                    if not title:
+                        continue
+
+                    cap_label = row[col_capitol] if col_capitol is not None else None
+                    foaie_label = row[col_foaie] if col_foaie is not None else None
+
+                    chapter = None
+                    criterion = None
+                    ch_num = _parse_chapter_from_label(str(cap_label or ""))
+                    if ch_num:
+                        # găsim/căutăm capitol
+                        chapter = Chapter.objects.filter(numar=ch_num).first()
+                        if not chapter:
+                            # fallback: denumire din etichetă
+                            den = str(cap_label or "").split("–", 1)
+                            denumire = den[1].strip() if len(den) > 1 else str(cap_label or "").strip()
+                            chapter = Chapter.objects.create(numar=ch_num, denumire=(denumire or "")[:255])
+                    else:
+                        code = _parse_primary_criterion_code(str(foaie_label or ""))
+                        if code:
+                            criterion = Criterion.objects.filter(cod=code).first()
+                            if not criterion:
+                                # încearcă să derive denumirea din label
+                                den = str(foaie_label or "").strip()
+                                criterion = Criterion.objects.create(cod=code, denumire=((den or code)[:255]))
+
+                    if not chapter and not criterion:
+                        nr_error += 1
+                        report_rows.append((row_idx, title, "ERROR", "Lipsește capitol/foaie de parcurs"))
+                        continue
+
+                    inst = (str(row[col_inst]).strip() if col_inst is not None and row[col_inst] is not None else "")[:300]
+                    inst2 = (str(row[col_inst2]).strip() if col_inst2 is not None and row[col_inst2] is not None else "")[:300]
+
+                    year = None
+                    if col_year is not None:
+                        try:
+                            yv = row[col_year]
+                            if yv is not None and str(yv).strip():
+                                year = int(float(yv))
+                        except Exception:
+                            year = None
+
+                    gov_date = _to_date_from_pna_term(row[col_gov], fallback_year=year) if col_gov is not None else None
+                    parl_date = _to_date_from_pna_term(row[col_parl_month], fallback_year=year) if col_parl_month is not None else None
+
+                    # Identificare proiect existent (cheie: titlu + scope)
+                    existing = PnaProject.objects.filter(titlu__iexact=title, chapter=chapter, criterion=criterion).first()
+
+                    if existing:
+                        obj = existing
+                        changed = False
+                        if obj.arhivat:
+                            obj.arhivat = False
+                            obj.arhivat_la = None
+                            changed = True
+                        if inst and obj.institutie_principala != inst:
+                            obj.institutie_principala = inst
+                            changed = True
+                        if inst2 and obj.institutie_coreponsabila != inst2:
+                            obj.institutie_coreponsabila = inst2
+                            changed = True
+                        if gov_date and obj.termen_aprobare_guvern != gov_date:
+                            obj.termen_aprobare_guvern = gov_date
+                            changed = True
+                        if parl_date and obj.termen_aprobare_parlament != parl_date:
+                            obj.termen_aprobare_parlament = parl_date
+                            changed = True
+
+                        # extra fields
+                        if col_cluster is not None and row[col_cluster] is not None:
+                            v = str(row[col_cluster]).strip()[:300]
+                            if v and obj.pna_cluster != v:
+                                obj.pna_cluster = v
+                                changed = True
+                        if col_prior_txt is not None and row[col_prior_txt] is not None:
+                            v = str(row[col_prior_txt]).strip()[:100]
+                            if v and obj.pna_prioritate_text != v:
+                                obj.pna_prioritate_text = v
+                                changed = True
+                        if col_nr_act is not None and row[col_nr_act] is not None:
+                            v = str(row[col_nr_act]).strip()[:50]
+                            if v and obj.pna_nr_actiune != v:
+                                obj.pna_nr_actiune = v
+                                changed = True
+                        if col_cod_unic is not None and row[col_cod_unic] is not None:
+                            v = str(row[col_cod_unic]).strip()[:255]
+                            if v and obj.pna_cod_unic != v:
+                                obj.pna_cod_unic = v
+                                changed = True
+                        if col_indicator is not None and row[col_indicator] is not None:
+                            v = str(row[col_indicator]).strip()
+                            if v and obj.indicator_monitorizare != v:
+                                obj.indicator_monitorizare = v
+                                changed = True
+
+                        cm = ""
+                        if col_comment1 is not None and row[col_comment1] is not None:
+                            cm = str(row[col_comment1]).strip()
+                        if (not cm) and col_comment2 is not None and row[col_comment2] is not None:
+                            cm = str(row[col_comment2]).strip()
+                        if cm and obj.comentariu_pna != cm:
+                            obj.comentariu_pna = cm
+                            changed = True
+
+                        if col_intarz is not None:
+                            v = str(row[col_intarz] or "").strip().lower()
+                            flag = v in {"da", "1", "true", "yes", "y"}
+                            if obj.intarziat_2025 != flag:
+                                obj.intarziat_2025 = flag
+                                changed = True
+
+                        if col_note is not None and row[col_note] is not None:
+                            v = str(row[col_note]).strip()
+                            if v and obj.note_explicative != v:
+                                obj.note_explicative = v
+                                changed = True
+
+                        if col_partner is not None and row[col_partner] is not None:
+                            v = str(row[col_partner]).strip()[:300]
+                            if v and obj.partener_de_dezvoltare != v:
+                                obj.partener_de_dezvoltare = v
+                                changed = True
+
+                        if col_exec is not None and row[col_exec] is not None:
+                            v = str(row[col_exec]).strip()[:300]
+                            if v and obj.executor_actiune != v:
+                                obj.executor_actiune = v
+                                changed = True
+
+                        if col_cost_total is not None:
+                            v = _to_decimal(row[col_cost_total])
+                            if v is not None and (obj.cost_total_mii_lei is None or float(obj.cost_total_mii_lei) != v):
+                                obj.cost_total_mii_lei = v
+                                changed = True
+                        if col_cost_bs is not None:
+                            v = _to_decimal(row[col_cost_bs])
+                            if v is not None and (obj.cost_buget_stat_mii_lei is None or float(obj.cost_buget_stat_mii_lei) != v):
+                                obj.cost_buget_stat_mii_lei = v
+                                changed = True
+                        if col_cost_ext is not None:
+                            v = _to_decimal(row[col_cost_ext])
+                            if v is not None and (obj.cost_asistenta_externa_mii_lei is None or float(obj.cost_asistenta_externa_mii_lei) != v):
+                                obj.cost_asistenta_externa_mii_lei = v
+                                changed = True
+                        if col_cost_neac is not None:
+                            v = _to_decimal(row[col_cost_neac])
+                            if v is not None and (obj.cost_neacoperite_mii_lei is None or float(obj.cost_neacoperite_mii_lei) != v):
+                                obj.cost_neacoperite_mii_lei = v
+                                changed = True
+
+                        if col_existing_transp:
+                            parts = []
+                            for ci in col_existing_transp:
+                                try:
+                                    vv = row[ci]
+                                except Exception:
+                                    vv = None
+                                if vv is None:
+                                    continue
+                                txt = str(vv).strip()
+                                if txt and txt not in parts:
+                                    parts.append(txt)
+                            if parts:
+                                joined = "\n".join(parts)
+                                if obj.acte_normative_transpunere_existente != joined:
+                                    obj.acte_normative_transpunere_existente = joined
+                                    changed = True
+
+                        if changed:
+                            obj.save()
+                            nr_update += 1
+                            report_rows.append((row_idx, title, "UPDATED", "Actualizat"))
+                        else:
+                            # nimic de schimbat (dar nu e eroare)
+                            report_rows.append((row_idx, title, "OK", "Neschimbat"))
+                    else:
+                        obj = PnaProject.objects.create(
+                            titlu=title,
+                            chapter=chapter,
+                            criterion=criterion,
+                            institutie_principala=inst,
+                            institutie_coreponsabila=inst2,
+                            termen_aprobare_guvern=gov_date,
+                            termen_aprobare_parlament=parl_date,
+                            pna_cluster=(str(row[col_cluster]).strip()[:300] if col_cluster is not None and row[col_cluster] is not None else ""),
+                            pna_prioritate_text=(str(row[col_prior_txt]).strip()[:100] if col_prior_txt is not None and row[col_prior_txt] is not None else ""),
+                            pna_nr_actiune=(str(row[col_nr_act]).strip()[:50] if col_nr_act is not None and row[col_nr_act] is not None else ""),
+                            pna_cod_unic=(str(row[col_cod_unic]).strip()[:255] if col_cod_unic is not None and row[col_cod_unic] is not None else ""),
+                            indicator_monitorizare=str(row[col_indicator]).strip() if col_indicator is not None and row[col_indicator] is not None else "",
+                            comentariu_pna=(
+                                str(row[col_comment1]).strip()
+                                if col_comment1 is not None and row[col_comment1] is not None
+                                else (str(row[col_comment2]).strip() if col_comment2 is not None and row[col_comment2] is not None else "")
+                            ),
+                            intarziat_2025=(str(row[col_intarz] or "").strip().lower() in {"da", "1", "true", "yes", "y"}) if col_intarz is not None else False,
+                            note_explicative=str(row[col_note]).strip() if col_note is not None and row[col_note] is not None else "",
+                            partener_de_dezvoltare=(str(row[col_partner]).strip()[:300] if col_partner is not None and row[col_partner] is not None else ""),
+                            executor_actiune=(str(row[col_exec]).strip()[:300] if col_exec is not None and row[col_exec] is not None else ""),
+                            cost_total_mii_lei=_to_decimal(row[col_cost_total]) if col_cost_total is not None else None,
+                            cost_buget_stat_mii_lei=_to_decimal(row[col_cost_bs]) if col_cost_bs is not None else None,
+                            cost_asistenta_externa_mii_lei=_to_decimal(row[col_cost_ext]) if col_cost_ext is not None else None,
+                            cost_neacoperite_mii_lei=_to_decimal(row[col_cost_neac]) if col_cost_neac is not None else None,
+                            acte_normative_transpunere_existente="\n".join(
+                                [
+                                    str(row[ci]).strip()
+                                    for ci in col_existing_transp
+                                    if ci is not None and ci < len(row) and row[ci] is not None and str(row[ci]).strip()
+                                ]
+                            )
+                            if col_existing_transp
+                            else "",
+                            creat_de=request.user,
+                        )
+                        nr_create += 1
+                        report_rows.append((row_idx, title, "CREATED", "Creat"))
+
+                    # Act UE din rând (dacă există)
+                    if col_celex is not None and col_celex < len(row):
+                        celex_raw = row[col_celex]
+                        celex = (str(celex_raw or "").strip() if celex_raw is not None else "")
+                        celex = celex.replace("CELEX:", "").replace("celex:", "").strip()
+                        if celex:
+                            act_name = (
+                                str(row[col_act_name]).strip()
+                                if col_act_name is not None and row[col_act_name] is not None
+                                else ""
+                            )
+                            act_type = (
+                                str(row[col_act_type]).strip()
+                                if col_act_type is not None and row[col_act_type] is not None
+                                else ""
+                            )
+
+                            act, _ = EUAct.objects.get_or_create(
+                                celex=celex,
+                                defaults={"denumire": act_name or celex, "tip_document": act_type},
+                            )
+                            # update if needed
+                            changed = False
+                            if act_name and act.denumire != act_name:
+                                act.denumire = act_name
+                                changed = True
+                            if act_type and act.tip_document != act_type:
+                                act.tip_document = act_type
+                                changed = True
+                            if changed:
+                                act.save()
+
+                            link, _ = PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
+                            if col_intentie is not None and col_intentie < len(row):
+                                intent = str(row[col_intentie] or "").strip().lower()
+                                tip = ""
+                                if "total" in intent:
+                                    tip = PnaProjectEUAct.TIP_TRANSPUNERE_TOTAL
+                                elif "par" in intent:
+                                    tip = PnaProjectEUAct.TIP_TRANSPUNERE_PARTIAL
+                                if tip and link.tip_transpunere != tip:
+                                    link.tip_transpunere = tip
+                                    link.save(update_fields=["tip_transpunere"])
+
+                except Exception as e:
+                    nr_error += 1
+                    report_rows.append((row_idx, "", "ERROR", str(e)))
+
+            rep_buf = io.StringIO()
+            rep_w = csv.writer(rep_buf)
+            rep_w.writerow(["rand", "email", "status", "mesaj"])  # "email"=identificator în UI
+            rep_w.writerows(report_rows)
+
+            run = ImportRun.objects.create(
+                kind=ImportRun.KIND_PNA,
+                creat_de=request.user,
+                nume_fisier=filename,
+                nr_create=nr_create,
+                nr_actualizate=nr_update,
+                nr_erori=nr_error,
+                raport_csv=rep_buf.getvalue(),
+                cred_csv="",
+            )
+
+            messages.success(
+                request,
+                f"Import PNA finalizat. Create: {nr_create}, Actualizate: {nr_update}, Erori: {nr_error}.",
+            )
+            return redirect("admin_import_run_detail", pk=run.pk)
+
+    else:
+        form = PnaImportXLSXForm()
+
+    return render(request, "portal/admin_pna_import.html", {"form": form})
 
 
 @user_passes_test(is_internal)
