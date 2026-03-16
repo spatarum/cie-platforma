@@ -6,7 +6,7 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
     <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
-    <div class="text-muted small">Completează câmpurile principale. Poți reveni ulterior pentru detalii și acte UE.</div>
+    <div class="text-muted small">Completează câmpurile principale. Poți adăuga acte UE acum sau ulterior.</div>
   </div>
   <div class="d-flex gap-2">
     <a href="{% url 'admin_pna_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
@@ -33,27 +33,40 @@
         {{ form.titlu }}
         {% if form.titlu.errors %}<div class="text-danger small">{{ form.titlu.errors }}</div>{% endif %}
       </div>
-      <div class="col-12 col-md-6">
+      <div class="col-12">
+        <label class="form-label">{{ form.descriere.label }}</label>
+        {{ form.descriere }}
+        {% if form.descriere.errors %}<div class="text-danger small">{{ form.descriere.errors }}</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-4">
         <label class="form-label">{{ form.chapter.label }}</label>
         {{ form.chapter }}
         {% if form.chapter.errors %}<div class="text-danger small">{{ form.chapter.errors }}</div>{% endif %}
       </div>
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-4">
         <label class="form-label">{{ form.criterion.label }}</label>
         {{ form.criterion }}
         {% if form.criterion.errors %}<div class="text-danger small">{{ form.criterion.errors }}</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.status_implementare.label }}</label>
+        {{ form.status_implementare }}
+        {% if form.status_implementare.errors %}<div class="text-danger small">{{ form.status_implementare.errors }}</div>{% endif %}
       </div>
     </div>
 
     <h2 class="h6">Instituții & contact</h2>
     <div class="row g-3 mb-3">
       <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.institutie_principala.label }}</label>
-        {{ form.institutie_principala }}
+        <label class="form-label">{{ form.institutie_principala_ref.label }}</label>
+        {{ form.institutie_principala_ref }}
+        {% if form.institutie_principala_ref.errors %}<div class="text-danger small">{{ form.institutie_principala_ref.errors }}</div>{% endif %}
+        <div class="text-muted small mt-1">Nu găsești instituția? <a href="{% url 'admin_pna_institution_list' %}" target="_blank">Gestionează lista instituțiilor</a>.</div>
       </div>
       <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.institutie_coreponsabila.label }}</label>
-        {{ form.institutie_coreponsabila }}
+        <label class="form-label">{{ form.institutii_responsabile.label }}</label>
+        {{ form.institutii_responsabile }}
+        {% if form.institutii_responsabile.errors %}<div class="text-danger small">{{ form.institutii_responsabile.errors }}</div>{% endif %}
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">{{ form.contact_responsabil.label }}</label>
@@ -120,7 +133,7 @@
       </div>
     </div>
 
-    <h2 class="h6">Costuri de implementare (lei)</h2>
+    <h2 class="h6">Costuri de implementare (mii lei)</h2>
     <div class="row g-3 mb-3">
       <div class="col-6 col-md-3">
         <label class="form-label">2026</label>
@@ -140,32 +153,116 @@
       </div>
     </div>
 
-    <h2 class="h6">Riscuri & descriere</h2>
+    <h2 class="h6">Riscuri</h2>
     <div class="row g-3 mb-3">
       <div class="col-12">
         <label class="form-label">{{ form.riscuri.label }}</label>
         {{ form.riscuri }}
       </div>
+    </div>
+
+    <h2 class="h6">Documente / condiționalități</h2>
+    <div class="row g-3 mb-3">
       <div class="col-12">
-        <label class="form-label">{{ form.descriere.label }}</label>
-        {{ form.descriere }}
+        <div class="d-flex flex-wrap gap-3">
+          <div class="form-check">
+            {{ form.raport_extindere_2023 }}
+            <label class="form-check-label" for="{{ form.raport_extindere_2023.id_for_label }}">{{ form.raport_extindere_2023.label }}</label>
+          </div>
+          <div class="form-check">
+            {{ form.raport_extindere_2024 }}
+            <label class="form-check-label" for="{{ form.raport_extindere_2024.id_for_label }}">{{ form.raport_extindere_2024.label }}</label>
+          </div>
+          <div class="form-check">
+            {{ form.raport_extindere_2025 }}
+            <label class="form-check-label" for="{{ form.raport_extindere_2025.id_for_label }}">{{ form.raport_extindere_2025.label }}</label>
+          </div>
+          <div class="form-check">
+            {{ form.raport_extindere_2026 }}
+            <label class="form-check-label" for="{{ form.raport_extindere_2026.id_for_label }}">{{ form.raport_extindere_2026.label }}</label>
+          </div>
+          <div class="form-check">
+            {{ form.raport_extindere_2027 }}
+            <label class="form-check-label" for="{{ form.raport_extindere_2027.id_for_label }}">{{ form.raport_extindere_2027.label }}</label>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="d-flex flex-wrap gap-3">
+          <div class="form-check">
+            {{ form.plan_crestere_economica }}
+            <label class="form-check-label" for="{{ form.plan_crestere_economica.id_for_label }}">{{ form.plan_crestere_economica.label }}</label>
+          </div>
+          <div class="form-check">
+            {{ form.necesita_avizare_comisia_europeana }}
+            <label class="form-check-label" for="{{ form.necesita_avizare_comisia_europeana.id_for_label }}">{{ form.necesita_avizare_comisia_europeana.label }}</label>
+          </div>
+        </div>
       </div>
     </div>
 
-    <h2 class="h6">Criterii de analiză (etapa 2: experți)</h2>
-    <div class="row g-3">
-      <div class="col-12">
-        <label class="form-label">{{ form.analiza_flexibilitate.label }}</label>
-        {{ form.analiza_flexibilitate }}
+    <h2 class="h6">Acte UE relevante</h2>
+    <div class="border rounded p-3 mb-3">
+      <div class="text-muted small mb-2">Poți adăuga unul sau mai multe acte UE (CELEX). Dacă ai nevoie de mai multe rânduri, apasă „Adaugă act UE”.</div>
+
+      {{ acte_formset.management_form }}
+
+      <div id="euActsContainer">
+        {% for f in acte_formset %}
+          {% if f.non_field_errors %}
+            <div class="text-danger small mb-2">{{ f.non_field_errors }}</div>
+          {% endif %}
+          <div class="row g-2 align-items-end mb-2 eu-act-row">
+            <div class="col-12 col-md-5">
+              <label class="form-label">{{ f.link_celex.label }}</label>
+              {{ f.link_celex }}
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">{{ f.denumire.label }}</label>
+              {{ f.denumire }}
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label">{{ f.tip_document.label }}</label>
+              {{ f.tip_document }}
+            </div>
+            {% if f.DELETE %}
+              <div class="col-12">
+                <div class="form-check">
+                  {{ f.DELETE }}
+                  <label class="form-check-label" for="{{ f.DELETE.id_for_label }}">Șterge acest rând</label>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
       </div>
-      <div class="col-12">
-        <label class="form-label">{{ form.analiza_gestiunea_impactului.label }}</label>
-        {{ form.analiza_gestiunea_impactului }}
-      </div>
-      <div class="col-12">
-        <label class="form-label">{{ form.analiza_potential_negociere.label }}</label>
-        {{ form.analiza_potential_negociere }}
-      </div>
+
+      <template id="euActEmptyFormTemplate">
+        <div class="row g-2 align-items-end mb-2 eu-act-row">
+          <div class="col-12 col-md-5">
+            <label class="form-label">{{ acte_formset.empty_form.link_celex.label }}</label>
+            {{ acte_formset.empty_form.link_celex }}
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">{{ acte_formset.empty_form.denumire.label }}</label>
+            {{ acte_formset.empty_form.denumire }}
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">{{ acte_formset.empty_form.tip_document.label }}</label>
+            {{ acte_formset.empty_form.tip_document }}
+          </div>
+          {% if acte_formset.empty_form.DELETE %}
+            <div class="col-12">
+              <div class="form-check">
+                {{ acte_formset.empty_form.DELETE }}
+                <label class="form-check-label">Șterge acest rând</label>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </template>
+
+      <button type="button" class="btn btn-outline-primary btn-sm" id="addEuActBtn"><i class="bi bi-plus-lg me-1"></i>Adaugă act UE</button>
     </div>
 
   </div>
@@ -174,5 +271,28 @@
     <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salvează</button>
   </div>
 </form>
+
+<script>
+  (function() {
+    const btn = document.getElementById('addEuActBtn');
+    if (!btn) return;
+    const container = document.getElementById('euActsContainer');
+    const tmpl = document.getElementById('euActEmptyFormTemplate');
+    const totalInput = document.getElementById('id_acts-TOTAL_FORMS');
+    if (!container || !tmpl || !totalInput) return;
+
+    btn.addEventListener('click', function() {
+      const idx = parseInt(totalInput.value || '0', 10);
+      const html = tmpl.innerHTML.replace(/__prefix__/g, String(idx));
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = html;
+      // append children
+      while (wrapper.firstElementChild) {
+        container.appendChild(wrapper.firstElementChild);
+      }
+      totalInput.value = String(idx + 1);
+    });
+  })();
+</script>
 
 {% endblock %}

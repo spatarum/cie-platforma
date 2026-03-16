@@ -1,5 +1,7 @@
 {% extends 'portal/base.html' %}
 
+{% load portal_extras %}
+
 {% block title %}{{ obj.titlu }} | PNA{% endblock %}
 
 {% block content %}
@@ -37,11 +39,34 @@
       <div class="card-header bg-white"><strong><i class="bi bi-info-circle me-1"></i>Detalii</strong></div>
       <div class="card-body">
         <dl class="row mb-0">
-          <dt class="col-sm-5 text-muted">Instituție principală</dt>
-          <dd class="col-sm-7">{{ obj.institutie_principala|default:"—" }}</dd>
+          <dt class="col-sm-5 text-muted">Status implementare</dt>
+          <dd class="col-sm-7">{{ obj.get_status_implementare_display|default:"—" }}</dd>
 
-          <dt class="col-sm-5 text-muted">Instituție co-responsabilă</dt>
-          <dd class="col-sm-7">{{ obj.institutie_coreponsabila|default:"—" }}</dd>
+          <dt class="col-sm-5 text-muted">Instituție principală</dt>
+          <dd class="col-sm-7">
+            {% if obj.institutie_principala_ref %}
+              {{ obj.institutie_principala_ref.nume }}
+            {% elif obj.institutie_principala %}
+              {{ obj.institutie_principala }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Alte instituții responsabile</dt>
+          <dd class="col-sm-7">
+            {% if obj.institutii_responsabile.all %}
+              <ul class="mb-0 ps-3">
+                {% for inst in obj.institutii_responsabile.all %}
+                  <li>{{ inst.nume }}</li>
+                {% endfor %}
+              </ul>
+            {% elif obj.institutie_coreponsabila %}
+              {{ obj.institutie_coreponsabila }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
 
           <dt class="col-sm-5 text-muted">Contact responsabil</dt>
           <dd class="col-sm-7">
@@ -50,13 +75,34 @@
           </dd>
 
           <dt class="col-sm-5 text-muted">Termen Guvern</dt>
-          <dd class="col-sm-7">{% if obj.termen_aprobare_guvern %}{{ obj.termen_aprobare_guvern|date:"d.m.Y" }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-7">{% if obj.termen_aprobare_guvern %}{{ obj.termen_aprobare_guvern|luna_an }}{% else %}—{% endif %}</dd>
 
           <dt class="col-sm-5 text-muted">Termen Parlament</dt>
-          <dd class="col-sm-7">{% if obj.termen_aprobare_parlament %}{{ obj.termen_aprobare_parlament|date:"d.m.Y" }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-7">{% if obj.termen_aprobare_parlament %}{{ obj.termen_aprobare_parlament|luna_an }}{% else %}—{% endif %}</dd>
 
           <dt class="col-sm-5 text-muted">Termen Guvern actualizat</dt>
-          <dd class="col-sm-7">{% if obj.termen_actualizat_aprobare_guvern %}{{ obj.termen_actualizat_aprobare_guvern|date:"d.m.Y" }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-7">{% if obj.termen_actualizat_aprobare_guvern %}{{ obj.termen_actualizat_aprobare_guvern|luna_an }}{% else %}—{% endif %}</dd>
+
+          {% if obj.descriere %}
+          <dt class="col-sm-5 text-muted">Descriere</dt>
+          <dd class="col-sm-7">{{ obj.descriere|linebreaksbr }}</dd>
+          {% endif %}
+
+          <dt class="col-sm-5 text-muted">Referințe</dt>
+          <dd class="col-sm-7">
+            <div class="d-flex flex-wrap gap-1">
+              {% if obj.raport_extindere_2023 %}<span class="badge text-bg-light border">Raport extindere 2023</span>{% endif %}
+              {% if obj.raport_extindere_2024 %}<span class="badge text-bg-light border">Raport extindere 2024</span>{% endif %}
+              {% if obj.raport_extindere_2025 %}<span class="badge text-bg-light border">Raport extindere 2025</span>{% endif %}
+              {% if obj.raport_extindere_2026 %}<span class="badge text-bg-light border">Raport extindere 2026</span>{% endif %}
+              {% if obj.raport_extindere_2027 %}<span class="badge text-bg-light border">Raport extindere 2027</span>{% endif %}
+              {% if obj.plan_crestere_economica %}<span class="badge text-bg-light border">Plan creștere economică</span>{% endif %}
+              {% if obj.necesita_avizare_comisia_europeana %}<span class="badge text-bg-warning">Necesită avizare CE</span>{% endif %}
+              {% if not obj.raport_extindere_2023 and not obj.raport_extindere_2024 and not obj.raport_extindere_2025 and not obj.raport_extindere_2026 and not obj.raport_extindere_2027 and not obj.plan_crestere_economica and not obj.necesita_avizare_comisia_europeana %}
+                —
+              {% endif %}
+            </div>
+          </dd>
 
           <dt class="col-sm-5 text-muted">Indicator monitorizare</dt>
           <dd class="col-sm-7">{{ obj.indicator_monitorizare|default:"—"|linebreaksbr }}</dd>
@@ -103,16 +149,16 @@
           <dd class="col-sm-6">{{ obj.parteneri_societate_civila|default:"—"|linebreaksbr }}</dd>
 
           <dt class="col-sm-6 text-muted">Cost 2026</dt>
-          <dd class="col-sm-6">{{ obj.cost_2026|default:"—" }}</dd>
+          <dd class="col-sm-6">{{ obj.cost_2026|default:"—" }} <span class="text-muted small">(mii lei)</span></dd>
 
           <dt class="col-sm-6 text-muted">Cost 2027</dt>
-          <dd class="col-sm-6">{{ obj.cost_2027|default:"—" }}</dd>
+          <dd class="col-sm-6">{{ obj.cost_2027|default:"—" }} <span class="text-muted small">(mii lei)</span></dd>
 
           <dt class="col-sm-6 text-muted">Cost 2028</dt>
-          <dd class="col-sm-6">{{ obj.cost_2028|default:"—" }}</dd>
+          <dd class="col-sm-6">{{ obj.cost_2028|default:"—" }} <span class="text-muted small">(mii lei)</span></dd>
 
           <dt class="col-sm-6 text-muted">Cost 2029</dt>
-          <dd class="col-sm-6">{{ obj.cost_2029|default:"—" }}</dd>
+          <dd class="col-sm-6">{{ obj.cost_2029|default:"—" }} <span class="text-muted small">(mii lei)</span></dd>
         </dl>
 
         {% if obj.riscuri %}
@@ -200,27 +246,6 @@
     </div>
   </div>
 
-  <div class="col-12">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-chat-left-text me-1"></i>Criterii de analiză</strong></div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <div class="small text-muted">Flexibilitate</div>
-            <div>{{ obj.analiza_flexibilitate|default:"—"|linebreaksbr }}</div>
-          </div>
-          <div class="col-md-4">
-            <div class="small text-muted">Gestiunea impactului</div>
-            <div>{{ obj.analiza_gestiunea_impactului|default:"—"|linebreaksbr }}</div>
-          </div>
-          <div class="col-md-4">
-            <div class="small text-muted">Potențial de negociere</div>
-            <div>{{ obj.analiza_potential_negociere|default:"—"|linebreaksbr }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 {% endblock %}

@@ -1,157 +1,261 @@
 {% extends 'portal/base.html' %}
 
-{% block title %}Dashboard PNA | Administrare{% endblock %}
+{% load portal_extras %}
 
 {% block content %}
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
   <div>
     <h1 class="h5 mb-0">Dashboard PNA</h1>
-    <div class="text-muted small">Overview rapid al proiectelor PNA și termenele apropiate.</div>
+    <div class="text-muted small">Overview proiecte PNA + termene pe luni (an selectat).</div>
   </div>
-  <div class="d-flex gap-2">
-    <a href="{% url 'admin_pna_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
-    <a href="{% url 'admin_pna_import' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-upload me-1"></i>Import</a>
-    <a href="{% url 'admin_pna_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>
-  </div>
-</div>
-
-<div class="row g-3 mb-3">
-  <div class="col-md-4">
-    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
-      <div class="card-body">
-        <div class="stat-label">Total proiecte</div>
-        <div class="stat-value">{{ total }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #b91c1c;">
-      <div class="card-body">
-        <div class="stat-label">Termene depășite</div>
-        <div class="stat-value">{{ nr_overdue }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #a16207;">
-      <div class="card-body">
-        <div class="stat-label">În următoarele 90 zile</div>
-        <div class="stat-value">{{ nr_upcoming_90 }}</div>
-      </div>
-    </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_list' %}"><i class="bi bi-building me-1"></i>Instituții</a>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
+    <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_create' %}"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>
   </div>
 </div>
 
 <div class="row g-3">
-  <div class="col-lg-6">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-calendar-event me-1"></i>Termene apropiate (90 zile)</strong></div>
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm">
       <div class="card-body">
-        {% if upcoming %}
-          <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Proiect</th>
-                  <th class="text-nowrap">Guvern</th>
-                  <th class="text-nowrap">Parlament</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for p in upcoming %}
-                  <tr>
-                    <td>
-                      <a href="{% url 'admin_pna_detail' p.id %}" class="text-decoration-none">{{ p.titlu }}</a>
-                      <div class="text-muted small">{{ p.atasare_label }}</div>
-                    </td>
-                    <td class="text-nowrap">{% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|date:"d.m.Y" }}{% else %}—{% endif %}</td>
-                    <td class="text-nowrap">{% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|date:"d.m.Y" }}{% else %}—{% endif %}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% else %}
-          <div class="text-muted">Nu există termene în următoarele 90 zile.</div>
-        {% endif %}
+        <div class="text-muted small">Total proiecte (ne-arhivate)</div>
+        <div class="display-6 fw-semibold">{{ total }}</div>
+        <div class="text-muted small mt-2">
+          În grafic și în matrice sunt incluse proiectele ne-arhivate.
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="col-lg-6">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-exclamation-triangle me-1"></i>Termene depășite</strong></div>
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <strong><i class="bi bi-bar-chart me-1"></i>Distribuție pe status implementare</strong>
+        <span class="text-muted small">Nr + % din total</span>
+      </div>
+      <div class="card-body">
+        <style>
+          .pna-bar-chart { height: 220px; }
+          .pna-bar-col { flex: 1 1 90px; min-width: 90px; }
+          .pna-bar { width: 100%; background: rgba(13,110,253,.65); border-radius: .35rem .35rem 0 0; }
+          .pna-bar-label { font-size: .75rem; line-height: 1.1; }
+        </style>
+
+        <div class="d-flex align-items-end gap-2 pna-bar-chart">
+          {% for s in status_rows %}
+            <div class="pna-bar-col text-center">
+              <div class="border rounded d-flex align-items-end" style="height: 100%;">
+                <div class="pna-bar" style="height: {{ s.pct }}%;" title="{{ s.label }}: {{ s.nr }} ({{ s.pct }}%)"></div>
+              </div>
+              <div class="mt-2 fw-semibold">{{ s.nr }} <span class="text-muted small">({{ s.pct }}%)</span></div>
+              <div class="pna-bar-label text-muted">{{ s.label }}</div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th class="text-end">Nr</th>
+                <th class="text-end">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in status_rows %}
+                <tr>
+                  <td>{{ s.label }}</td>
+                  <td class="text-end">{{ s.nr }}</td>
+                  <td class="text-end">{{ s.pct }}%</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <strong><i class="bi bi-grid-3x3-gap me-1"></i>Matrice deadline-uri pe luni</strong>
+          <div class="text-muted small">Deadline = termen actualizat Guvern (dacă există), altfel termen Parlament. (Fallback: termen Guvern)</div>
+        </div>
+        <form method="get" class="d-flex align-items-center gap-2">
+          <label class="small text-muted" for="yearSelect">An:</label>
+          <select id="yearSelect" name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for y in years %}
+              <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle text-center mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="text-start" style="min-width: 320px;">Foaie de parcurs / Capitol</th>
+                {% for m, ml in months %}
+                  <th title="{{ ml }}">{{ ml|slice:":3" }}</th>
+                {% endfor %}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+
+              <tr class="table-light">
+                <td class="text-start fw-semibold" colspan="{{ months|length|add:2 }}">Foi de parcurs</td>
+              </tr>
+
+              {% if criterii_rows %}
+                {% for r in criterii_rows %}
+                  <tr>
+                    <th class="text-start">
+                      <a href="{% url 'admin_pna_scope_list' %}?criterion={{ r.obj.id }}&year={{ selected_year }}" class="text-decoration-none">
+                        {{ r.obj.cod }} — {{ r.obj.denumire }}
+                      </a>
+                    </th>
+                    {% for c in r.counts %}
+                      {% with month_num=forloop.counter %}
+                        <td>
+                          {% if c > 0 %}
+                            <a href="{% url 'admin_pna_scope_list' %}?criterion={{ r.obj.id }}&year={{ selected_year }}&month={{ month_num }}" class="text-decoration-none fw-semibold">{{ c }}</a>
+                          {% else %}
+                            <span class="text-muted">0</span>
+                          {% endif %}
+                        </td>
+                      {% endwith %}
+                    {% endfor %}
+                    <td class="fw-semibold">{{ r.total }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td class="text-start text-muted" colspan="{{ months|length|add:2 }}">Nu există proiecte cu deadline în anul selectat pentru foile de parcurs.</td>
+                </tr>
+              {% endif %}
+
+              <tr class="table-light">
+                <td class="text-start fw-semibold" colspan="{{ months|length|add:2 }}">Capitole</td>
+              </tr>
+
+              {% if chapter_cluster_rows %}
+                {% for grp in chapter_cluster_rows %}
+                  <tr class="table-secondary">
+                    <td class="text-start" colspan="{{ months|length|add:2 }}"><strong>{{ grp.cluster }}</strong></td>
+                  </tr>
+                  {% for r in grp.rows %}
+                    <tr>
+                      <th class="text-start">
+                        <a href="{% url 'admin_pna_scope_list' %}?chapter={{ r.obj.id }}&year={{ selected_year }}" class="text-decoration-none">
+                          Cap. {{ r.obj.numar }} — {{ r.obj.denumire }}
+                        </a>
+                      </th>
+                      {% for c in r.counts %}
+                        {% with month_num=forloop.counter %}
+                          <td>
+                            {% if c > 0 %}
+                              <a href="{% url 'admin_pna_scope_list' %}?chapter={{ r.obj.id }}&year={{ selected_year }}&month={{ month_num }}" class="text-decoration-none fw-semibold">{{ c }}</a>
+                            {% else %}
+                              <span class="text-muted">0</span>
+                            {% endif %}
+                          </td>
+                        {% endwith %}
+                      {% endfor %}
+                      <td class="fw-semibold">{{ r.total }}</td>
+                    </tr>
+                  {% endfor %}
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td class="text-start text-muted" colspan="{{ months|length|add:2 }}">Nu există proiecte cu deadline în anul selectat pentru capitole.</td>
+                </tr>
+              {% endif %}
+
+            </tbody>
+          </table>
+        </div>
+
+        <div class="text-muted small mt-2">
+          Tip: apasă pe numărul din celulă pentru a vedea lista proiectelor filtrată pe foaie/capitol + luna selectată.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong><i class="bi bi-exclamation-triangle me-1"></i>Deadline-uri depășite</strong> <span class="text-muted small">({{ nr_overdue }})</span></div>
       <div class="card-body">
         {% if overdue %}
           <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-              <thead class="table-light">
+            <table class="table table-sm mb-0">
+              <thead>
                 <tr>
                   <th>Proiect</th>
-                  <th class="text-nowrap">Guvern</th>
-                  <th class="text-nowrap">Parlament</th>
+                  <th class="text-nowrap">Deadline</th>
                 </tr>
               </thead>
               <tbody>
                 {% for p in overdue %}
                   <tr>
                     <td>
-                      <a href="{% url 'admin_pna_detail' p.id %}" class="text-decoration-none">{{ p.titlu }}</a>
-                      <div class="text-muted small">{{ p.atasare_label }}</div>
+                      <a href="{% url 'admin_pna_detail' pk=p.pk %}">{{ p.titlu }}</a>
+                      <div class="text-muted small">{{ p.get_status_implementare_display }}</div>
                     </td>
-                    <td class="text-nowrap">{% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|date:"d.m.Y" }}{% else %}—{% endif %}</td>
-                    <td class="text-nowrap">{% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|date:"d.m.Y" }}{% else %}—{% endif %}</td>
+                    <td class="text-nowrap">{{ p.termen_deadline|luna_an }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
         {% else %}
-          <div class="text-muted">Nu există termene depășite.</div>
+          <div class="text-muted">Nu există deadline-uri depășite.</div>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="col-lg-6">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-layers me-1"></i>Top capitole (după număr proiecte)</strong></div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong><i class="bi bi-clock-history me-1"></i>Deadline-uri în următoarele 90 zile</strong> <span class="text-muted small">({{ nr_upcoming_90 }})</span></div>
       <div class="card-body">
-        {% if top_chapters %}
-          <ul class="list-group list-group-flush">
-            {% for r in top_chapters %}
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span>Cap. {{ r.obj.numar }} — {{ r.obj.denumire }}</span>
-                <span class="badge text-bg-light">{{ r.nr }}</span>
-              </li>
-            {% endfor %}
-          </ul>
+        {% if upcoming %}
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Proiect</th>
+                  <th class="text-nowrap">Deadline</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in upcoming %}
+                  <tr>
+                    <td>
+                      <a href="{% url 'admin_pna_detail' pk=p.pk %}">{{ p.titlu }}</a>
+                      <div class="text-muted small">{{ p.get_status_implementare_display }}</div>
+                    </td>
+                    <td class="text-nowrap">{{ p.termen_deadline|luna_an }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         {% else %}
-          <div class="text-muted">Nu există proiecte atașate capitolelor.</div>
+          <div class="text-muted">Nu există deadline-uri apropiate.</div>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="col-lg-6">
-    <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-signpost-split me-1"></i>Top foi de parcurs</strong></div>
-      <div class="card-body">
-        {% if top_criterii %}
-          <ul class="list-group list-group-flush">
-            {% for r in top_criterii %}
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span><strong>{{ r.obj.cod }}</strong> — {{ r.obj.denumire }}</span>
-                <span class="badge text-bg-light">{{ r.nr }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div class="text-muted">Nu există proiecte atașate foilor de parcurs.</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
 </div>
 
 {% endblock %}
