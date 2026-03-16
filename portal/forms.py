@@ -893,5 +893,5 @@ class PnaEUActAttachForm(forms.Form):
 class PnaImportXLSXForm(forms.Form):
     fisier = forms.FileField(
         label="Fișier Excel PNA (.xlsx)",
-        help_text="Încarcă fișierul PNA (de ex. sheet: Acțiuni_PNA).",
+        help_text="Acceptă atât fișierul sursă PNA (sheet: Acțiuni_PNA), cât și template-ul complet de import.",
     )

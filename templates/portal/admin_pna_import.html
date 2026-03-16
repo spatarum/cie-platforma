@@ -6,26 +6,68 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
     <h1 class="h5 mb-0">Import PNA</h1>
-    <div class="text-muted small">Încarcă fișierul Excel utilizat pentru monitorizarea PNA. Importul grupează rândurile cu aceeași acțiune și atașează actele UE (CELEX) dacă sunt disponibile.</div>
+    <div class="text-muted small">Importă fie fișierul sursă PNA, fie template-ul complet pentru import masiv al proiectelor și al actelor UE.</div>
   </div>
-  <div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'admin_pna_import_template_download' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Descarcă template import</a>
     <a href="{% url 'admin_pna_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-body">
+        <div class="text-uppercase small text-muted mb-2">Format recomandat</div>
+        <h2 class="h6">Template complet Excel</h2>
+        <p class="text-muted small mb-2">Folosește template-ul pentru importul tuturor câmpurilor structurate ale proiectelor PNA.</p>
+        <ul class="small mb-3 ps-3">
+          <li><strong>Proiecte_PNA</strong> — un rând = un proiect</li>
+          <li><strong>Acte_UE</strong> — un rând = un act UE atașat unui proiect</li>
+          <li><strong>Liste</strong> — valori de referință pentru câmpurile cu selecție</li>
+        </ul>
+        <a href="{% url 'admin_pna_import_template_download' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>Descarcă template</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-body">
+        <div class="text-uppercase small text-muted mb-2">Compatibilitate</div>
+        <h2 class="h6">Fișierul original PNA</h2>
+        <p class="text-muted small mb-0">Importul acceptă și fișierul folosit deja pentru monitorizarea PNA (<code>Acțiuni_PNA</code>). În acest mod sunt preluate câmpurile de bază, instituțiile și actele UE disponibile în sursă.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-body">
+        <div class="text-uppercase small text-muted mb-2">Reguli import</div>
+        <ul class="small mb-0 ps-3">
+          <li>Update după: <strong>cod unic</strong> → <strong>nr. acțiune + scop</strong> → <strong>denumire + scop</strong>.</li>
+          <li>Instituțiile noi sunt create automat dacă nu există în listă.</li>
+          <li>Actele UE existente se păstrează; importul doar adaugă / actualizează legăturile din fișier.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-body">
+    <div class="alert alert-info mb-0">
+      <div class="fw-semibold mb-1">Ce se poate importa din template</div>
+      <div class="small">
+        denumire, descriere, capitol / foaie de parcurs, status implementare, instituții, contacte, termene, complexitate,
+        prioritate, expertiză internă, volum de muncă, expertiză externă, parteneri, costuri, riscuri, rapoarte de extindere,
+        planul de creștere economică, necesitatea avizării Comisiei Europene, indicatori PNA, note, executor, costuri agregate și acte UE relevante.
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="card shadow-sm gov-card">
   <div class="card-body">
-    <div class="alert alert-info">
-      <div class="fw-semibold">Ce se importă (minim):</div>
-      <ul class="mb-0">
-        <li>Denumire proiect (ACȚIUNE NORMATIVĂ)</li>
-        <li>Capitol / Foaie de parcurs</li>
-        <li>Instituția responsabilă</li>
-        <li>Termen Guvern (dacă există) și Termen Parlament (LUNĂ + ANUL ADOPTĂRII)</li>
-        <li>Acte UE (CELEX + denumire), dacă sunt completate în fișier</li>
-      </ul>
-    </div>
-
     <form method="post" enctype="multipart/form-data" class="row g-3">
       {% csrf_token %}
       <div class="col-12">
@@ -34,7 +76,8 @@
         <div class="text-muted small">{{ form.fisier.help_text }}</div>
         {% if form.fisier.errors %}<div class="text-danger small">{{ form.fisier.errors }}</div>{% endif %}
       </div>
-      <div class="col-12 d-flex justify-content-end">
+      <div class="col-12 d-flex justify-content-end gap-2">
+        <a href="{% url 'admin_pna_import_template_download' %}" class="btn btn-light"><i class="bi bi-file-earmark-excel me-1"></i>Template</a>
         <button class="btn btn-primary"><i class="bi bi-upload me-1"></i>Importă</button>
       </div>
     </form>
