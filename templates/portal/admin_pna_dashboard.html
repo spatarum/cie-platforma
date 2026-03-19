@@ -38,17 +38,18 @@
       </div>
       <div class="card-body">
         <style>
-          .pna-bar-chart { height: 220px; }
-          .pna-bar-col { flex: 1 1 90px; min-width: 90px; }
-          .pna-bar { width: 100%; background: rgba(13,110,253,.65); border-radius: .35rem .35rem 0 0; }
-          .pna-bar-label { font-size: .75rem; line-height: 1.1; }
-        </style>
+  /* Bar chart fix: ensure parent has fixed height so % heights render */
+  .pna-bar-chart { height: 220px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
+  .pna-bar-col { min-width: 110px; height: 100%; display: flex; flex-direction: column; }
+  .pna-bar-box { height: 100%; display: flex; align-items: flex-end; }
+  .pna-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-primary); min-height: 0; }
+</style>
 
         <div class="d-flex align-items-end gap-2 pna-bar-chart">
           {% for s in status_rows %}
             <div class="pna-bar-col text-center">
-              <div class="border rounded d-flex align-items-end" style="height: 100%;">
-                <div class="pna-bar" style="height: {{ s.pct }}%;" title="{{ s.label }}: {{ s.nr }} ({{ s.pct }}%)"></div>
+              <div class="border rounded d-flex align-items-end pna-bar-box">
+                <div class="pna-bar" style="height: {{ s.pct }}%;{% if s.nr > 0 %} min-height: 3px;{% endif %}" title="{{ s.label }}: {{ s.nr }} ({{ s.pct }}%)"></div>
               </div>
               <div class="mt-2 fw-semibold">{{ s.nr }} <span class="text-muted small">({{ s.pct }}%)</span></div>
               <div class="pna-bar-label text-muted">{{ s.label }}</div>

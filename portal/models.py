@@ -583,22 +583,26 @@ class PnaProject(models.Model):
         (3, "Disponibilă"),
     ]
 
-    STATUS_NEINCEPUT = "NEINCEPUT"
-    STATUS_IN_LUCRU_GUVERN = "IN_LUCRU_GUVERN"
-    STATUS_IN_AVIZARE_GUVERN = "IN_AVIZARE_GUVERN"
-    STATUS_ADOPTAT_GUVERN = "ADOPTAT_GUVERN"
-    STATUS_IN_AVIZARE_CE = "IN_AVIZARE_CE"
-    STATUS_IN_PROCEDURA_PARLAMENT = "IN_PROCEDURA_PARLAMENT"
-    STATUS_ADOPTAT_PARLAMENT = "ADOPTAT_PARLAMENT"
+    STATUS_NEINITIAT = "NEINITIAT"
+    STATUS_INITIAT_GUVERN = "INITIAT_GUVERN"
+    STATUS_AVIZARE_GUVERN = "AVIZARE_GUVERN"
+    STATUS_COORDONARE_CE = "COORDONARE_CE"
+    STATUS_APROBARE_GUVERN = "APROBARE_GUVERN"
+    STATUS_INITIAT_PARLAMENT = "INITIAT_PARLAMENT"
+    STATUS_AVIZARE_PARLAMENT = "AVIZARE_PARLAMENT"
+    STATUS_ADOPTAT_PRIMA_LECTURA = "ADOPTAT_PRIMA_LECTURA"
+    STATUS_ADOPTAT_FINAL = "ADOPTAT_FINAL"
 
     STATUS_IMPLEMENTARE_CHOICES = [
-        (STATUS_NEINCEPUT, "Neînceput"),
-        (STATUS_IN_LUCRU_GUVERN, "În lucru la Guvern"),
-        (STATUS_IN_AVIZARE_GUVERN, "În avizare la Guvern"),
-        (STATUS_ADOPTAT_GUVERN, "Adoptat de Guvern"),
-        (STATUS_IN_AVIZARE_CE, "În avizare la Comisia Europeană"),
-        (STATUS_IN_PROCEDURA_PARLAMENT, "În procedură legislativă la Parlament"),
-        (STATUS_ADOPTAT_PARLAMENT, "Adoptat de Parlament"),
+        (STATUS_NEINITIAT, "Neinițiat"),
+        (STATUS_INITIAT_GUVERN, "Inițiat în Guvern"),
+        (STATUS_AVIZARE_GUVERN, "În avizare la Guvern"),
+        (STATUS_COORDONARE_CE, "În coordonare cu Comisia Europeană"),
+        (STATUS_APROBARE_GUVERN, "În aprobare la Guvern"),
+        (STATUS_INITIAT_PARLAMENT, "Inițiat în Parlament"),
+        (STATUS_AVIZARE_PARLAMENT, "În avizare la Parlament"),
+        (STATUS_ADOPTAT_PRIMA_LECTURA, "Adoptat în prima lectură"),
+        (STATUS_ADOPTAT_FINAL, "Adoptat în lectura finală de Parlament"),
     ]
 
     titlu = models.CharField(max_length=700)
@@ -648,10 +652,15 @@ class PnaProject(models.Model):
     termen_aprobare_parlament = models.DateField(null=True, blank=True)
     termen_actualizat_aprobare_guvern = models.DateField(null=True, blank=True)
 
+
+    # Alte termene / etape (Parlament)
+    intrare_planificata_vigoare = models.CharField(max_length=300, blank=True, default="")
+    consultari_publice_parlament = models.DateField(null=True, blank=True)
+
     status_implementare = models.CharField(
         max_length=40,
         choices=STATUS_IMPLEMENTARE_CHOICES,
-        default=STATUS_NEINCEPUT,
+        default=STATUS_NEINITIAT,
     )
 
     # Detalii / meta
@@ -698,7 +707,6 @@ class PnaProject(models.Model):
     pna_prioritate_text = models.CharField(max_length=100, blank=True)
     pna_nr_actiune = models.CharField(max_length=50, blank=True)
     pna_cod_unic = models.CharField(max_length=255, blank=True)
-    indicator_monitorizare = models.TextField(blank=True)
     comentariu_pna = models.TextField(blank=True)
     intarziat_2025 = models.BooleanField(default=False)
     note_explicative = models.TextField(blank=True)

@@ -434,6 +434,13 @@ class ChestionarForm(forms.ModelForm):
             widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Scrie întrebarea aici..."}),
         )
 
+    consultari_publice_parlament = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"class": "form-control", "type": "date"}),
+    )
+
+
     class Meta:
         model = Questionnaire
         fields = ["titlu", "descriere", "termen_limita", "este_general", "capitole", "criterii"]
@@ -675,6 +682,13 @@ class PnaProjectForm(forms.ModelForm):
         widget=forms.DateInput(format="%Y-%m", attrs={"class": "form-control", "type": "month"}),
     )
 
+    consultari_publice_parlament = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"class": "form-control", "type": "date"}),
+    )
+
+
     class Meta:
         model = PnaProject
         fields = [
@@ -690,6 +704,8 @@ class PnaProjectForm(forms.ModelForm):
             "termen_aprobare_guvern",
             "termen_aprobare_parlament",
             "termen_actualizat_aprobare_guvern",
+            "intrare_planificata_vigoare",
+            "consultari_publice_parlament",
             "complexitate",
             "prioritate",
             "expertiza_interna",
@@ -721,6 +737,8 @@ class PnaProjectForm(forms.ModelForm):
             "institutii_responsabile": forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
             "contact_responsabil": forms.TextInput(attrs={"class": "form-control"}),
             "contact_responsabil_email": forms.EmailInput(attrs={"class": "form-control"}),
+            "intrare_planificata_vigoare": forms.TextInput(attrs={"class": "form-control", "placeholder": "ex: Ianuarie 2026"}),
+            "consultari_publice_parlament": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "complexitate": forms.Select(attrs={"class": "form-select"}),
             "prioritate": forms.Select(attrs={"class": "form-select"}),
             "expertiza_interna": forms.Select(attrs={"class": "form-select"}),
@@ -754,6 +772,8 @@ class PnaProjectForm(forms.ModelForm):
             "termen_aprobare_guvern": "Termen aprobare în Guvern",
             "termen_aprobare_parlament": "Termen aprobare în Parlament",
             "termen_actualizat_aprobare_guvern": "Termen actualizat aprobare în Guvern",
+            "intrare_planificata_vigoare": "Intrare planificată în vigoare",
+            "consultari_publice_parlament": "Consultări publice în Parlament",
             "complexitate": "Complexitate (1–5)",
             "prioritate": "Prioritate (1–3)",
             "expertiza_interna": "Disponibilitate expertiză internă (1–3)",

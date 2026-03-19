@@ -42,6 +42,9 @@
           <dt class="col-sm-5 text-muted">Status implementare</dt>
           <dd class="col-sm-7">{{ obj.get_status_implementare_display|default:"—" }}</dd>
 
+          <dt class="col-sm-5 text-muted">Necesită avizare Comisia Europeană</dt>
+          <dd class="col-sm-7">{% if obj.necesita_avizare_comisia_europeana %}Da{% else %}Nu{% endif %}</dd>
+
           <dt class="col-sm-5 text-muted">Instituție principală</dt>
           <dd class="col-sm-7">
             {% if obj.institutie_principala_ref %}
@@ -83,12 +86,18 @@
           <dt class="col-sm-5 text-muted">Termen Guvern actualizat</dt>
           <dd class="col-sm-7">{% if obj.termen_actualizat_aprobare_guvern %}{{ obj.termen_actualizat_aprobare_guvern|luna_an }}{% else %}—{% endif %}</dd>
 
+          <dt class="col-sm-5 text-muted">Consultări publice în Parlament</dt>
+          <dd class="col-sm-7">{% if obj.consultari_publice_parlament %}{{ obj.consultari_publice_parlament|date:"d.m.Y" }}{% else %}—{% endif %}</dd>
+
+          <dt class="col-sm-5 text-muted">Intrare planificată în vigoare</dt>
+          <dd class="col-sm-7">{{ obj.intrare_planificata_vigoare|default:"—" }}</dd>
+
           {% if obj.descriere %}
           <dt class="col-sm-5 text-muted">Descriere</dt>
           <dd class="col-sm-7">{{ obj.descriere|linebreaksbr }}</dd>
           {% endif %}
 
-          <dt class="col-sm-5 text-muted">Referințe</dt>
+          <dt class="col-sm-5 text-muted">Documente aferente</dt>
           <dd class="col-sm-7">
             <div class="d-flex flex-wrap gap-1">
               {% if obj.raport_extindere_2023 %}<span class="badge text-bg-light border">Raport extindere 2023</span>{% endif %}
@@ -96,17 +105,11 @@
               {% if obj.raport_extindere_2025 %}<span class="badge text-bg-light border">Raport extindere 2025</span>{% endif %}
               {% if obj.raport_extindere_2026 %}<span class="badge text-bg-light border">Raport extindere 2026</span>{% endif %}
               {% if obj.raport_extindere_2027 %}<span class="badge text-bg-light border">Raport extindere 2027</span>{% endif %}
-              {% if obj.plan_crestere_economica %}<span class="badge text-bg-light border">Plan creștere economică</span>{% endif %}
-              {% if obj.necesita_avizare_comisia_europeana %}<span class="badge text-bg-warning">Necesită avizare CE</span>{% endif %}
-              {% if not obj.raport_extindere_2023 and not obj.raport_extindere_2024 and not obj.raport_extindere_2025 and not obj.raport_extindere_2026 and not obj.raport_extindere_2027 and not obj.plan_crestere_economica and not obj.necesita_avizare_comisia_europeana %}
+              {% if obj.plan_crestere_economica %}<span class="badge text-bg-light border">Plan creștere economică</span>{% endif %}              {% if not obj.raport_extindere_2023 and not obj.raport_extindere_2024 and not obj.raport_extindere_2025 and not obj.raport_extindere_2026 and not obj.raport_extindere_2027 and not obj.plan_crestere_economica %}
                 —
               {% endif %}
             </div>
           </dd>
-
-          <dt class="col-sm-5 text-muted">Indicator monitorizare</dt>
-          <dd class="col-sm-7">{{ obj.indicator_monitorizare|default:"—"|linebreaksbr }}</dd>
-
           {% if obj.comentariu_pna %}
           <dt class="col-sm-5 text-muted">Comentariu PNA</dt>
           <dd class="col-sm-7">{{ obj.comentariu_pna|linebreaksbr }}</dd>
@@ -177,7 +180,7 @@
         <span class="text-muted small">Click pe CELEX pentru EUR-Lex</span>
       </div>
       <div class="card-body">
-        {% if obj.acte_ue_legaturi.all %}
+        {% if acts %}
           <div class="table-responsive">
             <table class="table table-hover align-middle">
               <thead class="table-light">
@@ -186,11 +189,11 @@
                   <th>Denumire</th>
                   <th>Tip document</th>
                   <th>Tip transpunere</th>
-                  <th></th>
+                  
                 </tr>
               </thead>
               <tbody>
-                {% for link in obj.acte_ue_legaturi.all %}
+                {% for link in acts %}
                   <tr>
                     <td class="text-nowrap">
                       <a href="{{ link.eu_act.url_final }}" target="_blank" rel="noopener">{{ link.eu_act.celex }}</a>
@@ -198,12 +201,6 @@
                     <td>{{ link.eu_act.denumire }}</td>
                     <td class="text-muted">{{ link.eu_act.tip_document|default:"—" }}</td>
                     <td class="text-muted">{{ link.get_tip_transpunere_display|default:"—" }}</td>
-                    <td class="text-end">
-                      <form method="post" action="{% url 'admin_pna_detach_act' link.id %}" class="d-inline" onsubmit="return confirm('Scoți acest act din proiect?');">
-                        {% csrf_token %}
-                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>
-                      </form>
-                    </td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -212,36 +209,6 @@
         {% else %}
           <div class="text-muted">Nu sunt atașate acte UE.</div>
         {% endif %}
-
-        <hr>
-        <h2 class="h6 mb-2">Adaugă act UE</h2>
-        <form method="post" class="row g-2">
-          {% csrf_token %}
-          <div class="col-md-3">
-            <label class="form-label">{{ attach_form.celex.label }}</label>
-            {{ attach_form.celex }}
-            {% if attach_form.celex.errors %}<div class="text-danger small">{{ attach_form.celex.errors }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">{{ attach_form.denumire.label }}</label>
-            {{ attach_form.denumire }}
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">{{ attach_form.tip_document.label }}</label>
-            {{ attach_form.tip_document }}
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">{{ attach_form.tip_transpunere.label }}</label>
-            {{ attach_form.tip_transpunere }}
-          </div>
-          <div class="col-md-1 d-flex align-items-end">
-            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-plus-lg"></i></button>
-          </div>
-          <div class="col-12">
-            <label class="form-label">{{ attach_form.url.label }}</label>
-            {{ attach_form.url }}
-          </div>
-        </form>
       </div>
     </div>
   </div>

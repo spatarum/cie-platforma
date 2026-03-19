@@ -67,6 +67,8 @@ _TEMPLATE_PROJECT_COLUMNS = [
     ("Termen aprobare în Guvern", 22, "Lună/an. Poți introduce 2026-10, Octombrie 2026 sau o dată Excel (ziua va fi ignorată)."),
     ("Termen aprobare în Parlament", 24, "Lună/an. Poți introduce 2026-12, Decembrie 2026 sau o dată Excel (ziua va fi ignorată)."),
     ("Termen actualizat aprobare în Guvern", 28, "Lună/an. Dacă este completat, acesta este termenul efectiv pentru Guvern."),
+    ("Consultări publice în Parlament", 24, "Dată calendaristică (zi/lună/an)."),
+    ("Intrare planificată în vigoare", 28, "Text liber: ex. Ianuarie 2026 / T2 2027 etc."),
     ("Complexitate", 18, "Valori acceptate: 1-5 sau eticheta completă (ex. 3 - Medie)."),
     ("Prioritate (1-3)", 18, "Valori acceptate: 1-3 sau eticheta completă."),
     ("Disponibilitate expertiză internă", 28, "Valori acceptate: 1-3 sau eticheta completă."),
@@ -86,7 +88,6 @@ _TEMPLATE_PROJECT_COLUMNS = [
     ("Raport de extindere 2027", 20, "Da / Nu."),
     ("Planul de creștere economică", 24, "Da / Nu."),
     ("Necesită avizare Comisia Europeană", 28, "Da / Nu."),
-    ("Indicator de monitorizare", 30, "Indicatorul de monitorizare din PNA / intern."),
     ("Comentariu PNA", 30, "Comentariu din monitorizarea PNA."),
     ("Întârziat 2025", 16, "Da / Nu."),
     ("Note explicative", 28, "Note explicative / context."),
@@ -235,6 +236,55 @@ def _to_date_from_month_value(raw_value: Any, fallback_year: int | None = None) 
     return None
 
 
+def _to_date_value(raw_value: Any) -> date | None:
+    """Parsează o valoare de tip dată (zi/lună/an).
+
+    Acceptă:
+    - date / datetime
+    - string-uri (YYYY-MM-DD, DD.MM.YYYY, etc.)
+    - valori Excel serial (număr)
+
+    Dacă se primește doar lună/an, setează ziua = 1.
+    """
+
+    if raw_value in (None, ""):
+        return None
+
+    if isinstance(raw_value, datetime):
+        return raw_value.date()
+    if isinstance(raw_value, date):
+        return raw_value
+
+    s = str(raw_value).strip()
+    if not s:
+        return None
+
+    for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%Y-%m", "%m/%Y", "%m-%Y"]:
+        try:
+            d = datetime.strptime(s, fmt).date()
+            # dacă nu există zi în format (ex. %Y-%m), ziua va fi 1
+            return d
+        except Exception:
+            pass
+
+    # Formate gen 2026.10 / 2026/10
+    m = re.match(r"^(\d{4})[./](\d{1,2})$", s)
+    if m:
+        return date(int(m.group(1)), int(m.group(2)), 1)
+
+    try:
+        num = float(s)
+        dt = openpyxl.utils.datetime.from_excel(num)
+        if isinstance(dt, datetime):
+            return dt.date()
+        if isinstance(dt, date):
+            return dt
+    except Exception:
+        pass
+
+    return None
+
+
 _TRUE_VALUES = {"da", "true", "1", "x", "yes", "y", "ok"}
 _FALSE_VALUES = {"nu", "false", "0", "no", "n", ""}
 
@@ -319,11 +369,39 @@ def _status_code(value: Any) -> str | None:
     raw = str(value).strip()
     if not raw:
         return None
+
     norm = _norm_header(raw)
+
+    # match direct code / labels din enum-ul curent
     for code, label in PnaProject.STATUS_IMPLEMENTARE_CHOICES:
         if raw == code or norm == _norm_header(label) or norm == _norm_header(f"{code} {label}"):
             return code
-    return None
+
+    # fallback: acceptă și statusuri vechi / sinonime (pentru compatibilitate la import)
+    alt = {
+        _norm_header("Neînceput"): PnaProject.STATUS_NEINITIAT,
+        _norm_header("IN_LUCRU_GUVERN"): PnaProject.STATUS_INITIAT_GUVERN,
+        _norm_header("IN_AVIZARE_GUVERN"): PnaProject.STATUS_AVIZARE_GUVERN,
+        _norm_header("ADOPTAT_GUVERN"): PnaProject.STATUS_INITIAT_PARLAMENT,
+        _norm_header("IN_AVIZARE_CE"): PnaProject.STATUS_COORDONARE_CE,
+        _norm_header("IN_PROCEDURA_PARLAMENT"): PnaProject.STATUS_AVIZARE_PARLAMENT,
+        _norm_header("ADOPTAT_PARLAMENT"): PnaProject.STATUS_ADOPTAT_FINAL,
+        _norm_header("Neinițiat"): PnaProject.STATUS_NEINITIAT,
+        _norm_header("În lucru la Guvern"): PnaProject.STATUS_INITIAT_GUVERN,
+        _norm_header("Inițiat în Guvern"): PnaProject.STATUS_INITIAT_GUVERN,
+        _norm_header("În avizare la Guvern"): PnaProject.STATUS_AVIZARE_GUVERN,
+        _norm_header("În coordonare cu Comisia Europeană"): PnaProject.STATUS_COORDONARE_CE,
+        _norm_header("În avizare la Comisia Europeană"): PnaProject.STATUS_COORDONARE_CE,
+        _norm_header("În aprobare la Guvern"): PnaProject.STATUS_APROBARE_GUVERN,
+        _norm_header("Adoptat de Guvern"): PnaProject.STATUS_INITIAT_PARLAMENT,
+        _norm_header("Inițiat în Parlament"): PnaProject.STATUS_INITIAT_PARLAMENT,
+        _norm_header("În avizare la Parlament"): PnaProject.STATUS_AVIZARE_PARLAMENT,
+        _norm_header("În procedură legislativă la Parlament"): PnaProject.STATUS_AVIZARE_PARLAMENT,
+        _norm_header("Adoptat în prima lectură"): PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA,
+        _norm_header("Adoptat în lectura finală de Parlament"): PnaProject.STATUS_ADOPTAT_FINAL,
+        _norm_header("Adoptat de Parlament"): PnaProject.STATUS_ADOPTAT_FINAL,
+    }
+    return alt.get(norm)
 
 
 def _tip_transpunere(value: Any) -> str:
@@ -384,6 +462,8 @@ def _header_alias_map() -> dict[str, str]:
             "Termen actualizat aprobare în Guvern",
             "termen_actualizat_aprobare_guvern",
         ],
+        "consultari_publice_parlament": ["Consultări publice în Parlament", "consultari_publice_parlament"],
+        "intrare_planificata_vigoare": ["Intrare planificată în vigoare", "intrare_planificata_vigoare"],
         "complexitate": ["Complexitate", "complexitate"],
         "prioritate": ["Prioritate (1-3)", "prioritate"],
         "expertiza_interna": ["Disponibilitate expertiză internă", "expertiza_interna"],
@@ -410,7 +490,6 @@ def _header_alias_map() -> dict[str, str]:
             "Este necesară avizarea Comisiei Europene",
             "necesita_avizare_comisia_europeana",
         ],
-        "indicator_monitorizare": ["Indicator de monitorizare", "INDICATOR DE MONITORIZARE", "indicator_monitorizare"],
         "comentariu_pna": ["Comentariu PNA", "Comentariu", "COMENTARIU", "comentariu_pna"],
         "intarziat_2025": ["Întârziat 2025", "intarziat_2025"],
         "note_explicative": ["Note explicative", "note_explicative"],
@@ -680,12 +759,14 @@ def _upsert_project(
         "pna_nr_actiune": nr_actiune or "",
         "descriere": _norm_text(data.get("descriere")) if data.get("descriere") is not None else ("" if clear_missing else None),
         "pna_cluster": _norm_text(data.get("pna_cluster")) if data.get("pna_cluster") is not None else ("" if clear_missing else None),
-        "status_implementare": _status_code(data.get("status_implementare")) if data.get("status_implementare") not in (None, "") else (PnaProject.STATUS_NEINCEPUT if create_new else None),
+        "status_implementare": _status_code(data.get("status_implementare")) if data.get("status_implementare") not in (None, "") else (PnaProject.STATUS_NEINITIAT if create_new else None),
         "contact_responsabil": _norm_text(data.get("contact_responsabil")) if data.get("contact_responsabil") is not None else ("" if clear_missing else None),
         "contact_responsabil_email": _norm_text(data.get("contact_responsabil_email")) if data.get("contact_responsabil_email") is not None else ("" if clear_missing else None),
         "termen_aprobare_guvern": _to_date_from_month_value(data.get("termen_aprobare_guvern"), fallback_year=_to_int(data.get("anul_adoptarii"))),
         "termen_aprobare_parlament": _to_date_from_month_value(data.get("termen_aprobare_parlament"), fallback_year=_to_int(data.get("anul_adoptarii"))),
         "termen_actualizat_aprobare_guvern": _to_date_from_month_value(data.get("termen_actualizat_aprobare_guvern"), fallback_year=_to_int(data.get("anul_adoptarii"))),
+        "consultari_publice_parlament": _to_date_value(data.get("consultari_publice_parlament")),
+        "intrare_planificata_vigoare": _norm_text(data.get("intrare_planificata_vigoare")) if data.get("intrare_planificata_vigoare") is not None else ("" if clear_missing else None),
         "complexitate": _choice_int(data.get("complexitate"), PnaProject.COMPLEXITATE_CHOICES),
         "prioritate": _choice_int(data.get("prioritate"), PnaProject.PRIORITATE_CHOICES),
         "expertiza_interna": _choice_int(data.get("expertiza_interna"), PnaProject.EXPERTIZA_INTERNA_CHOICES),
@@ -705,7 +786,6 @@ def _upsert_project(
         "raport_extindere_2027": _to_bool(data.get("raport_extindere_2027"), default=False) if (clear_missing or data.get("raport_extindere_2027") is not None) else None,
         "plan_crestere_economica": _to_bool(data.get("plan_crestere_economica"), default=False) if (clear_missing or data.get("plan_crestere_economica") is not None) else None,
         "necesita_avizare_comisia_europeana": _to_bool(data.get("necesita_avizare_comisia_europeana"), default=False) if (clear_missing or data.get("necesita_avizare_comisia_europeana") is not None) else None,
-        "indicator_monitorizare": _norm_text(data.get("indicator_monitorizare")) if data.get("indicator_monitorizare") is not None else ("" if clear_missing else None),
         "comentariu_pna": _norm_text(data.get("comentariu_pna")) if data.get("comentariu_pna") is not None else ("" if clear_missing else None),
         "intarziat_2025": _to_bool(data.get("intarziat_2025"), default=False) if (clear_missing or data.get("intarziat_2025") is not None) else None,
         "note_explicative": _norm_text(data.get("note_explicative")) if data.get("note_explicative") is not None else ("" if clear_missing else None),
@@ -1132,6 +1212,10 @@ def build_pna_import_template_workbook() -> Workbook:
         "Termen aprobare în Parlament",
         "Termen actualizat aprobare în Guvern",
     }
+    date_headers = {
+        "Consultări publice în Parlament",
+    }
+
     money_headers = {
         "Cost 2026 (mii lei)",
         "Cost 2027 (mii lei)",
@@ -1147,6 +1231,9 @@ def build_pna_import_template_workbook() -> Workbook:
         if header in month_headers:
             for row_no in range(2, 501):
                 ws_main[f"{get_column_letter(col_idx)}{row_no}"].number_format = "mmmm yyyy"
+        elif header in date_headers:
+            for row_no in range(2, 501):
+                ws_main[f"{get_column_letter(col_idx)}{row_no}"].number_format = "dd.mm.yyyy"
         elif header in money_headers:
             for row_no in range(2, 501):
                 ws_main[f"{get_column_letter(col_idx)}{row_no}"].number_format = "#,##0.00"
@@ -1204,7 +1291,11 @@ def build_pna_import_template_workbook() -> Workbook:
     # validări
     max_rows = 500
     header_to_col_main = {header: i for i, (header, _w, _c) in enumerate(_TEMPLATE_PROJECT_COLUMNS, start=1)}
-    _add_list_validation(ws_main, f"{get_column_letter(header_to_col_main['Status implementare'])}2:{get_column_letter(header_to_col_main['Status implementare'])}{max_rows}", "=Liste!$B$2:$B$8")
+    _add_list_validation(
+        ws_main,
+        f"{get_column_letter(header_to_col_main['Status implementare'])}2:{get_column_letter(header_to_col_main['Status implementare'])}{max_rows}",
+        f"=Liste!$B$2:$B${len(PnaProject.STATUS_IMPLEMENTARE_CHOICES)+1}",
+    )
     _add_list_validation(ws_main, f"{get_column_letter(header_to_col_main['Complexitate'])}2:{get_column_letter(header_to_col_main['Complexitate'])}{max_rows}", "=Liste!$C$2:$C$6")
     _add_list_validation(ws_main, f"{get_column_letter(header_to_col_main['Prioritate (1-3)'])}2:{get_column_letter(header_to_col_main['Prioritate (1-3)'])}{max_rows}", "=Liste!$D$2:$D$4")
     _add_list_validation(ws_main, f"{get_column_letter(header_to_col_main['Disponibilitate expertiză internă'])}2:{get_column_letter(header_to_col_main['Disponibilitate expertiză internă'])}{max_rows}", "=Liste!$E$2:$E$4")

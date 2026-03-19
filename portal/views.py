@@ -2298,6 +2298,11 @@ def admin_pna_edit(request, pk: int):
 
 @user_passes_test(is_admin)
 def admin_pna_detail(request, pk: int):
+    """Fișa proiectului PNA (doar vizualizare).
+
+    Adăugarea / scoaterea actelor UE se face doar din pagina de editare.
+    """
+
     obj = get_object_or_404(
         PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref")
         .prefetch_related("acte_ue_legaturi__eu_act")
@@ -2305,49 +2310,14 @@ def admin_pna_detail(request, pk: int):
         pk=pk,
     )
 
-    if request.method == "POST":
-        attach_form = PnaEUActAttachForm(request.POST)
-        if attach_form.is_valid():
-            celex = attach_form.cleaned_data["celex"]
-            den = (attach_form.cleaned_data.get("denumire") or "").strip()
-            tip_doc = (attach_form.cleaned_data.get("tip_document") or "").strip()
-            url = (attach_form.cleaned_data.get("url") or "").strip()
-            tip_transp = (attach_form.cleaned_data.get("tip_transpunere") or "").strip()
-
-            act, created = EUAct.objects.get_or_create(
-                celex=celex,
-                defaults={"denumire": den or celex, "tip_document": tip_doc, "url": url},
-            )
-            # update fields if provided
-            changed = False
-            if den and act.denumire != den:
-                act.denumire = den
-                changed = True
-            if tip_doc and act.tip_document != tip_doc:
-                act.tip_document = tip_doc
-                changed = True
-            if url and act.url != url:
-                act.url = url
-                changed = True
-            if changed:
-                act.save()
-
-            link, _ = PnaProjectEUAct.objects.get_or_create(project=obj, eu_act=act)
-            if tip_transp and link.tip_transpunere != tip_transp:
-                link.tip_transpunere = tip_transp
-                link.save(update_fields=["tip_transpunere"])
-
-            messages.success(request, "Actul UE a fost atașat proiectului.")
-            return redirect("admin_pna_detail", pk=obj.pk)
-    else:
-        attach_form = PnaEUActAttachForm()
+    acts = list(obj.acte_ue_legaturi.select_related("eu_act").all())
 
     return render(
         request,
         "portal/admin_pna_detail.html",
         {
             "obj": obj,
-            "attach_form": attach_form,
+            "acts": acts,
         },
     )
 
