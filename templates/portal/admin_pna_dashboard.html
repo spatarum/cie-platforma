@@ -142,27 +142,29 @@
       </div>
       <div class="card-body">
         <style>
-          .pna-bar-chart { height: 240px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
-          .pna-bar-col { min-width: 140px; height: 100%; display: flex; flex-direction: column; }
-          .pna-bar-box { height: 100%; display: flex; align-items: flex-end; padding: .35rem; }
-          .pna-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-primary); }
-          .pna-bar-label { font-size: .78rem; line-height: 1.1rem; }
+          .pna-status-chart { display: grid; gap: .8rem; }
+          .pna-status-row { display: grid; grid-template-columns: minmax(180px, 260px) 1fr auto; gap: .75rem; align-items: center; }
+          .pna-status-label { font-size: .92rem; line-height: 1.25rem; }
+          .pna-status-track { height: 16px; background: #eef2f7; border-radius: 999px; overflow: hidden; }
+          .pna-status-fill { height: 100%; background: var(--bs-primary); border-radius: 999px; min-width: 0; }
+          .pna-status-value { min-width: 96px; text-align: right; font-weight: 600; }
         </style>
 
-        <div class="d-flex align-items-end gap-2 pna-bar-chart">
+        <div class="pna-status-chart">
           {% for s in status_rows %}
-            <div class="pna-bar-col text-center">
-              <div class="border rounded d-flex align-items-end pna-bar-box">
-                <div class="pna-bar" style="height: {{ s.bar_h }}%;{% if s.nr > 0 %} min-height: 10px;{% endif %}" title="{{ s.label }}: {{ s.nr }} ({{ s.pct }}%)"></div>
+            <div class="pna-status-row">
+              <div class="pna-status-label">{{ s.label }}</div>
+              <div class="pna-status-track" title="{{ s.label }}: {{ s.nr }} ({{ s.pct }}%)">
+                <div class="pna-status-fill" style="width: {{ s.pct }}%;{% if s.nr > 0 and s.pct < 2 %} min-width: 10px;{% endif %}"></div>
               </div>
-              <div class="mt-2 fw-semibold">{{ s.nr }} <span class="text-muted small">({{ s.pct }}%)</span></div>
-              <div class="pna-bar-label text-muted">{{ s.label }}</div>
+              <div class="pna-status-value">{{ s.nr }} <span class="text-muted small">({{ s.pct }}%)</span></div>
             </div>
           {% endfor %}
         </div>
 
-        <div class="text-muted small mt-2">Înălțimea barei este scalată relativ la statusul cu cele mai multe proiecte (pentru vizibilitate). Procentajul exact este afișat sub fiecare bară.</div>
+        <div class="text-muted small mt-2">Graficul folosește procentajul real din total pentru lățimea fiecărei bare. Pentru valori foarte mici, proiectele nenule primesc o lățime minimă doar pentru vizibilitate, fără a modifica procentele afișate.</div></div>
 
+        
         <div class="table-responsive mt-3">
           <table class="table table-sm mb-0">
             <thead>
@@ -211,31 +213,7 @@
             </div>
           {% endfor %}
         </div>
-
-        <div class="row g-3">
-          <div class="col-lg-5">
-            <div class="fw-semibold mb-1">Distribuție: câte dimensiuni sunt completate (0/1/2/3)</div>
-            <style>
-              .pna-mini2-chart { height: 170px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
-              .pna-mini2-col { min-width: 80px; height: 100%; display: flex; flex-direction: column; }
-              .pna-mini2-box { height: 100%; display: flex; align-items: flex-end; padding: .25rem; }
-              .pna-mini2-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-secondary); }
-              .pna-mini2-label { font-size: .78rem; line-height: 1.1rem; }
-            </style>
-            <div class="d-flex align-items-end gap-2 pna-mini2-chart">
-              {% for r in contrib_dims_rows %}
-                <div class="pna-mini2-col text-center">
-                  <div class="border rounded d-flex align-items-end pna-mini2-box">
-                    <div class="pna-mini2-bar" style="height: {{ r.bar_h }}%;{% if r.nr > 0 %} min-height: 6px;{% endif %}" title="{{ r.label }}: {{ r.nr }} ({{ r.pct }}%)"></div>
-                  </div>
-                  <div class="mt-1 fw-semibold">{{ r.nr }} <span class="text-muted small">({{ r.pct }}%)</span></div>
-                  <div class="pna-mini2-label text-muted">{{ r.label }}</div>
-                </div>
-              {% endfor %}
-            </div>
-            <div class="text-muted small mt-2">"Completat" = există cel puțin o contribuție cu text, pe dimensiunea respectivă.</div>
-          </div>
-        </div>
+        <div class="text-muted small mt-2">„Completat” înseamnă că există cel puțin o contribuție cu text pe dimensiunea respectivă, pentru proiectul respectiv.</div>
 
         <hr class="my-3">
 
@@ -508,9 +486,24 @@
     <div class="card shadow-sm">
       <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
         <strong><i class="bi bi-exclamation-triangle me-1"></i>Top riscuri (euristic)</strong>
-        <span class="text-muted small">Scor bazat pe termene + expertiză + CE + complexitate</span>
+        <span class="text-muted small">Metodologie afișată mai jos</span>
       </div>
       <div class="card-body">
+        <div class="alert alert-light border small mb-3">
+          <div class="fw-semibold mb-1">Metodologie scor „Top riscuri (euristic)”</div>
+          <div>Scorul se calculează prin adunarea următoarelor puncte:</div>
+          <ul class="mb-2">
+            <li>fără deadline: <strong>+2</strong></li>
+            <li>deadline depășit: <strong>+3</strong></li>
+            <li>deadline în următoarele 60 zile: <strong>+2</strong></li>
+            <li>prioritate înaltă: <strong>+1</strong></li>
+            <li>complexitate ridicată (nivel 4–5): <strong>+1</strong></li>
+            <li>expertiză internă insuficientă: <strong>+2</strong>; parțială: <strong>+1</strong></li>
+            <li>expertiză externă necesară: <strong>+2</strong>; fără furnizor indicat: încă <strong>+2</strong></li>
+            <li>necesită avizare / coordonare cu Comisia Europeană: <strong>+2</strong>; dacă statusul nu este „În coordonare cu Comisia Europeană”: încă <strong>+1</strong></li>
+          </ul>
+          <div class="mb-0">Scorul este unul orientativ, pentru prioritizare managerială, nu o evaluare formală a riscului.</div>
+        </div>
         {% if top_risks %}
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">

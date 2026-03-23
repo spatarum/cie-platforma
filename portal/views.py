@@ -3583,13 +3583,14 @@ def admin_pna_detail(request, pk: int):
 
     acts = list(obj.acte_ue_legaturi.select_related("eu_act").all())
 
-    # Istoric (status + termene)
+    # Istoric (status + termene) – doar pentru admin
+    can_view_history = bool(request.user.is_superuser)
     status_hist = list(
         obj.status_history.select_related("changed_by").all()[:100]
-    )
+    ) if can_view_history else []
     deadline_hist = list(
         obj.deadline_history.select_related("changed_by").all()[:100]
-    )
+    ) if can_view_history else []
 
     contributii_rows = []
     contributii_qs = (
@@ -3620,6 +3621,7 @@ def admin_pna_detail(request, pk: int):
             "deadline_hist": deadline_hist,
             "contributii_rows": contributii_rows,
             "can_edit_pna": can_edit_pna(request.user),
+            "can_view_history": can_view_history,
         },
     )
 
@@ -3795,6 +3797,7 @@ def admin_pna_institution_list(request):
             "q": q,
             "institutii": list(qs),
             "can_edit_pna": can_edit_pna(request.user),
+            "can_view_history": can_view_history,
         },
     )
 
