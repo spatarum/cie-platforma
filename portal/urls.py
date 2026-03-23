@@ -16,6 +16,8 @@ urlpatterns = [
     path("expert/preferinte/", views.expert_preferinte, name="expert_preferinte"),
     path("expert/newslettere/", views.expert_newsletters, name="expert_newsletters"),
     path("expert/newslettere/<int:pk>/", views.expert_newsletter_detail, name="expert_newsletter_detail"),
+    path("expert/pna/", views.expert_pna_list, name="expert_pna_list"),
+    path("expert/pna/<int:pk>/", views.expert_pna_detail, name="expert_pna_detail"),
     path("expert/chestionar/<int:pk>/", views.expert_questionnaire, name="expert_chestionar"),
 
     # Staff (read-only)
@@ -72,6 +74,11 @@ urlpatterns = [
     path("administrare/experti/", views.admin_expert_list, name="admin_experti_list"),
     path("administrare/experti/nou/", views.admin_expert_create, name="admin_expert_create"),
     path("administrare/experti/<int:pk>/editare/", views.admin_expert_edit, name="admin_expert_edit"),
+    path(
+        "administrare/experti/<int:pk>/dashboard/",
+        views.admin_expert_dashboard,
+        name="admin_expert_dashboard",
+    ),
     path("administrare/experti/<int:pk>/arhivare/", views.admin_expert_arhivare, name="admin_expert_arhivare"),
     path("administrare/experti/<int:pk>/restabilire/", views.admin_expert_restabilire, name="admin_expert_restabilire"),
 
@@ -108,7 +115,23 @@ urlpatterns = [
     # PNA (etapa 1 – doar admin)
     path("administrare/pna/", views.admin_pna_list, name="admin_pna_list"),
     path("administrare/pna/dashboard/", views.admin_pna_dashboard, name="admin_pna_dashboard"),
+    path(
+        "administrare/pna/dashboard/institutie/<int:pk>/",
+        views.admin_pna_dashboard_institution,
+        name="admin_pna_dashboard_institution",
+    ),
+    path(
+        "administrare/pna/dashboard/capitol/<int:pk>/",
+        views.admin_pna_dashboard_chapter,
+        name="admin_pna_dashboard_chapter",
+    ),
+    path(
+        "administrare/pna/dashboard/foaie/<int:pk>/",
+        views.admin_pna_dashboard_criterion,
+        name="admin_pna_dashboard_criterion",
+    ),
     path("administrare/pna/scop/", views.admin_pna_scope_list, name="admin_pna_scope_list"),
+    path("administrare/pna/filtru/", views.admin_pna_filtered_list, name="admin_pna_filtered_list"),
     path("administrare/pna/institutii/", views.admin_pna_institution_list, name="admin_pna_institution_list"),
     path("administrare/pna/institutii/nou/", views.admin_pna_institution_create, name="admin_pna_institution_create"),
     path("administrare/pna/institutii/<int:pk>/edit/", views.admin_pna_institution_edit, name="admin_pna_institution_edit"),
@@ -116,6 +139,16 @@ urlpatterns = [
     path("administrare/pna/import/", views.admin_pna_import, name="admin_pna_import"),
     path("administrare/pna/import/template/", views.admin_pna_import_template_download, name="admin_pna_import_template_download"),
     path("administrare/pna/<int:pk>/", views.admin_pna_detail, name="admin_pna_detail"),
+    path(
+        "administrare/pna/<int:pk>/contributii/",
+        views.admin_pna_contributii,
+        name="admin_pna_contributii",
+    ),
+    path(
+        "administrare/pna/<int:pk>/contributii/expert/<int:expert_id>/",
+        views.admin_pna_contributii_expert,
+        name="admin_pna_contributii_expert",
+    ),
     path("administrare/pna/<int:pk>/edit/", views.admin_pna_edit, name="admin_pna_edit"),
     path("administrare/pna/acte/<int:pk>/sterge/", views.admin_pna_detach_act, name="admin_pna_detach_act"),
     path("administrare/pna/<int:pk>/arhiveaza/", views.admin_pna_arhivare, name="admin_pna_arhivare"),

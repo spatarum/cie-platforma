@@ -19,6 +19,7 @@ from .models import (
     PnaInstitution,
     EUAct,
     PnaProjectEUAct,
+    PnaExpertContribution,
 )
 
 
@@ -195,6 +196,13 @@ class StaffUpdateForm(forms.Form):
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
 
+    staff_comisie = forms.BooleanField(
+        label='Staff comisie (poate edita PNA)',
+        required=False,
+        help_text='Permite editarea proiectelor de lege din secțiunea PNA (fără acces la restul funcțiilor de editare).',
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
     schimba_parola = forms.BooleanField(
         label="Schimbă parola",
         required=False,
@@ -227,12 +235,15 @@ class StaffUpdateForm(forms.Form):
     def __init__(self, *args, user: User, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+
+        profil = ExpertProfile.objects.filter(user=user).first()
         self.initial.update(
             {
                 "prenume": user.first_name,
                 "nume": user.last_name,
                 "email": user.email or user.username,
                 "este_activ": bool(user.is_active),
+                "staff_comisie": bool(profil and getattr(profil, "este_staff_comisie", False)),
             }
         )
 
@@ -287,6 +298,11 @@ class StaffUpdateForm(forms.Form):
             u.set_password(self.cleaned_data.get("parola_noua"))
 
         u.save()
+
+        # Toggle pentru "Staff comisie" este păstrat în profil.
+        profil, _ = ExpertProfile.objects.get_or_create(user=u)
+        profil.este_staff_comisie = bool(self.cleaned_data.get("staff_comisie"))
+        profil.save(update_fields=["este_staff_comisie"])
         return u
 
 
@@ -905,6 +921,34 @@ class PnaEUActInlineForm(forms.Form):
             return cleaned
         if not link:
             raise forms.ValidationError("Completează link-ul / codul CELEX pentru actul UE.")
+        return cleaned
+
+
+class PnaExpertContributionForm(forms.ModelForm):
+    """Form pentru experți: contribuții la proiectele PNA (etapa 2)."""
+
+    class Meta:
+        model = PnaExpertContribution
+        fields = ["flexibilitate", "compensare", "tranzitie"]
+        widgets = {
+            "flexibilitate": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+            "compensare": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+            "tranzitie": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+        }
+        labels = {
+            "flexibilitate": "Flexibilitate: opțiuni recomandate care se înscriu în limitele permise de actele UE",
+            "compensare": "Compensare: impact asupra unor categorii concrete + măsuri compensatorii recomandate",
+            "tranzitie": "Tranziție: argumente pentru solicitarea perioadelor tranzitorii",
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        # Normalizăm whitespace pentru a nu număra drept "contribuție" texte goale/spații.
+        for k in ["flexibilitate", "compensare", "tranzitie"]:
+            v = cleaned.get(k)
+            if v is None:
+                continue
+            cleaned[k] = (v or "").strip()
         return cleaned
 
 

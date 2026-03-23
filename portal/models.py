@@ -119,6 +119,10 @@ class ExpertProfile(models.Model):
     # Preferințe UI (expert)
     pref_text_mare = models.BooleanField(default=False)
 
+    # Rol special pentru utilizatorii Staff: "Staff comisie" (poate edita PNA).
+    # Pentru experți este ignorat (rămâne False).
+    este_staff_comisie = models.BooleanField(default=False)
+
 
     capitole = models.ManyToManyField(Chapter, blank=True, related_name="experti")
     criterii = models.ManyToManyField(Criterion, blank=True, related_name="experti")
@@ -800,3 +804,178 @@ class PnaProjectEUAct(models.Model):
 
     def __str__(self) -> str:
         return f"{self.project_id} ↔ {self.eu_act_id}"
+
+
+class PnaExpertContribution(models.Model):
+    """Comentarii ale experților la proiecte PNA (etapa 2).
+
+    Un expert poate contribui la un proiect PNA pe 3 dimensiuni:
+      - Flexibilitate (opțiuni recomandate în limitele actelor UE)
+      - Compensare (impact + măsuri compensatorii)
+      - Tranziție (argumente pentru perioade tranzitorii)
+
+    Comentariile sunt atașate per proiect și per expert.
+    """
+
+    project = models.ForeignKey(
+        PnaProject,
+        on_delete=models.CASCADE,
+        related_name="contributii_experti",
+    )
+    expert = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pna_contributii",
+    )
+
+    flexibilitate = models.TextField(blank=True)
+    compensare = models.TextField(blank=True)
+    tranzitie = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Contribuție expert PNA"
+        verbose_name_plural = "Contribuții experți PNA"
+        ordering = ["-updated_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "expert"],
+                name="uniq_pna_expert_contribution",
+            )
+        ]
+
+    def __str__(self) -> str:
+        who = "(expert)" if not self.expert_id else (self.expert.get_full_name() or self.expert.username)
+        return f"PNA#{self.project_id} – {who}"
+
+    @property
+    def are_orice(self) -> bool:
+        return bool(
+            (self.flexibilitate or "").strip()
+            or (self.compensare or "").strip()
+            or (self.tranzitie or "").strip()
+        )
+
+
+class PnaProjectStatusHistory(models.Model):
+    """Istoric schimbări status pentru proiectele PNA.
+
+    Scop:
+      - analiză de progres (flux pe etape)
+      - detectare stagnare / "time in stage"
+      - audit (cine și când a schimbat statusul)
+
+    În etapa 2 populăm acest istoric din interfața admin și din import.
+    """
+
+    SOURCE_UI = "UI"
+    SOURCE_IMPORT = "IMPORT"
+    SOURCE_SYSTEM = "SYSTEM"
+    SOURCE_CHOICES = [
+        (SOURCE_UI, "Interfață"),
+        (SOURCE_IMPORT, "Import"),
+        (SOURCE_SYSTEM, "Sistem"),
+    ]
+
+    project = models.ForeignKey(
+        PnaProject,
+        on_delete=models.CASCADE,
+        related_name="status_history",
+    )
+
+    from_status = models.CharField(max_length=40, blank=True)
+    to_status = models.CharField(max_length=40, blank=True, db_index=True)
+
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pna_status_changes",
+    )
+
+    changed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_UI)
+    note = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "Istoric status PNA"
+        verbose_name_plural = "Istoric status PNA"
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"PNA#{self.project_id}: {self.from_status} → {self.to_status}"
+
+    @property
+    def from_label(self) -> str:
+        if not self.from_status:
+            return ""
+        try:
+            return dict(PnaProject.STATUS_IMPLEMENTARE_CHOICES).get(self.from_status, self.from_status)
+        except Exception:
+            return self.from_status
+
+    @property
+    def to_label(self) -> str:
+        if not self.to_status:
+            return ""
+        try:
+            return dict(PnaProject.STATUS_IMPLEMENTARE_CHOICES).get(self.to_status, self.to_status)
+        except Exception:
+            return self.to_status
+
+
+class PnaProjectDeadlineHistory(models.Model):
+    """Istoric modificări termene (baseline + revizii) pentru proiectele PNA."""
+
+    FIELD_GOV = "termen_aprobare_guvern"
+    FIELD_PARL = "termen_aprobare_parlament"
+    FIELD_GOV_UPDATED = "termen_actualizat_aprobare_guvern"
+    FIELD_PARL_CONSULT = "consultari_publice_parlament"
+
+    FIELD_CHOICES = [
+        (FIELD_GOV, "Termen aprobare în Guvern"),
+        (FIELD_PARL, "Termen aprobare în Parlament"),
+        (FIELD_GOV_UPDATED, "Termen actualizat aprobare în Guvern"),
+        (FIELD_PARL_CONSULT, "Consultări publice în Parlament"),
+    ]
+
+    SOURCE_UI = "UI"
+    SOURCE_IMPORT = "IMPORT"
+    SOURCE_SYSTEM = "SYSTEM"
+    SOURCE_CHOICES = [
+        (SOURCE_UI, "Interfață"),
+        (SOURCE_IMPORT, "Import"),
+        (SOURCE_SYSTEM, "Sistem"),
+    ]
+
+    project = models.ForeignKey(
+        PnaProject,
+        on_delete=models.CASCADE,
+        related_name="deadline_history",
+    )
+
+    field = models.CharField(max_length=60, choices=FIELD_CHOICES, db_index=True)
+    old_value = models.DateField(null=True, blank=True)
+    new_value = models.DateField(null=True, blank=True)
+
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pna_deadline_changes",
+    )
+    changed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_UI)
+    note = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "Istoric termene PNA"
+        verbose_name_plural = "Istoric termene PNA"
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"PNA#{self.project_id}: {self.field}"

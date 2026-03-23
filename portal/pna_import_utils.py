@@ -17,7 +17,16 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from django.contrib.auth.models import User
 from django.db import transaction
 
-from .models import Chapter, Criterion, EUAct, PnaInstitution, PnaProject, PnaProjectEUAct
+from .models import (
+    Chapter,
+    Criterion,
+    EUAct,
+    PnaInstitution,
+    PnaProject,
+    PnaProjectEUAct,
+    PnaProjectStatusHistory,
+    PnaProjectDeadlineHistory,
+)
 
 _TEMPLATE_MAIN_SHEET = "Proiecte_PNA"
 _TEMPLATE_ACTS_SHEET = "Acte_UE"
@@ -745,6 +754,15 @@ def _upsert_project(
     obj = existing or PnaProject(creat_de=user)
     changed = False
 
+    # snapshot pentru istoric (doar câmpurile relevante)
+    old_status = existing.status_implementare if existing else ""
+    old_deadlines = {
+        PnaProjectDeadlineHistory.FIELD_GOV: existing.termen_aprobare_guvern if existing else None,
+        PnaProjectDeadlineHistory.FIELD_PARL: existing.termen_aprobare_parlament if existing else None,
+        PnaProjectDeadlineHistory.FIELD_GOV_UPDATED: existing.termen_actualizat_aprobare_guvern if existing else None,
+        PnaProjectDeadlineHistory.FIELD_PARL_CONSULT: existing.consultari_publice_parlament if existing else None,
+    }
+
     # required / identifiers
     if not title and create_new:
         return None, "ERROR", "Lipsește denumirea proiectului."
@@ -856,6 +874,59 @@ def _upsert_project(
 
     obj.full_clean(exclude=["acte_ue", "institutii_responsabile"])
     obj.save()
+
+    # -------------------- istoric (etapa 2) --------------------
+    if create_new:
+        PnaProjectStatusHistory.objects.create(
+            project=obj,
+            from_status="",
+            to_status=obj.status_implementare or "",
+            changed_by=user,
+            source=PnaProjectStatusHistory.SOURCE_IMPORT,
+            note="Creare proiect (import)",
+        )
+        for field_name in [
+            PnaProjectDeadlineHistory.FIELD_GOV,
+            PnaProjectDeadlineHistory.FIELD_PARL,
+            PnaProjectDeadlineHistory.FIELD_GOV_UPDATED,
+            PnaProjectDeadlineHistory.FIELD_PARL_CONSULT,
+        ]:
+            val = getattr(obj, field_name, None)
+            if val is None:
+                continue
+            PnaProjectDeadlineHistory.objects.create(
+                project=obj,
+                field=field_name,
+                old_value=None,
+                new_value=val,
+                changed_by=user,
+                source=PnaProjectDeadlineHistory.SOURCE_IMPORT,
+                note="Baseline (import)",
+            )
+    else:
+        # status
+        if old_status != obj.status_implementare:
+            PnaProjectStatusHistory.objects.create(
+                project=obj,
+                from_status=old_status or "",
+                to_status=obj.status_implementare or "",
+                changed_by=user,
+                source=PnaProjectStatusHistory.SOURCE_IMPORT,
+                note="Actualizare status (import)",
+            )
+        # termene
+        for field_name, old_val in old_deadlines.items():
+            new_val = getattr(obj, field_name, None)
+            if old_val != new_val:
+                PnaProjectDeadlineHistory.objects.create(
+                    project=obj,
+                    field=field_name,
+                    old_value=old_val,
+                    new_value=new_val,
+                    changed_by=user,
+                    source=PnaProjectDeadlineHistory.SOURCE_IMPORT,
+                    note="Actualizare termen (import)",
+                )
 
     m2m_changed = False
     if clear_missing or other_raw is not None:
