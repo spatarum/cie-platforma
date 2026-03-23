@@ -1,0 +1,243 @@
+{% extends 'portal/base.html' %}
+
+{% load portal_extras %}
+
+{% block content %}
+
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">Proiecte PNA – listă filtrată</h1>
+    <div class="text-muted small">Rezultate: <strong>{{ total }}</strong></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ back_dashboard_url }}"><i class="bi bi-arrow-left me-1"></i>{{ back_dashboard_label }}</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_list' %}"><i class="bi bi-list-ul me-1"></i>Lista PNA</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-white"><strong><i class="bi bi-funnel me-1"></i>Filtre</strong></div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-lg-4">
+        <label class="form-label small text-muted">Căutare</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Denumire, descriere, instituție...">
+      </div>
+      <div class="col-12 col-lg-3">
+        <label class="form-label small text-muted">Status</label>
+        <select name="status" class="form-select">
+          <option value="">— Toate —</option>
+          {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if status == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-lg-3">
+        <label class="form-label small text-muted">Instituție principală</label>
+        <select name="institution" class="form-select">
+          <option value="">— Toate —</option>
+          {% for inst in institutions %}
+            <option value="{{ inst.id }}" {% if institution|add:'' == inst.id|add:'' %}selected{% endif %}>{{ inst.nume }}</option>
+          {% endfor %}
+        </select>
+        {% if institution %}
+          <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" name="include_co" value="1" id="fIncludeCo" {% if include_co == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fIncludeCo">Include și proiecte unde instituția e co-responsabilă</label>
+          </div>
+        {% endif %}
+      </div>
+      <div class="col-6 col-lg-1">
+        <label class="form-label small text-muted">An</label>
+        <input type="number" name="year" value="{{ year }}" class="form-control" placeholder="YYYY">
+      </div>
+      <div class="col-6 col-lg-1">
+        <label class="form-label small text-muted">Lună</label>
+        <input type="number" name="month" value="{{ month }}" class="form-control" placeholder="1-12" min="1" max="12">
+      </div>
+
+      <div class="col-6 col-lg-1">
+        <label class="form-label small text-muted">Stagnare ≥ (zile)</label>
+        <input type="number" name="stale_days" value="{{ stale_days }}" class="form-control" placeholder="ex: 60" min="1" max="3650">
+      </div>
+      <div class="col-6 col-lg-1">
+        <label class="form-label small text-muted">Schimbări status (zile)</label>
+        <input type="number" name="status_changed_days" value="{{ status_changed_days }}" class="form-control" placeholder="ex: 30" min="1" max="3650">
+      </div>
+
+      <div class="col-12">
+        <div class="d-flex flex-wrap gap-3 mt-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="needs_ce" value="1" id="fNeedsCe" {% if needs_ce == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNeedsCe">Necesită coordonare/avizare CE</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="needs_external" value="1" id="fNeedsExt" {% if needs_external == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNeedsExt">Necesită expertiză externă</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="external_provider_missing" value="1" id="fExtMissing" {% if external_provider_missing == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fExtMissing">Expertiză externă fără furnizor</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="ce_status_mismatch" value="1" id="fCeMismatch" {% if ce_status_mismatch == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fCeMismatch">Necesită CE dar status ≠ coordonare CE</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="overdue" value="1" id="fOverdue" {% if overdue == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fOverdue">Deadline depășit</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_deadline" value="1" id="fNoDl" {% if missing_deadline == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoDl">Fără deadline</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_cost" value="1" id="fNoCost" {% if missing_cost == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoCost">Fără costuri</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_volum" value="1" id="fNoVol" {% if missing_volum == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoVol">Fără estimare volum</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_institution" value="1" id="fNoInst" {% if missing_institution == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoInst">Fără instituție principală</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_acts" value="1" id="fNoActs" {% if missing_acts == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoActs">Fără acte UE</label>
+          </div>
+
+          <div class="vr d-none d-lg-block"></div>
+
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="has_contrib" value="1" id="fHasContrib" {% if has_contrib == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fHasContrib">Are contribuții experți</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_contrib" value="1" id="fNoContrib" {% if missing_contrib == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoContrib">Fără contribuții</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_flex" value="1" id="fNoFlex" {% if missing_flex == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoFlex">Fără Flexibilitate</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_comp" value="1" id="fNoComp" {% if missing_comp == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoComp">Fără Compensare</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_tran" value="1" id="fNoTran" {% if missing_tran == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoTran">Fără Tranziție</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="missing_all_dims" value="1" id="fNoAllDims" {% if missing_all_dims == '1' %}checked{% endif %}>
+            <label class="form-check-label" for="fNoAllDims">Nu are toate 3 dimensiunile</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-3">
+        <label class="form-label small text-muted">Expertiză internă</label>
+        <select name="internal_expertise" class="form-select">
+          <option value="">— Toate —</option>
+          <option value="1" {% if internal_expertise == '1' %}selected{% endif %}>Insuficientă</option>
+          <option value="2" {% if internal_expertise == '2' %}selected{% endif %}>Parțială</option>
+          <option value="3" {% if internal_expertise == '3' %}selected{% endif %}>Disponibilă</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-3">
+        <label class="form-label small text-muted">Deadline în următoarele</label>
+        <select name="upcoming_days" class="form-select">
+          <option value="">—</option>
+          <option value="30" {% if upcoming_days == '30' %}selected{% endif %}>30 zile</option>
+          <option value="60" {% if upcoming_days == '60' %}selected{% endif %}>60 zile</option>
+          <option value="90" {% if upcoming_days == '90' %}selected{% endif %}>90 zile</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-6 d-flex gap-2 justify-content-end">
+        <a class="btn btn-outline-secondary" href="{% url 'admin_pna_filtered_list' %}">Resetează</a>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Aplică</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Denumire</th>
+            <th>Foaie / Capitol</th>
+            <th>Instituție</th>
+            <th class="text-nowrap">Deadline</th>
+            <th>Status</th>
+            <th class="text-end">Zile</th>
+            <th class="text-end">Cost 2026</th>
+            <th class="text-end">Cost 2027</th>
+            <th class="text-end">Cost 2028</th>
+            <th class="text-end">Cost 2029</th>
+            <th>Flag-uri</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in projects %}
+            <tr>
+              <td style="min-width: 340px;">
+                <a href="{% url 'admin_pna_detail' pk=p.pk %}">{{ p.titlu }}</a>
+                <div class="text-muted small">
+                  {% if p.prioritate %}Prioritate: {{ p.get_prioritate_display }}{% endif %}
+                  {% if p.complexitate %} · Complexitate: {{ p.get_complexitate_display }}{% endif %}
+                  {% if p.expertiza_interna %} · Expertiză: {{ p.get_expertiza_interna_display }}{% endif %}
+                </div>
+              </td>
+              <td class="text-muted">{{ p.atasare_label }}</td>
+              <td class="text-muted">
+                {% if p.institutie_principala_ref %}
+                  {{ p.institutie_principala_ref.nume }}
+                {% elif p.institutie_principala %}
+                  {{ p.institutie_principala }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-nowrap">
+                {% if p.deadline %}
+                  {{ p.deadline|luna_an }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{{ p.get_status_implementare_display }}</td>
+              <td class="text-end">{% if p.volum_munca_zile %}{{ p.volum_munca_zile }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if p.cost_2026 != None %}{{ p.cost_2026 }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if p.cost_2027 != None %}{{ p.cost_2027 }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if p.cost_2028 != None %}{{ p.cost_2028 }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if p.cost_2029 != None %}{{ p.cost_2029 }}{% else %}—{% endif %}</td>
+              <td class="text-nowrap">
+                {% if p.necesita_avizare_comisia_europeana %}
+                  <span class="badge text-bg-warning">CE</span>
+                {% endif %}
+                {% if p.necesita_expertiza_externa %}
+                  <span class="badge text-bg-info">Ext</span>
+                {% endif %}
+                {% if p.expertiza_interna == 1 %}
+                  <span class="badge text-bg-danger">Expertiză internă ↓</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="11" class="text-muted">Nu există rezultate pentru filtrele selectate.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

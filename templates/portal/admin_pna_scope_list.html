@@ -12,7 +12,7 @@
     </div>
   </div>
   <div class="d-flex flex-wrap gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la dashboard</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ back_dashboard_url }}"><i class="bi bi-arrow-left me-1"></i>{{ back_dashboard_label }}</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_list' %}"><i class="bi bi-list-ul me-1"></i>Lista PNA</a>
   </div>
 </div>
@@ -27,13 +27,21 @@
             <th>Instituție principală</th>
             <th class="text-nowrap">Deadline</th>
             <th>Status</th>
+            <th class="text-end">Zile</th>
+            <th class="text-end">Cost 2026</th>
+            <th>Flag-uri</th>
           </tr>
         </thead>
         <tbody>
           {% for p in projects %}
             <tr>
-              <td>
+              <td style="min-width: 360px;">
                 <a href="{% url 'admin_pna_detail' pk=p.pk %}">{{ p.titlu }}</a>
+                <div class="text-muted small">
+                  {% if p.prioritate %}Prioritate: {{ p.get_prioritate_display }}{% endif %}
+                  {% if p.complexitate %} · Complexitate: {{ p.get_complexitate_display }}{% endif %}
+                  {% if p.expertiza_interna %} · Expertiză: {{ p.get_expertiza_interna_display }}{% endif %}
+                </div>
               </td>
               <td class="text-muted">
                 {% if p.institutie_principala_ref %}
@@ -52,10 +60,23 @@
                 {% endif %}
               </td>
               <td>{{ p.get_status_implementare_display }}</td>
+              <td class="text-end">{% if p.volum_munca_zile %}{{ p.volum_munca_zile }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if p.cost_2026 != None %}{{ p.cost_2026 }}{% else %}—{% endif %}</td>
+              <td class="text-nowrap">
+                {% if p.necesita_avizare_comisia_europeana %}
+                  <span class="badge text-bg-warning">CE</span>
+                {% endif %}
+                {% if p.necesita_expertiza_externa %}
+                  <span class="badge text-bg-info">Ext</span>
+                {% endif %}
+                {% if p.expertiza_interna == 1 %}
+                  <span class="badge text-bg-danger">Expertiză internă ↓</span>
+                {% endif %}
+              </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="4" class="text-muted">Nu există proiecte pentru filtrul selectat.</td>
+              <td colspan="7" class="text-muted">Nu există proiecte pentru filtrul selectat.</td>
             </tr>
           {% endfor %}
         </tbody>

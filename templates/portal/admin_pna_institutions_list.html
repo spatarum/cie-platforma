@@ -5,11 +5,13 @@
 <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
   <div>
     <h1 class="h5 mb-0">Instituții PNA</h1>
-    <div class="text-muted small">Listă instituții utilizate la proiectele PNA (se pot adăuga și edita).</div>
+    <div class="text-muted small">Listă instituții utilizate la proiectele PNA (editare doar pentru Admin / Staff comisie).</div>
   </div>
   <div class="d-flex flex-wrap gap-2">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
-    <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_institution_create' %}"><i class="bi bi-plus-lg me-1"></i>Instituție nouă</a>
+    {% if can_edit_pna %}
+      <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_institution_create' %}"><i class="bi bi-plus-lg me-1"></i>Instituție nouă</a>
+    {% endif %}
   </div>
 </div>
 
@@ -39,7 +41,10 @@
             <tr>
               <td>{{ inst.nume }}</td>
               <td class="text-end">
-                <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_edit' pk=inst.pk %}"><i class="bi bi-pencil me-1"></i>Editare</a>
+                <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard_institution' pk=inst.pk %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                {% if can_edit_pna %}
+                  <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_edit' pk=inst.pk %}"><i class="bi bi-pencil me-1"></i>Editare</a>
+                {% endif %}
               </td>
             </tr>
           {% empty %}

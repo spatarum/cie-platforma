@@ -1,0 +1,238 @@
+{% extends 'portal/base.html' %}
+
+{% load portal_extras %}
+
+{% block title %}PNA | Expert{% endblock %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">PNA</h1>
+    <div class="text-muted small">Proiecte de lege (acțiuni) relevante pentru capitolele / foile de parcurs alocate.</div>
+  </div>
+</div>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-12 col-md-6">
+    <label class="form-label small text-muted">Caută</label>
+    <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Caută după denumire, instituție sau act UE...">
+  </div>
+  <div class="col-12 col-md-auto">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search me-1"></i>Caută</button>
+  </div>
+  {% if q %}
+    <div class="col-12 col-md-auto">
+      <a class="btn btn-light" href="{% url 'expert_pna_list' %}">Resetează</a>
+    </div>
+  {% endif %}
+</form>
+
+<div class="alert alert-light border small">
+  <div class="fw-semibold mb-1"><i class="bi bi-chat-square-text me-1"></i>Contribuție expert (3 dimensiuni)</div>
+  <div class="text-muted">Pentru fiecare proiect poți salva comentarii la: <strong>Flexibilitate</strong>, <strong>Compensare</strong> și <strong>Tranziție</strong>.</div>
+</div>
+
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <strong><i class="bi bi-signpost-split me-1"></i>Foi de parcurs</strong>
+    <span class="text-muted small">Proiecte atașate foilor de parcurs</span>
+  </div>
+  <div class="card-body">
+    {% if criterii_groups %}
+      <div class="accordion" id="accCriterii">
+        {% for g in criterii_groups %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="crHead{{ g.criteriu.id }}">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#crBody{{ g.criteriu.id }}" aria-expanded="false" aria-controls="crBody{{ g.criteriu.id }}">
+                <span class="me-2" style="color: {{ g.criteriu.culoare_ui }};"><i class="bi {{ g.criteriu.pictograma|default:'bi-flag' }}"></i></span>
+                <span><strong>{{ g.criteriu.cod }}</strong> — {{ g.criteriu.denumire }}</span>
+                <span class="badge text-bg-light ms-2">{{ g.proiecte|length }}</span>
+              </button>
+            </h2>
+            <div id="crBody{{ g.criteriu.id }}" class="accordion-collapse collapse" aria-labelledby="crHead{{ g.criteriu.id }}" data-bs-parent="#accCriterii">
+              <div class="accordion-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Denumire proiect</th>
+                        <th class="text-nowrap">Guvern</th>
+                        <th class="text-nowrap">Parlament</th>
+                        <th>Instituție responsabilă</th>
+                        <th>Acte UE transpuse</th>
+                        <th class="text-center">F</th>
+                        <th class="text-center">C</th>
+                        <th class="text-center">T</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for p in g.proiecte %}
+                        {% with c=contribs|get_item:p.id %}
+                        <tr>
+                          <td>
+                            <a href="{% url 'expert_pna_detail' p.id %}" class="text-decoration-none fw-semibold">{{ p.titlu }}</a>
+                            {% if p.descriere %}
+                              <div class="text-muted small">{{ p.descriere|truncatewords:18 }}</div>
+                            {% endif %}
+                          </td>
+                          <td class="text-nowrap">{% if p.termen_aprobare_guvern %}{{ p.termen_aprobare_guvern|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                          <td class="text-nowrap">{% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                          <td class="text-muted">
+                            {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
+                          </td>
+                          <td class="small">
+                            {% if p.acte_ue_legaturi.all %}
+                              <ul class="mb-0 ps-3">
+                                {% for link in p.acte_ue_legaturi.all %}
+                                  <li>
+                                    {% if link.eu_act.url_final %}
+                                      <a class="text-decoration-none" href="{{ link.eu_act.url_final }}" target="_blank" rel="noopener">{{ link.eu_act.denumire }}</a>
+                                    {% else %}
+                                      {{ link.eu_act.denumire }}
+                                    {% endif %}
+                                    {% if link.get_tip_transpunere_display %}<span class="text-muted">({{ link.get_tip_transpunere_display }})</span>{% endif %}
+                                  </li>
+                                {% endfor %}
+                              </ul>
+                            {% else %}
+                              <span class="text-muted">—</span>
+                            {% endif %}
+                          </td>
+                          <td class="text-center">
+                            {% if c and c.flexibilitate and c.flexibilitate|length > 0 %}<span class="badge bg-success">F</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                          </td>
+                          <td class="text-center">
+                            {% if c and c.compensare and c.compensare|length > 0 %}<span class="badge bg-success">C</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                          </td>
+                          <td class="text-center">
+                            {% if c and c.tranzitie and c.tranzitie|length > 0 %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                          </td>
+                        </tr>
+                        {% endwith %}
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted">Nu există proiecte atașate foilor de parcurs (sau filtrul nu a găsit rezultate).</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <strong><i class="bi bi-layers me-1"></i>Capitole (grupate pe clustere)</strong>
+    <span class="text-muted small">Proiecte atașate capitolelor</span>
+  </div>
+  <div class="card-body">
+    {% if chapter_groups %}
+      <div class="accordion" id="accChapters">
+        {% for cl in chapter_groups %}
+          <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div>
+                <strong>
+                  {% if cl.cluster %}
+                    <span class="me-1" style="color: {{ cl.cluster.culoare_ui }};"><i class="bi {{ cl.cluster.pictograma|default:'bi-grid' }}"></i></span>
+                    {{ cl.cluster.cod }} — {{ cl.cluster.denumire }}
+                  {% else %}
+                    Alte capitole
+                  {% endif %}
+                </strong>
+              </div>
+              <span class="text-muted small">{{ cl.chapters|length }} capitole cu proiecte</span>
+            </div>
+
+            {% for chg in cl.chapters %}
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="chHead{{ chg.capitol.id }}">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#chBody{{ chg.capitol.id }}" aria-expanded="false" aria-controls="chBody{{ chg.capitol.id }}">
+                    <span class="me-2" style="color: {{ chg.capitol.culoare_ui }};"><i class="bi {{ chg.capitol.pictograma|default:'bi-journal-text' }}"></i></span>
+                    <span><strong>Cap. {{ chg.capitol.numar }}</strong> — {{ chg.capitol.denumire }}</span>
+                    <span class="badge text-bg-light ms-2">{{ chg.proiecte|length }}</span>
+                  </button>
+                </h2>
+                <div id="chBody{{ chg.capitol.id }}" class="accordion-collapse collapse" aria-labelledby="chHead{{ chg.capitol.id }}" data-bs-parent="#accChapters">
+                  <div class="accordion-body p-0">
+                    <div class="table-responsive">
+                      <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                          <tr>
+                            <th>Denumire proiect</th>
+                            <th class="text-nowrap">Guvern</th>
+                            <th class="text-nowrap">Parlament</th>
+                            <th>Instituție responsabilă</th>
+                            <th>Acte UE transpuse</th>
+                            <th class="text-center">F</th>
+                            <th class="text-center">C</th>
+                            <th class="text-center">T</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for p in chg.proiecte %}
+                            {% with c=contribs|get_item:p.id %}
+                            <tr>
+                              <td>
+                                <a href="{% url 'expert_pna_detail' p.id %}" class="text-decoration-none fw-semibold">{{ p.titlu }}</a>
+                                {% if p.descriere %}
+                                  <div class="text-muted small">{{ p.descriere|truncatewords:18 }}</div>
+                                {% endif %}
+                              </td>
+                              <td class="text-nowrap">{% if p.termen_aprobare_guvern %}{{ p.termen_aprobare_guvern|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                              <td class="text-nowrap">{% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                              <td class="text-muted">
+                                {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
+                              </td>
+                              <td class="small">
+                                {% if p.acte_ue_legaturi.all %}
+                                  <ul class="mb-0 ps-3">
+                                    {% for link in p.acte_ue_legaturi.all %}
+                                      <li>
+                                        {% if link.eu_act.url_final %}
+                                          <a class="text-decoration-none" href="{{ link.eu_act.url_final }}" target="_blank" rel="noopener">{{ link.eu_act.denumire }}</a>
+                                        {% else %}
+                                          {{ link.eu_act.denumire }}
+                                        {% endif %}
+                                        {% if link.get_tip_transpunere_display %}<span class="text-muted">({{ link.get_tip_transpunere_display }})</span>{% endif %}
+                                      </li>
+                                    {% endfor %}
+                                  </ul>
+                                {% else %}
+                                  <span class="text-muted">—</span>
+                                {% endif %}
+                              </td>
+                              <td class="text-center">
+                                {% if c and c.flexibilitate and c.flexibilitate|length > 0 %}<span class="badge bg-success">F</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                              </td>
+                              <td class="text-center">
+                                {% if c and c.compensare and c.compensare|length > 0 %}<span class="badge bg-success">C</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                              </td>
+                              <td class="text-center">
+                                {% if c and c.tranzitie and c.tranzitie|length > 0 %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                              </td>
+                            </tr>
+                            {% endwith %}
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted">Nu există proiecte atașate capitolelor (sau filtrul nu a găsit rezultate).</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

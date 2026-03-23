@@ -17,18 +17,22 @@
 
   <div class="d-flex flex-wrap gap-2">
     <a href="{% url 'admin_pna_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
-    <a href="{% url 'admin_pna_edit' obj.id %}" class="btn btn-primary btn-sm"><i class="bi bi-pencil me-1"></i>Editează</a>
+    <a href="{% url 'admin_pna_contributii' obj.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chat-square-text me-1"></i>Contribuții experți</a>
 
-    {% if obj.arhivat %}
-      <form method="post" action="{% url 'admin_pna_restabilire' obj.id %}" class="d-inline">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Restabilește</button>
-      </form>
-    {% else %}
-      <form method="post" action="{% url 'admin_pna_arhivare' obj.id %}" class="d-inline" onsubmit="return confirm('Arhivezi acest proiect?');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-archive me-1"></i>Arhivează</button>
-      </form>
+    {% if can_edit_pna %}
+      <a href="{% url 'admin_pna_edit' obj.id %}" class="btn btn-primary btn-sm"><i class="bi bi-pencil me-1"></i>Editează</a>
+
+      {% if obj.arhivat %}
+        <form method="post" action="{% url 'admin_pna_restabilire' obj.id %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Restabilește</button>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'admin_pna_arhivare' obj.id %}" class="d-inline" onsubmit="return confirm('Arhivezi acest proiect?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-archive me-1"></i>Arhivează</button>
+        </form>
+      {% endif %}
     {% endif %}
   </div>
 </div>
@@ -40,7 +44,15 @@
       <div class="card-body">
         <dl class="row mb-0">
           <dt class="col-sm-5 text-muted">Status implementare</dt>
-          <dd class="col-sm-7">{{ obj.get_status_implementare_display|default:"—" }}</dd>
+          <dd class="col-sm-7">
+            {{ obj.get_status_implementare_display|default:"—" }}
+            {% if zile_in_status is not None %}
+              <div class="text-muted small">Zile în status: <strong>{{ zile_in_status }}</strong></div>
+            {% endif %}
+            {% if status_hist %}
+              <div class="text-muted small">Ultima schimbare: {{ status_hist.0.changed_at|date:"d.m.Y H:i" }}{% if status_hist.0.changed_by %} · {{ status_hist.0.changed_by.get_full_name|default:status_hist.0.changed_by.username }}{% endif %}</div>
+            {% endif %}
+          </dd>
 
           <dt class="col-sm-5 text-muted">Necesită avizare Comisia Europeană</dt>
           <dd class="col-sm-7">{% if obj.necesita_avizare_comisia_europeana %}Da{% else %}Nu{% endif %}</dd>
@@ -209,6 +221,85 @@
         {% else %}
           <div class="text-muted">Nu sunt atașate acte UE.</div>
         {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-clock-history me-1"></i>Istoric schimbări</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="fw-semibold mb-2">Istoric status</div>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Data</th>
+                    <th>De la</th>
+                    <th>Către</th>
+                    <th>Utilizator</th>
+                    <th>Sursă</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for h in status_hist %}
+                    <tr>
+                      <td class="text-muted text-nowrap">{{ h.changed_at|date:"d.m.Y H:i" }}</td>
+                      <td class="text-muted">{% if h.from_label %}{{ h.from_label }}{% else %}—{% endif %}</td>
+                      <td class="fw-semibold">{% if h.to_label %}{{ h.to_label }}{% else %}—{% endif %}</td>
+                      <td class="text-muted">{% if h.changed_by %}{{ h.changed_by.get_full_name|default:h.changed_by.username }}{% else %}—{% endif %}</td>
+                      <td class="text-muted">{{ h.get_source_display }}</td>
+                    </tr>
+                  {% empty %}
+                    <tr><td colspan="5" class="text-muted">Nu există istoric.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="fw-semibold mb-2">Istoric termene</div>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Data</th>
+                    <th>Câmp</th>
+                    <th>Vechi</th>
+                    <th>Nou</th>
+                    <th>Utilizator</th>
+                    <th>Sursă</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for h in deadline_hist %}
+                    <tr>
+                      <td class="text-muted text-nowrap">{{ h.changed_at|date:"d.m.Y H:i" }}</td>
+                      <td class="text-muted">{{ h.get_field_display }}</td>
+                      <td class="text-muted">
+                        {% if h.old_value %}
+                          {% if h.field == 'consultari_publice_parlament' %}{{ h.old_value|date:"d.m.Y" }}{% else %}{{ h.old_value|luna_an }}{% endif %}
+                        {% else %}—{% endif %}
+                      </td>
+                      <td class="fw-semibold">
+                        {% if h.new_value %}
+                          {% if h.field == 'consultari_publice_parlament' %}{{ h.new_value|date:"d.m.Y" }}{% else %}{{ h.new_value|luna_an }}{% endif %}
+                        {% else %}—{% endif %}
+                      </td>
+                      <td class="text-muted">{% if h.changed_by %}{{ h.changed_by.get_full_name|default:h.changed_by.username }}{% else %}—{% endif %}</td>
+                      <td class="text-muted">{{ h.get_source_display }}</td>
+                    </tr>
+                  {% empty %}
+                    <tr><td colspan="6" class="text-muted">Nu există istoric termene.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

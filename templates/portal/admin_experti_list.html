@@ -46,6 +46,7 @@
                 </td>
                 <td class="text-end">{{ e.profil_expert.numar_logari|default:0 }}</td>
                 <td class="text-end">
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin_expert_dashboard' e.pk %}"><i class="bi bi-graph-up me-1"></i>Dashboard</a>
                   {% if request.user.is_superuser %}
                     <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_expert_edit' e.pk %}">Editează</a>
                     <a class="btn btn-sm btn-outline-danger" href="{% url 'admin_expert_arhivare' e.pk %}?next=/administrare/experti/">

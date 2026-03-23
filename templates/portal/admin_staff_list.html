@@ -22,6 +22,7 @@
           <tr>
             <th>Nume</th>
             <th>Email</th>
+            <th class="text-nowrap">Rol</th>
             <th class="text-nowrap">Activ</th>
             <th class="text-nowrap">Ultima autentificare</th>
             <th class="text-end">Acțiuni</th>
@@ -32,6 +33,13 @@
             <tr>
               <td class="fw-semibold">{{ u.get_full_name|default:u.username }}</td>
               <td><a class="text-decoration-none" href="mailto:{{ u.email }}">{{ u.email }}</a></td>
+              <td>
+                {% if u.profil_expert.este_staff_comisie %}
+                  <span class="badge text-bg-warning text-dark">Staff comisie</span>
+                {% else %}
+                  <span class="badge text-bg-light text-dark">Staff</span>
+                {% endif %}
+              </td>
               <td>
                 {% if u.is_active %}
                   <span class="badge text-bg-success">Activ</span>
@@ -46,7 +54,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="5" class="text-muted p-3">Nu există utilizatori Staff încă.</td>
+              <td colspan="6" class="text-muted p-3">Nu există utilizatori Staff încă.</td>
             </tr>
           {% endfor %}
         </tbody>

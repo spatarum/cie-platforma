@@ -1,0 +1,66 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Contribuție expert | PNA{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">Contribuție expert — PNA</h1>
+    <div class="text-muted small">
+      <strong>{{ obj.titlu }}</strong> · {{ expert.get_full_name|default:expert.username }}
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-light btn-sm" href="{% url 'admin_pna_contributii' obj.pk %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la listă</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_expert_dashboard' expert.pk %}"><i class="bi bi-graph-up me-1"></i>Dashboard expert</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_detail' obj.pk %}"><i class="bi bi-file-earmark-text me-1"></i>Proiect</a>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-body">
+    <div class="fw-semibold">Expert</div>
+    <div class="text-muted small">
+      <div>{{ expert.get_full_name|default:expert.username }} · <a href="mailto:{{ expert.email }}">{{ expert.email }}</a></div>
+      {% if profil %}
+        {% if profil.organizatie %}<div>{{ profil.organizatie }}</div>{% endif %}
+        {% if profil.functie %}<div>{{ profil.functie }}</div>{% endif %}
+      {% endif %}
+      {% if contrib %}<div class="mt-1">Ultima actualizare: <strong>{{ contrib.updated_at|date:"d.m.Y H:i" }}</strong></div>{% endif %}
+    </div>
+  </div>
+</div>
+
+{% if not contrib or (not contrib.flexibilitate and not contrib.compensare and not contrib.tranzitie) %}
+  <div class="alert alert-light border">Nu există încă o contribuție pentru acest proiect.</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-header bg-white"><strong>Flexibilitate</strong></div>
+      <div class="card-body">
+        <div class="small">{{ contrib.flexibilitate|default:"—"|linebreaksbr }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-header bg-white"><strong>Compensare</strong></div>
+      <div class="card-body">
+        <div class="small">{{ contrib.compensare|default:"—"|linebreaksbr }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-header bg-white"><strong>Tranziție</strong></div>
+      <div class="card-body">
+        <div class="small">{{ contrib.tranzitie|default:"—"|linebreaksbr }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

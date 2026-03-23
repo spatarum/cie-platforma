@@ -1,0 +1,132 @@
+{% extends 'portal/base.html' %}
+
+{% block title %}Contribuții experți | PNA{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">Contribuții experți — PNA</h1>
+    <div class="text-muted small">
+      <strong>{{ obj.titlu }}</strong>
+      {% if scope_label %}· {{ scope_label }}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-light btn-sm" href="{% url 'admin_pna_detail' obj.pk %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la proiect</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_list' %}"><i class="bi bi-list-ul me-1"></i>PNA</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
+      <div class="card-body">
+        <div class="stat-label">Experți relevanți</div>
+        <div class="stat-value">{{ total_experti }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #15803d;">
+      <div class="card-body">
+        <div class="stat-label">Cu contribuții (oricare)</div>
+        <div class="stat-value">{{ nr_any }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #16a34a;">
+      <div class="card-body">
+        <div class="stat-label">Flexibilitate</div>
+        <div class="stat-value">{{ nr_flex }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #16a34a;">
+      <div class="card-body">
+        <div class="stat-label">Compensare</div>
+        <div class="stat-value">{{ nr_comp }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #16a34a;">
+      <div class="card-body">
+        <div class="stat-label">Tranziție</div>
+        <div class="stat-value">{{ nr_tran }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <div class="text-muted small">Lista experților alocați pe capitol/foaia de parcurs a proiectului.</div>
+  <div class="d-flex gap-2">
+    {% if only == 'filled' %}
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin_pna_contributii' obj.pk %}"><i class="bi bi-x-circle me-1"></i>Arată toți</a>
+    {% else %}
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin_pna_contributii' obj.pk %}?only=filled"><i class="bi bi-funnel me-1"></i>Doar cu contribuții</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Expert</th>
+            <th class="text-nowrap">Organizație / funcție</th>
+            <th class="text-center">F</th>
+            <th class="text-center">C</th>
+            <th class="text-center">T</th>
+            <th class="text-nowrap">Ultima actualizare</th>
+            <th class="text-end">Acțiuni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ r.expert.get_full_name|default:r.expert.username }}</div>
+                <div class="text-muted small"><a class="text-decoration-none" href="mailto:{{ r.expert.email }}">{{ r.expert.email }}</a></div>
+              </td>
+              <td class="text-muted small">
+                {% if r.profil %}
+                  {% if r.profil.organizatie %}{{ r.profil.organizatie }}{% endif %}
+                  {% if r.profil.functie %}<div>{{ r.profil.functie }}</div>{% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if r.has_flex %}<span class="badge bg-success">F</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if r.has_comp %}<span class="badge bg-success">C</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if r.has_tran %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-muted small">
+                {% if r.contrib %}{{ r.contrib.updated_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'admin_pna_contributii_expert' pk=obj.pk expert_id=r.expert.pk %}"><i class="bi bi-eye me-1"></i>Vezi</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-muted p-3">Nu există experți alocați pe acest capitol / foaie de parcurs.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

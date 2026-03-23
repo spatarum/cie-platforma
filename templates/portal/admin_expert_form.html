@@ -8,7 +8,12 @@
     <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
     {% if expert_user %}<div class="text-muted small">Utilizator: {{ expert_user.username }}</div>{% endif %}
   </div>
-  <a class="btn btn-light" href="{% url 'admin_experti_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+  <div class="d-flex gap-2">
+    {% if expert_user %}
+      <a class="btn btn-outline-secondary" href="{% url 'admin_expert_dashboard' expert_user.pk %}"><i class="bi bi-graph-up me-1"></i>Dashboard</a>
+    {% endif %}
+    <a class="btn btn-light" href="{% url 'admin_experti_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+  </div>
 </div>
 
 <div class="card shadow-sm gov-card">

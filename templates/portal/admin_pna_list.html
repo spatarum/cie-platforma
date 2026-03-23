@@ -13,8 +13,10 @@
   <div class="d-flex flex-wrap gap-2">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard' %}"><i class="bi bi-graph-up me-1"></i>Dashboard</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_list' %}"><i class="bi bi-building me-1"></i>Instituții</a>
-    <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
-    <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_create' %}"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>
+    {% if can_edit_pna %}
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
+      <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_create' %}"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>
+    {% endif %}
   </div>
 </div>
 
@@ -89,6 +91,9 @@
             </h2>
             <div id="crBody{{ g.criteriu.id }}" class="accordion-collapse collapse" aria-labelledby="crHead{{ g.criteriu.id }}" data-bs-parent="#accCriterii">
               <div class="accordion-body p-0">
+                <div class="p-2 border-bottom bg-white d-flex justify-content-end">
+                  <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard_criterion' pk=g.criteriu.id %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard foaie de parcurs</a>
+                </div>
                 <div class="table-responsive">
                   <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
@@ -184,6 +189,9 @@
                 </h2>
                 <div id="chBody{{ chg.capitol.id }}" class="accordion-collapse collapse" aria-labelledby="chHead{{ chg.capitol.id }}" data-bs-parent="#accChapters">
                   <div class="accordion-body p-0">
+                    <div class="p-2 border-bottom bg-white d-flex justify-content-end">
+                      <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard_chapter' pk=chg.capitol.id %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard capitol</a>
+                    </div>
                     <div class="table-responsive">
                       <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">

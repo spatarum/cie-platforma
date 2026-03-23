@@ -6,31 +6,135 @@
 
 <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
   <div>
-    <h1 class="h5 mb-0">Dashboard PNA</h1>
-    <div class="text-muted small">Overview proiecte PNA + termene pe luni (an selectat).</div>
+    <h1 class="h5 mb-0">Dashboard PNA{% if scope_title %} — {{ scope_title }}{% endif %}</h1>
+    <div class="text-muted small">
+      Monitorizare: etape, termene, riscuri, resurse, costuri, acte UE.
+      {% if scope_kind != 'global' and scope_title %}<span class="ms-1">(filtrat)</span>{% endif %}
+    </div>
   </div>
   <div class="d-flex flex-wrap gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>{{ back_label }}</a>
+    {% if scope_kind != 'global' %}
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard' %}"><i class="bi bi-graph-up me-1"></i>Dashboard general</a>
+    {% endif %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ filtered_list_url }}"><i class="bi bi-funnel me-1"></i>Listă filtrată</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_list' %}"><i class="bi bi-building me-1"></i>Instituții</a>
-    <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
-    <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_create' %}"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>
+    {% if can_edit_pna %}
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
+      <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_create' %}"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if scope_kind == 'institution' %}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="includeCoToggle" {% if include_co %}checked{% endif %} onclick="window.location='{{ toggle_include_co_url }}'">
+        <label class="form-check-label" for="includeCoToggle">Include și proiecte unde instituția e co-responsabilă (nu doar principală)</label>
+      </div>
+      <div class="text-muted small">Când este activat, dashboard-ul include proiecte unde instituția apare la „Alte instituții responsabile”.</div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a class="btn btn-outline-secondary btn-sm" href="#status"><i class="bi bi-bar-chart me-1"></i>Status</a>
+  <a class="btn btn-outline-secondary btn-sm" href="#contributii"><i class="bi bi-chat-square-text me-1"></i>Contribuții experți</a>
+  <a class="btn btn-outline-secondary btn-sm" href="#termene"><i class="bi bi-calendar2-week me-1"></i>Termene</a>
+  <a class="btn btn-outline-secondary btn-sm" href="#riscuri"><i class="bi bi-exclamation-triangle me-1"></i>Riscuri</a>
+  <a class="btn btn-outline-secondary btn-sm" href="#resurse"><i class="bi bi-people me-1"></i>Resurse</a>
+  <a class="btn btn-outline-secondary btn-sm" href="#costuri"><i class="bi bi-cash-coin me-1"></i>Costuri</a>
+  <a class="btn btn-outline-secondary btn-sm" href="#acte"><i class="bi bi-journal-text me-1"></i>Acte UE</a>
+  <a class="btn btn-outline-secondary btn-sm" href="#date"><i class="bi bi-check2-square me-1"></i>Calitate date</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{{ filtered_list_url }}">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total proiecte</div>
+          <div class="display-6 fw-semibold">{{ total }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?overdue=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+      <div class="card shadow-sm h-100 border-danger">
+        <div class="card-body">
+          <div class="text-muted small">Deadline-uri depășite</div>
+          <div class="display-6 fw-semibold">{{ nr_overdue }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?upcoming_days=60{% if scope_params %}&{{ scope_params }}{% endif %}">
+      <div class="card shadow-sm h-100 border-warning">
+        <div class="card-body">
+          <div class="text-muted small">Deadline &lt; 60 zile</div>
+          <div class="display-6 fw-semibold">{{ nr_upcoming_60 }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?missing_deadline=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+      <div class="card shadow-sm h-100 border-secondary">
+        <div class="card-body">
+          <div class="text-muted small">Fără deadline</div>
+          <div class="display-6 fw-semibold">{{ nr_no_deadline }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?needs_ce=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Necesită coordonare/avizare CE</div>
+          <div class="display-6 fw-semibold">{{ nr_necesita_ce }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?needs_external=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Necesită expertiză externă</div>
+          <div class="display-6 fw-semibold">{{ nr_expertiza_externa }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?internal_expertise=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Expertiză internă insuficientă</div>
+          <div class="display-6 fw-semibold">{{ nr_expertiza_interna_insuf }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?missing_cost=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Fără costuri (2026–2029)</div>
+          <div class="display-6 fw-semibold">{{ nr_missing_cost }}</div>
+        </div>
+      </div>
+    </a>
   </div>
 </div>
 
 <div class="row g-3">
-  <div class="col-12 col-lg-4">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="text-muted small">Total proiecte (ne-arhivate)</div>
-        <div class="display-6 fw-semibold">{{ total }}</div>
-        <div class="text-muted small mt-2">
-          În grafic și în matrice sunt incluse proiectele ne-arhivate.
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-lg-8">
+  <div class="col-12" id="status">
     <div class="card shadow-sm">
       <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
         <strong><i class="bi bi-bar-chart me-1"></i>Distribuție pe status implementare</strong>
@@ -38,24 +142,26 @@
       </div>
       <div class="card-body">
         <style>
-  /* Bar chart fix: ensure parent has fixed height so % heights render */
-  .pna-bar-chart { height: 220px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
-  .pna-bar-col { min-width: 110px; height: 100%; display: flex; flex-direction: column; }
-  .pna-bar-box { height: 100%; display: flex; align-items: flex-end; }
-  .pna-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-primary); min-height: 0; }
-</style>
+          .pna-bar-chart { height: 240px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
+          .pna-bar-col { min-width: 140px; height: 100%; display: flex; flex-direction: column; }
+          .pna-bar-box { height: 100%; display: flex; align-items: flex-end; padding: .35rem; }
+          .pna-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-primary); }
+          .pna-bar-label { font-size: .78rem; line-height: 1.1rem; }
+        </style>
 
         <div class="d-flex align-items-end gap-2 pna-bar-chart">
           {% for s in status_rows %}
             <div class="pna-bar-col text-center">
               <div class="border rounded d-flex align-items-end pna-bar-box">
-                <div class="pna-bar" style="height: {{ s.pct }}%;{% if s.nr > 0 %} min-height: 3px;{% endif %}" title="{{ s.label }}: {{ s.nr }} ({{ s.pct }}%)"></div>
+                <div class="pna-bar" style="height: {{ s.bar_h }}%;{% if s.nr > 0 %} min-height: 10px;{% endif %}" title="{{ s.label }}: {{ s.nr }} ({{ s.pct }}%)"></div>
               </div>
               <div class="mt-2 fw-semibold">{{ s.nr }} <span class="text-muted small">({{ s.pct }}%)</span></div>
               <div class="pna-bar-label text-muted">{{ s.label }}</div>
             </div>
           {% endfor %}
         </div>
+
+        <div class="text-muted small mt-2">Înălțimea barei este scalată relativ la statusul cu cele mai multe proiecte (pentru vizibilitate). Procentajul exact este afișat sub fiecare bară.</div>
 
         <div class="table-responsive mt-3">
           <table class="table table-sm mb-0">
@@ -77,11 +183,372 @@
             </tbody>
           </table>
         </div>
+
       </div>
     </div>
   </div>
 
-  <div class="col-12">
+  <div class="col-12" id="contributii">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <strong><i class="bi bi-chat-square-text me-1"></i>Progres contribuții experți</strong>
+        <a class="btn btn-outline-primary btn-sm" href="{{ contrib_missing_url }}">Vezi proiecte fără contribuții</a>
+      </div>
+      <div class="card-body">
+
+        <div class="row g-3 mb-3">
+          {% for c in contrib_summary_cards %}
+            <div class="col-12 col-md-6 col-lg-4 col-xl">
+              <div class="border rounded p-2 h-100">
+                <div class="text-muted small">{{ c.label }}</div>
+                <div class="d-flex align-items-baseline justify-content-between gap-2">
+                  <div class="fw-semibold">{{ c.nr }} <span class="text-muted">/ {{ total }}</span></div>
+                  <div class="text-muted small">{{ c.pct }}%</div>
+                </div>
+                <div class="progress mt-1" style="height: 6px;">
+                  <div class="progress-bar" role="progressbar" style="width: {{ c.pct }}%" aria-valuenow="{{ c.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                {% if c.href and c.href_mode == 'missing' %}
+                  <div class="mt-1 small">
+                    <a class="text-decoration-none" href="{{ c.href }}">Vezi proiecte unde lipsește</a>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="row g-3">
+          <div class="col-lg-5">
+            <div class="fw-semibold mb-1">Distribuție: câte dimensiuni sunt completate (0/1/2/3)</div>
+            <style>
+              .pna-mini2-chart { height: 170px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
+              .pna-mini2-col { min-width: 80px; height: 100%; display: flex; flex-direction: column; }
+              .pna-mini2-box { height: 100%; display: flex; align-items: flex-end; padding: .25rem; }
+              .pna-mini2-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-secondary); }
+              .pna-mini2-label { font-size: .78rem; line-height: 1.1rem; }
+            </style>
+            <div class="d-flex align-items-end gap-2 pna-mini2-chart">
+              {% for r in contrib_dims_rows %}
+                <div class="pna-mini2-col text-center">
+                  <div class="border rounded d-flex align-items-end pna-mini2-box">
+                    <div class="pna-mini2-bar" style="height: {{ r.bar_h }}%;{% if r.nr > 0 %} min-height: 6px;{% endif %}" title="{{ r.label }}: {{ r.nr }} ({{ r.pct }}%)"></div>
+                  </div>
+                  <div class="mt-1 fw-semibold">{{ r.nr }} <span class="text-muted small">({{ r.pct }}%)</span></div>
+                  <div class="pna-mini2-label text-muted">{{ r.label }}</div>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="text-muted small mt-2">"Completat" = există cel puțin o contribuție cu text, pe dimensiunea respectivă.</div>
+          </div>
+
+          <div class="col-lg-7">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+              <div>
+                <div class="fw-semibold">Top proiecte fără contribuții</div>
+                <div class="text-muted small">Ordine: deadline (cel mai apropiat), apoi prioritate.</div>
+              </div>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ contrib_missing_url }}">Vezi toate</a>
+            </div>
+
+            {% if contrib_missing_top %}
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Denumire</th>
+                      <th>Foaie / Capitol</th>
+                      <th class="text-nowrap">Deadline</th>
+                      <th class="text-end">Experți eligibili</th>
+                      <th class="text-end">Acțiune</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for r in contrib_missing_top %}
+                      <tr>
+                        <td style="min-width: 320px;">
+                          <a href="{% url 'admin_pna_detail' pk=r.project.pk %}">{{ r.project.titlu }}</a>
+                          <div class="text-muted small">{{ r.project.get_status_implementare_display }}</div>
+                        </td>
+                        <td class="text-muted">{{ r.project.atasare_label }}</td>
+                        <td class="text-nowrap">{% if r.deadline %}{{ r.deadline|luna_an }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{{ r.eligible }}</td>
+                        <td class="text-end">
+                          <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_contributii' r.project.pk %}">Contribuții</a>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-muted">Toate proiectele au cel puțin o contribuție.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="row g-3">
+
+          {% if contrib_chapter_groups and scope_kind != 'chapter' %}
+            <div class="col-12">
+              <div class="fw-semibold mb-2">Progres pe capitole (proiecte din capitole)</div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Capitol</th>
+                      <th class="text-end">Proiecte</th>
+                      <th class="text-end">Oricare</th>
+                      <th class="text-end">F</th>
+                      <th class="text-end">C</th>
+                      <th class="text-end">T</th>
+                      <th class="text-end">Toate 3</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for g in contrib_chapter_groups %}
+                      <tr class="table-light">
+                        <td colspan="7" class="fw-semibold">
+                          {% if g.cluster %}{{ g.cluster.denumire }}{% else %}Altele{% endif %}
+                        </td>
+                      </tr>
+                      {% for r in g.rows %}
+                        <tr>
+                          <td>
+                            <a href="{{ r.dashboard_url }}">Cap. {{ r.obj.numar }} — {{ r.obj.denumire }}</a>
+                            <a class="text-muted ms-2" href="{{ r.filter_url }}" title="Listă filtrată"><i class="bi bi-funnel"></i></a>
+                          </td>
+                          <td class="text-end fw-semibold">{{ r.stats.total }}</td>
+                          <td class="text-end">{{ r.stats.any }} <span class="text-muted small">({{ r.stats.any_pct }}%)</span></td>
+                          <td class="text-end">{{ r.stats.f }} <span class="text-muted small">({{ r.stats.f_pct }}%)</span></td>
+                          <td class="text-end">{{ r.stats.c }} <span class="text-muted small">({{ r.stats.c_pct }}%)</span></td>
+                          <td class="text-end">{{ r.stats.t }} <span class="text-muted small">({{ r.stats.t_pct }}%)</span></td>
+                          <td class="text-end">{{ r.stats.all }} <span class="text-muted small">({{ r.stats.all_pct }}%)</span></td>
+                        </tr>
+                      {% endfor %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if contrib_criterii_rows and scope_kind != 'criterion' %}
+            <div class="col-12">
+              <div class="fw-semibold mb-2">Progres pe foi de parcurs</div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Foaie de parcurs</th>
+                      <th class="text-end">Proiecte</th>
+                      <th class="text-end">Oricare</th>
+                      <th class="text-end">F</th>
+                      <th class="text-end">C</th>
+                      <th class="text-end">T</th>
+                      <th class="text-end">Toate 3</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for r in contrib_criterii_rows %}
+                      <tr>
+                        <td>
+                          <a href="{{ r.dashboard_url }}">{{ r.obj.cod }} — {{ r.obj.denumire }}</a>
+                          <a class="text-muted ms-2" href="{{ r.filter_url }}" title="Listă filtrată"><i class="bi bi-funnel"></i></a>
+                        </td>
+                        <td class="text-end fw-semibold">{{ r.stats.total }}</td>
+                        <td class="text-end">{{ r.stats.any }} <span class="text-muted small">({{ r.stats.any_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.f }} <span class="text-muted small">({{ r.stats.f_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.c }} <span class="text-muted small">({{ r.stats.c_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.t }} <span class="text-muted small">({{ r.stats.t_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.all }} <span class="text-muted small">({{ r.stats.all_pct }}%)</span></td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if contrib_institution_rows %}
+            <div class="col-12">
+              <div class="fw-semibold mb-2">Progres pe instituții (instituție principală)</div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Instituție</th>
+                      <th class="text-end">Proiecte</th>
+                      <th class="text-end">Oricare</th>
+                      <th class="text-end">F</th>
+                      <th class="text-end">C</th>
+                      <th class="text-end">T</th>
+                      <th class="text-end">Toate 3</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for r in contrib_institution_rows %}
+                      <tr>
+                        <td>
+                          {% if r.id %}
+                            <a href="{{ r.dashboard_url }}">{{ r.name }}</a>
+                          {% else %}
+                            <a href="{{ r.filter_url }}">{{ r.name }}</a>
+                          {% endif %}
+                          <a class="text-muted ms-2" href="{{ r.filter_url }}" title="Listă filtrată"><i class="bi bi-funnel"></i></a>
+                        </td>
+                        <td class="text-end fw-semibold">{{ r.stats.total }}</td>
+                        <td class="text-end">{{ r.stats.any }} <span class="text-muted small">({{ r.stats.any_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.f }} <span class="text-muted small">({{ r.stats.f_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.c }} <span class="text-muted small">({{ r.stats.c_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.t }} <span class="text-muted small">({{ r.stats.t_pct }}%)</span></td>
+                        <td class="text-end">{{ r.stats.all }} <span class="text-muted small">({{ r.stats.all_pct }}%)</span></td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <div class="text-muted small mt-2">Tabelul este limitat la primele 30 instituții (după nr. de proiecte) pentru lizibilitate.</div>
+            </div>
+          {% endif %}
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12" id="activitate">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <strong><i class="bi bi-clock-history me-1"></i>Activitate & stagnare</strong>
+        <span class="text-muted small">Prag stagnare: {{ stale_days_threshold }} zile</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+              <div>
+                <div class="fw-semibold">Schimbări de status (ultimele 12 luni)</div>
+                <div class="text-muted small">Excludem intrarea de bază (creare/baseline) – numărăm doar schimbările reale de status.</div>
+              </div>
+              <div class="text-muted small">Ultimele 30 zile: <span class="fw-semibold">{{ status_moves_30 }}</span></div>
+            </div>
+
+            <style>
+              .pna-mini-chart { height: 150px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
+              .pna-mini-col { min-width: 70px; height: 100%; display: flex; flex-direction: column; }
+              .pna-mini-box { height: 100%; display: flex; align-items: flex-end; padding: .25rem; }
+              .pna-mini-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-info); }
+              .pna-mini-label { font-size: .78rem; line-height: 1.1rem; }
+            </style>
+
+            <div class="d-flex align-items-end gap-2 pna-mini-chart">
+              {% for r in months_activity %}
+                <div class="pna-mini-col text-center">
+                  <div class="border rounded d-flex align-items-end pna-mini-box">
+                    <div class="pna-mini-bar" style="height: {{ r.bar_h }}%;{% if r.nr > 0 %} min-height: 6px;{% endif %}" title="{{ r.month|date:'m.Y' }}: {{ r.nr }} schimbări"></div>
+                  </div>
+                  <div class="mt-1 fw-semibold">{{ r.nr }}</div>
+                  <div class="pna-mini-label text-muted">{{ r.month|date:'M' }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+              <div>
+                <div class="fw-semibold">Proiecte stagnante</div>
+                <div class="text-muted small">Stagnant = fără schimbare status ≥ {{ stale_days_threshold }} zile (excludem „Adoptat în lectura finală”).</div>
+              </div>
+              <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_filtered_list' %}?stale_days={{ stale_days_threshold }}{% if scope_params %}&{{ scope_params }}{% endif %}">Vezi lista</a>
+            </div>
+
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <div class="border rounded p-2">
+                  <div class="text-muted small">Total stagnante</div>
+                  <div class="h4 mb-0">{{ stale_total }}</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="border rounded p-2">
+                  <div class="text-muted small">% din total</div>
+                  <div class="h4 mb-0">{{ stale_pct_total }}%</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Status</th>
+                    <th class="text-end">Nr</th>
+                    <th class="text-end">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for s in stale_status_rows %}
+                    {% if s.nr > 0 %}
+                      <tr>
+                        <td>{{ s.label }}</td>
+                        <td class="text-end">{{ s.nr }}</td>
+                        <td class="text-end">{{ s.pct }}%</td>
+                      </tr>
+                    {% endif %}
+                  {% endfor %}
+                  {% if stale_total == 0 %}
+                    <tr><td colspan="3" class="text-muted">Nu sunt proiecte stagnante conform pragului selectat.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <div class="fw-semibold">Top proiecte stagnante</div>
+          <span class="text-muted small">Primele {{ stale_projects_top|length }} (din {{ stale_total }})</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Proiect</th>
+                <th>Status</th>
+                <th class="text-end">Zile în status</th>
+                <th>Deadline</th>
+                <th>Instituție</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in stale_projects_top %}
+                <tr>
+                  <td>
+                    <a href="{% url 'admin_pna_detail' r.project.id %}">{{ r.project.titlu|truncatechars:80 }}</a>
+                    <div class="text-muted small">{{ r.project.atasare_label }}</div>
+                  </td>
+                  <td class="text-muted">{{ r.project.get_status_implementare_display }}</td>
+                  <td class="text-end fw-semibold">{{ r.days }}</td>
+                  <td class="text-muted">{% if r.project.termen_deadline %}{{ r.project.termen_deadline|luna_an }}{% else %}—{% endif %}</td>
+                  <td class="text-muted">{% if r.project.institutie_principala_ref %}{{ r.project.institutie_principala_ref.nume }}{% elif r.project.institutie_principala %}{{ r.project.institutie_principala }}{% else %}—{% endif %}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-muted">Nu sunt proiecte stagnante.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12" id="termene">
     <div class="card shadow-sm">
       <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
@@ -89,6 +556,12 @@
           <div class="text-muted small">Deadline = termen actualizat Guvern (dacă există), altfel termen Parlament. (Fallback: termen Guvern)</div>
         </div>
         <form method="get" class="d-flex align-items-center gap-2">
+          <label class="small text-muted" for="modeSelect">Mod:</label>
+          <select id="modeSelect" name="mode" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="count" {% if mode == 'count' %}selected{% endif %}>Nr. proiecte</option>
+            <option value="days" {% if mode == 'days' %}selected{% endif %}>Volum muncă (zile)</option>
+          </select>
+
           <label class="small text-muted" for="yearSelect">An:</label>
           <select id="yearSelect" name="year" class="form-select form-select-sm" onchange="this.form.submit()">
             {% for y in years %}
@@ -119,7 +592,7 @@
                 {% for r in criterii_rows %}
                   <tr>
                     <th class="text-start">
-                      <a href="{% url 'admin_pna_scope_list' %}?criterion={{ r.obj.id }}&year={{ selected_year }}" class="text-decoration-none">
+                        <a href="{% url 'admin_pna_scope_list' %}?criterion={{ r.obj.id }}&year={{ selected_year }}{% if scope_params %}&{{ scope_params }}{% endif %}" class="text-decoration-none">
                         {{ r.obj.cod }} — {{ r.obj.denumire }}
                       </a>
                     </th>
@@ -127,7 +600,7 @@
                       {% with month_num=forloop.counter %}
                         <td>
                           {% if c > 0 %}
-                            <a href="{% url 'admin_pna_scope_list' %}?criterion={{ r.obj.id }}&year={{ selected_year }}&month={{ month_num }}" class="text-decoration-none fw-semibold">{{ c }}</a>
+                              <a href="{% url 'admin_pna_scope_list' %}?criterion={{ r.obj.id }}&year={{ selected_year }}&month={{ month_num }}{% if scope_params %}&{{ scope_params }}{% endif %}" class="text-decoration-none fw-semibold">{{ c }}</a>
                           {% else %}
                             <span class="text-muted">0</span>
                           {% endif %}
@@ -155,7 +628,7 @@
                   {% for r in grp.rows %}
                     <tr>
                       <th class="text-start">
-                        <a href="{% url 'admin_pna_scope_list' %}?chapter={{ r.obj.id }}&year={{ selected_year }}" class="text-decoration-none">
+                        <a href="{% url 'admin_pna_scope_list' %}?chapter={{ r.obj.id }}&year={{ selected_year }}{% if scope_params %}&{{ scope_params }}{% endif %}" class="text-decoration-none">
                           Cap. {{ r.obj.numar }} — {{ r.obj.denumire }}
                         </a>
                       </th>
@@ -163,7 +636,7 @@
                         {% with month_num=forloop.counter %}
                           <td>
                             {% if c > 0 %}
-                              <a href="{% url 'admin_pna_scope_list' %}?chapter={{ r.obj.id }}&year={{ selected_year }}&month={{ month_num }}" class="text-decoration-none fw-semibold">{{ c }}</a>
+                              <a href="{% url 'admin_pna_scope_list' %}?chapter={{ r.obj.id }}&year={{ selected_year }}&month={{ month_num }}{% if scope_params %}&{{ scope_params }}{% endif %}" class="text-decoration-none fw-semibold">{{ c }}</a>
                             {% else %}
                               <span class="text-muted">0</span>
                             {% endif %}
@@ -186,7 +659,305 @@
 
         <div class="text-muted small mt-2">
           Tip: apasă pe numărul din celulă pentru a vedea lista proiectelor filtrată pe foaie/capitol + luna selectată.
+          {% if mode == 'days' %}<br>Notă: în modul „Volum muncă”, celula reprezintă suma zilelor estimate pentru proiectele cu deadline în luna respectivă.{% endif %}
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4" id="date">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong><i class="bi bi-check2-square me-1"></i>Calitate date / acțiuni recomandate</strong></div>
+      <div class="card-body">
+        <div class="list-group list-group-flush">
+          {% for a in actions %}
+            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="{{ a.href }}">
+              <span>{{ a.label }}</span>
+              <span class="badge text-bg-secondary rounded-pill">{{ a.nr }}</span>
+            </a>
+          {% endfor %}
+        </div>
+        <div class="text-muted small mt-2">Apasă pe un item pentru a vedea lista filtrată.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8" id="riscuri">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <strong><i class="bi bi-exclamation-triangle me-1"></i>Top riscuri (euristic)</strong>
+        <span class="text-muted small">Scor bazat pe termene + expertiză + CE + complexitate</span>
+      </div>
+      <div class="card-body">
+        {% if top_risks %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Proiect</th>
+                  <th class="text-end">Scor</th>
+                  <th class="text-nowrap">Deadline</th>
+                  <th>Status</th>
+                  <th>Semnale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in top_risks %}
+                  <tr>
+                    <td>
+                      <a href="{% url 'admin_pna_detail' pk=r.project.pk %}">{{ r.project.titlu }}</a>
+                      <div class="text-muted small">{{ r.project.atasare_label }}</div>
+                    </td>
+                    <td class="text-end fw-semibold">{{ r.score }}</td>
+                    <td class="text-nowrap">{% if r.project.termen_deadline %}{{ r.project.termen_deadline|luna_an }}{% else %}—{% endif %}</td>
+                    <td>{{ r.project.get_status_implementare_display }}</td>
+                    <td>
+                      {% for f in r.flags|slice:":4" %}
+                        <span class="badge text-bg-light border">{{ f }}</span>
+                      {% endfor %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted">Nu există riscuri calculate.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6" id="resurse">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <strong>
+          <i class="bi bi-people me-1"></i>
+          {% if scope_kind == 'institution' %}
+            Resurse & expertiză (capitole / foi de parcurs)
+          {% else %}
+            Resurse & expertiză (instituții)
+          {% endif %}
+        </strong>
+        <span class="text-muted small">Volum total estimat: <strong>{{ sum_zile }}</strong> zile</span>
+      </div>
+      <div class="card-body">
+        {% if scope_kind == 'institution' and top_scopes %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Foaie de parcurs / Capitol</th>
+                  <th class="text-end">Proiecte</th>
+                  <th class="text-end">Depășite</th>
+                  <th class="text-end">&lt;60 zile</th>
+                  <th class="text-end">Zile</th>
+                  <th class="text-end">Ext (fără)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in top_scopes %}
+                  <tr>
+                    <td>
+                      <a href="{{ r.filter_url }}">{{ r.label }}</a>
+                      {% if r.dashboard_url %}
+                        <a class="text-muted ms-2" href="{{ r.dashboard_url }}" title="Dashboard"><i class="bi bi-speedometer2"></i></a>
+                      {% endif %}
+                    </td>
+                    <td class="text-end fw-semibold">{{ r.nr }}</td>
+                    <td class="text-end">{{ r.overdue }}</td>
+                    <td class="text-end">{{ r.upcoming60 }}</td>
+                    <td class="text-end">{{ r.zile }}</td>
+                    <td class="text-end">{{ r.ext }}{% if r.ext_fara %} <span class="text-danger">({{ r.ext_fara }})</span>{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% elif top_institutii %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Instituție</th>
+                  <th class="text-end">Proiecte</th>
+                  <th class="text-end">Depășite</th>
+                  <th class="text-end">&lt;60 zile</th>
+                  <th class="text-end">Zile</th>
+                  <th class="text-end">Ext (fără)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for i in top_institutii %}
+                  <tr>
+                    <td>
+                      {% if i.id %}
+                        <a href="{% url 'admin_pna_filtered_list' %}?institution={{ i.id }}{% if scope_params %}&{{ scope_params }}{% endif %}">{{ i.name }}</a>
+                        <a class="text-muted ms-2" href="{% url 'admin_pna_dashboard_institution' pk=i.id %}" title="Dashboard instituție"><i class="bi bi-speedometer2"></i></a>
+                      {% else %}
+                        <a href="{% url 'admin_pna_filtered_list' %}?missing_institution=1{% if scope_params %}&{{ scope_params }}{% endif %}">{{ i.name }}</a>
+                      {% endif %}
+                    </td>
+                    <td class="text-end fw-semibold">{{ i.nr }}</td>
+                    <td class="text-end">{{ i.overdue }}</td>
+                    <td class="text-end">{{ i.upcoming60 }}</td>
+                    <td class="text-end">{{ i.zile }}</td>
+                    <td class="text-end">{{ i.ext }}{% if i.ext_fara %} <span class="text-danger">({{ i.ext_fara }})</span>{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted">Nu există date.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6" id="costuri">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <strong><i class="bi bi-cash-coin me-1"></i>Costuri (mii lei) – sumă pe ani</strong>
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_filtered_list' %}?missing_cost=1{% if scope_params %}&{{ scope_params }}{% endif %}">Vezi fără costuri</a>
+      </div>
+      <div class="card-body">
+        <style>
+          .pna-cost-chart { height: 220px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
+          .pna-cost-col { min-width: 120px; height: 100%; display:flex; flex-direction:column; }
+          .pna-cost-box { height:100%; display:flex; align-items:flex-end; padding:.35rem; }
+          .pna-cost-bar { width:100%; border-radius:.35rem; background: var(--bs-success); }
+        </style>
+        <div class="d-flex align-items-end gap-2 pna-cost-chart">
+          {% for c in cost_rows %}
+            <div class="pna-cost-col text-center">
+              <div class="border rounded pna-cost-box">
+                <div class="pna-cost-bar" style="height: {{ c.bar_h }}%;{% if c.nr > 0 %} min-height: 8px;{% endif %}" title="{{ c.year }}: {{ c.nr }} mii lei"></div>
+              </div>
+              <div class="mt-2 fw-semibold">{{ c.nr|floatformat:0 }}</div>
+              <div class="text-muted small">{{ c.year }}</div>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="text-muted small mt-2">Sumele includ doar proiectele care au costul completat pentru anul respectiv.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6" id="acte">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong><i class="bi bi-journal-text me-1"></i>Acte UE – distribuții</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="text-muted small mb-1">Tip document (Top)</div>
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th>Tip</th>
+                    <th class="text-end">Nr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in acte_tip_rows %}
+                    <tr>
+                      <td>{{ r.tip }}</td>
+                      <td class="text-end">{{ r.nr }}</td>
+                    </tr>
+                  {% empty %}
+                    <tr><td colspan="2" class="text-muted">Nu există acte UE atașate.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="text-muted small mb-1">Tip transpunere</div>
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th>Tip</th>
+                    <th class="text-end">Nr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in transp_rows %}
+                    <tr>
+                      <td>{{ r.label }}</td>
+                      <td class="text-end">{{ r.nr }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="text-muted small mb-1">Top acte UE după nr. proiecte (drill-down din fișă)</div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>CELEX</th>
+                <th>Denumire</th>
+                <th class="text-end">Proiecte</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in top_acte_rows %}
+                <tr>
+                  <td class="text-nowrap"><a href="{{ r.act.url_final }}" target="_blank">{{ r.act.celex_curat }}</a></td>
+                  <td>{{ r.act.denumire }}</td>
+                  <td class="text-end">{{ r.nr_projects }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-muted">Nu există date.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong><i class="bi bi-arrow-left-right me-1"></i>Derapaje (termen actualizat vs inițial)</strong></div>
+      <div class="card-body">
+        {% if derapaje_top %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Proiect</th>
+                  <th class="text-nowrap">Inițial</th>
+                  <th class="text-nowrap">Actualizat</th>
+                  <th class="text-end">Δ luni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in derapaje_top %}
+                  <tr>
+                    <td>
+                      <a href="{% url 'admin_pna_detail' pk=d.project.pk %}">{{ d.project.titlu }}</a>
+                      <div class="text-muted small">{{ d.project.atasare_label }}</div>
+                    </td>
+                    <td class="text-nowrap">{{ d.baseline|luna_an }}</td>
+                    <td class="text-nowrap">{{ d.updated|luna_an }}</td>
+                    <td class="text-end fw-semibold">{% if d.diff_months > 0 %}+{% endif %}{{ d.diff_months }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted">Nu există derapaje calculate.</div>
+        {% endif %}
       </div>
     </div>
   </div>

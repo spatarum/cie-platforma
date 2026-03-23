@@ -1,0 +1,195 @@
+{% extends 'portal/base.html' %}
+
+{% load portal_extras %}
+
+{% block title %}Dashboard expert | Administrare{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">Dashboard expert</h1>
+    <div class="text-muted small">
+      {{ expert.get_full_name|default:expert.username }} · {{ expert.email }}
+      {% if profil.organizatie %}· {{ profil.organizatie }}{% endif %}
+      {% if profil.functie %}· {{ profil.functie }}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_expert_edit' expert.pk %}"><i class="bi bi-person-lines-fill me-1"></i>Detalii expert</a>
+    <a class="btn btn-light btn-sm" href="{% url 'admin_experti_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la listă</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Chestionare accesibile</div>
+        <div class="display-6 fw-semibold">{{ nr_total_chestionare }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Trimise</div>
+        <div class="display-6 fw-semibold">{{ nr_trimise }}</div>
+        <div class="text-muted small">{{ rata_chestionare }}%</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Ciorne</div>
+        <div class="display-6 fw-semibold">{{ nr_ciorne }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Neîncepute</div>
+        <div class="display-6 fw-semibold">{{ nr_neincepute }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card mb-4">
+  <div class="card-body">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="fw-semibold"><i class="bi bi-ui-checks me-1"></i>Contribuții la chestionare</div>
+      <div class="text-muted small">Link către răspunsuri doar pentru chestionarele trimise</div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Chestionar</th>
+            <th class="text-nowrap">Termen</th>
+            <th>Status</th>
+            <th class="text-end">Acțiuni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in q_rows %}
+            <tr>
+              <td class="fw-semibold">{{ r.q.titlu }}</td>
+              <td class="text-nowrap">
+                {% if r.q.termen_limita %}{{ r.q.termen_limita|date:"d.m.Y" }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td>
+                {% if r.status == 'trimis' %}
+                  <span class="badge bg-success">Trimis</span>
+                {% elif r.status == 'draft' %}
+                  <span class="badge bg-warning text-dark">Ciornă</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">Neînceput</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if r.raspuns_url %}
+                  <a class="btn btn-sm btn-outline-primary" href="{{ r.raspuns_url }}"><i class="bi bi-eye me-1"></i>Vezi răspunsuri</a>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Proiecte PNA accesibile</div>
+        <div class="display-6 fw-semibold">{{ nr_total_proiecte }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Proiecte cu contribuții</div>
+        <div class="display-6 fw-semibold">{{ nr_cu_contrib }}</div>
+        <div class="text-muted small">{{ rata_pna }}%</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Legendă</div>
+        <div class="small">
+          <span class="badge bg-success me-1">F</span> Flexibilitate
+          <span class="badge bg-success me-1">C</span> Compensare
+          <span class="badge bg-success">T</span> Tranziție
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card">
+  <div class="card-body">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="fw-semibold"><i class="bi bi-file-earmark-text me-1"></i>Contribuții la proiecte PNA</div>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin_pna_list' %}"><i class="bi bi-list-ul me-1"></i>Deschide PNA</a>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Proiect</th>
+            <th class="text-nowrap">Termen Guvern</th>
+            <th class="text-nowrap">Termen Parlament</th>
+            <th>Instituție</th>
+            <th class="text-center">F</th>
+            <th class="text-center">C</th>
+            <th class="text-center">T</th>
+            <th class="text-end">Acțiuni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in p_rows %}
+            <tr>
+              <td>
+                <div class="fw-semibold"><a href="{% url 'admin_pna_detail' r.p.pk %}">{{ r.p.titlu }}</a></div>
+                <div class="text-muted small">
+                  {% if r.p.criterion %}{{ r.p.criterion.cod }}{% elif r.p.chapter %}Cap. {{ r.p.chapter.numar }}{% endif %}
+                </div>
+              </td>
+              <td class="text-nowrap">{% if r.p.termen_aprobare_guvern %}{{ r.p.termen_aprobare_guvern|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-nowrap">{% if r.p.termen_aprobare_parlament %}{{ r.p.termen_aprobare_parlament|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-muted">
+                {% if r.p.institutie_principala_ref %}{{ r.p.institutie_principala_ref.nume }}{% elif r.p.institutie_principala %}{{ r.p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if r.has_flex %}<span class="badge bg-success">F</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if r.has_comp %}<span class="badge bg-success">C</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if r.has_tran %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="{{ r.detail_url }}"><i class="bi bi-eye me-1"></i>Vezi contribuție</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
