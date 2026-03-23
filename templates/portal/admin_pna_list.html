@@ -35,36 +35,44 @@
   {% endif %}
 </form>
 
-<div class="row g-3 mb-3">
-  <div class="col-md-3">
-    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #0b3d91;">
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-3">
+  <div class="col">
+    <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #0b3d91;">
       <div class="card-body">
         <div class="stat-label">Total proiecte</div>
         <div class="stat-value">{{ total }}</div>
       </div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #b91c1c;">
+  <div class="col">
+    <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #475569;">
       <div class="card-body">
-        <div class="stat-label">Termene depășite</div>
-        <div class="stat-value">{{ nr_overdue }}</div>
+        <div class="stat-label">Neinițiate</div>
+        <div class="stat-value">{{ nr_neinitiate }}</div>
       </div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #a16207;">
+  <div class="col">
+    <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #a16207;">
       <div class="card-body">
-        <div class="stat-label">În următoarele 60 zile</div>
-        <div class="stat-value">{{ nr_upcoming_60 }}</div>
+        <div class="stat-label">În procedură la Guvern</div>
+        <div class="stat-value">{{ nr_in_procedura_guvern }}</div>
       </div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card shadow-sm gov-card stat-card" style="--stat-accent: #475569;">
+  <div class="col">
+    <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #2563eb;">
       <div class="card-body">
-        <div class="stat-label">Fără termene</div>
-        <div class="stat-value">{{ nr_fara_termene }}</div>
+        <div class="stat-label">În procedură la Parlament</div>
+        <div class="stat-value">{{ nr_in_procedura_parlament }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #16a34a;">
+      <div class="card-body">
+        <div class="stat-label">Adoptat în lectura finală</div>
+        <div class="stat-value">{{ nr_adoptate_final }}</div>
       </div>
     </div>
   </div>
@@ -102,7 +110,7 @@
                         <th>Instituție principală</th>
                         <th class="text-nowrap">Guvern</th>
                         <th class="text-nowrap">Parlament</th>
-                        <th class="text-nowrap">Guvern actualizat</th>
+                        <th class="text-nowrap">Status implementare</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -122,18 +130,12 @@
                             {% endif %}
                           </td>
                           <td class="text-nowrap">
-                            {% if p.termen_aprobare_guvern %}{{ p.termen_aprobare_guvern|luna_an }}{% else %}—{% endif %}
+                            {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}
                           </td>
                           <td class="text-nowrap">
                             {% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}—{% endif %}
                           </td>
-                          <td class="text-nowrap">
-                            {% if p.termen_actualizat_aprobare_guvern %}
-                              {{ p.termen_actualizat_aprobare_guvern|luna_an }}
-                            {% else %}
-                              —
-                            {% endif %}
-                          </td>
+                          <td class="text-nowrap">{{ p.get_status_implementare_display|default:"—" }}</td>
                         </tr>
                       {% endfor %}
                     </tbody>
@@ -200,7 +202,7 @@
                             <th>Instituție principală</th>
                             <th class="text-nowrap">Guvern</th>
                             <th class="text-nowrap">Parlament</th>
-                            <th class="text-nowrap">Guvern actualizat</th>
+                            <th class="text-nowrap">Status implementare</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -220,18 +222,12 @@
                                 {% endif %}
                               </td>
                               <td class="text-nowrap">
-                                {% if p.termen_aprobare_guvern %}{{ p.termen_aprobare_guvern|luna_an }}{% else %}—{% endif %}
+                                {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}
                               </td>
                               <td class="text-nowrap">
                                 {% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}—{% endif %}
                               </td>
-                              <td class="text-nowrap">
-                                {% if p.termen_actualizat_aprobare_guvern %}
-                                  {{ p.termen_actualizat_aprobare_guvern|luna_an }}
-                                {% else %}
-                                  —
-                                {% endif %}
-                              </td>
+                              <td class="text-nowrap">{{ p.get_status_implementare_display|default:"—" }}</td>
                             </tr>
                           {% endfor %}
                         </tbody>

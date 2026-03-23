@@ -1,6 +1,11 @@
 {% extends 'portal/base.html' %}
 {% load portal_extras %}
 {% block content %}
+<style>
+  .pna-num-col { width: 92px; min-width: 92px; }
+  .pna-num-cell { width: 92px; min-width: 92px; }
+</style>
+
 
 <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
   <div>
@@ -103,55 +108,6 @@
   </div>
 </div>
 
-<div class="card shadow-sm mb-3" id="contributii">
-  <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <strong><i class="bi bi-chat-square-text me-1"></i>Ultimele contribuții ale experților</strong>
-    <a class="btn btn-outline-secondary btn-sm" href="{{ all_contributions_url }}">Vezi toate contribuțiile</a>
-  </div>
-  <div class="card-body">
-    {% if latest_contribution_rows %}
-      <div class="vstack gap-3">
-        {% for r in latest_contribution_rows %}
-          <div class="border rounded p-3">
-            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
-              <div>
-                <div class="fw-semibold"><a href="{% url 'admin_pna_detail' pk=r.project.pk %}#contributii-experti">{{ r.project.titlu }}</a></div>
-                <div class="text-muted small">
-                  {{ r.project.atasare_label }} · {{ r.expert.get_full_name|default:r.expert.username }}
-                </div>
-              </div>
-              <div class="text-muted small">{{ r.contrib.updated_at|date:"d.m.Y H:i" }}</div>
-            </div>
-            <div class="row g-3">
-              {% if r.has_flex %}
-                <div class="col-12 col-lg-4">
-                  <div class="small text-muted fw-semibold mb-1">Flexibilitate</div>
-                  <div class="small">{{ r.contrib.flexibilitate|linebreaksbr }}</div>
-                </div>
-              {% endif %}
-              {% if r.has_comp %}
-                <div class="col-12 col-lg-4">
-                  <div class="small text-muted fw-semibold mb-1">Compensare</div>
-                  <div class="small">{{ r.contrib.compensare|linebreaksbr }}</div>
-                </div>
-              {% endif %}
-              {% if r.has_tran %}
-                <div class="col-12 col-lg-4">
-                  <div class="small text-muted fw-semibold mb-1">Tranziție</div>
-                  <div class="small">{{ r.contrib.tranzitie|linebreaksbr }}</div>
-                </div>
-              {% endif %}
-            </div>
-            <div class="mt-2"><a class="btn btn-sm btn-outline-primary" href="{% url 'admin_pna_detail' pk=r.project.pk %}#contributii-experti">Vezi proiectul</a></div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="text-muted">Nu există contribuții ale experților pentru acest scope.</div>
-    {% endif %}
-  </div>
-</div>
-
 <div class="card shadow-sm mb-3" id="termene">
   <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div>
@@ -224,6 +180,57 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-3" id="contributii">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <strong><i class="bi bi-chat-square-text me-1"></i>Ultimele contribuții ale experților</strong>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ all_contributions_url }}">Vezi toate contribuțiile</a>
+  </div>
+  <div class="card-body">
+    {% if latest_contribution_rows %}
+      <div class="vstack gap-3">
+        {% for r in latest_contribution_rows %}
+          <div class="border rounded p-3">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+              <div>
+                <div class="fw-semibold"><a href="{% url 'admin_pna_detail' pk=r.project.pk %}#contributii-experti">{{ r.project.titlu }}</a></div>
+                <div class="text-muted small">
+                  {{ r.project.atasare_label }} · {{ r.expert.get_full_name|default:r.expert.username }}
+                </div>
+              </div>
+              <div class="text-muted small">{{ r.contrib.updated_at|date:"d.m.Y H:i" }}</div>
+            </div>
+            <div class="row g-3">
+              {% if r.has_flex %}
+                <div class="col-12 col-lg-4">
+                  <div class="small text-muted fw-semibold mb-1">Flexibilitate</div>
+                  <div class="small">{{ r.contrib.flexibilitate|linebreaksbr }}</div>
+                </div>
+              {% endif %}
+              {% if r.has_comp %}
+                <div class="col-12 col-lg-4">
+                  <div class="small text-muted fw-semibold mb-1">Compensare</div>
+                  <div class="small">{{ r.contrib.compensare|linebreaksbr }}</div>
+                </div>
+              {% endif %}
+              {% if r.has_tran %}
+                <div class="col-12 col-lg-4">
+                  <div class="small text-muted fw-semibold mb-1">Tranziție</div>
+                  <div class="small">{{ r.contrib.tranzitie|linebreaksbr }}</div>
+                </div>
+              {% endif %}
+            </div>
+            <div class="mt-2"><a class="btn btn-sm btn-outline-primary" href="{% url 'admin_pna_detail' pk=r.project.pk %}#contributii-experti">Vezi proiectul</a></div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted">Nu există contribuții ale experților pentru acest scope.</div>
+    {% endif %}
+  </div>
+</div>
+
+
+{% if request.user.is_superuser %}
 <div class="card shadow-sm mb-3" id="date">
   <div class="card-header bg-white"><strong><i class="bi bi-check2-square me-1"></i>Calitate date / acțiuni recomandate</strong></div>
   <div class="card-body">
@@ -238,6 +245,7 @@
     <div class="text-muted small mt-2">Apasă pe un item pentru a vedea lista filtrată.</div>
   </div>
 </div>
+{% endif %}
 
 <div class="card shadow-sm mb-3" id="resurse-institutii">
   <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -251,15 +259,15 @@
           <thead>
             <tr>
               <th>Instituție</th>
-              <th class="text-end">Proiecte</th>
-              <th class="text-end">Neinițiate</th>
-              <th class="text-end">În procedură la Guvern</th>
-              <th class="text-end">În procedură la Parlament</th>
-              <th class="text-end">Adoptat final</th>
-              <th class="text-end">Depășite</th>
-              <th class="text-end">&lt;60 zile</th>
-              <th class="text-end">Zile</th>
-              <th class="text-end">Cost total</th>
+              <th class="text-end pna-num-col">Proiecte</th>
+              <th class="text-end pna-num-col">Neinițiate</th>
+              <th class="text-end pna-num-col">În procedură la Guvern</th>
+              <th class="text-end pna-num-col">În procedură la Parlament</th>
+              <th class="text-end pna-num-col">Adoptat final</th>
+              <th class="text-end pna-num-col">Depășite</th>
+              <th class="text-end pna-num-col">&lt;60 zile</th>
+              <th class="text-end pna-num-col">Zile</th>
+              <th class="text-end pna-num-col">Cost total</th>
             </tr>
           </thead>
           <tbody>
@@ -269,15 +277,15 @@
                   {% if r.dashboard_url %}<a href="{{ r.dashboard_url }}">{{ r.name }}</a>{% else %}<a href="{{ r.filter_url }}">{{ r.name }}</a>{% endif %}
                   <a class="text-muted ms-2" href="{{ r.filter_url }}" title="Listă filtrată"><i class="bi bi-funnel"></i></a>
                 </td>
-                <td class="text-end fw-semibold">{{ r.total }}</td>
-                <td class="text-end">{{ r.neinitiate }}</td>
-                <td class="text-end">{{ r.guvern }}</td>
-                <td class="text-end">{{ r.parlament }}</td>
-                <td class="text-end">{{ r.adoptat }}</td>
-                <td class="text-end">{{ r.overdue }}</td>
-                <td class="text-end">{{ r.upcoming60 }}</td>
-                <td class="text-end">{{ r.zile }}</td>
-                <td class="text-end">{{ r.cost_total|floatformat:0 }}</td>
+                <td class="text-end fw-semibold pna-num-cell">{{ r.total }}</td>
+                <td class="text-end pna-num-cell">{{ r.neinitiate }}</td>
+                <td class="text-end pna-num-cell">{{ r.guvern }}</td>
+                <td class="text-end pna-num-cell">{{ r.parlament }}</td>
+                <td class="text-end pna-num-cell">{{ r.adoptat }}</td>
+                <td class="text-end pna-num-cell">{{ r.overdue }}</td>
+                <td class="text-end pna-num-cell">{{ r.upcoming60 }}</td>
+                <td class="text-end pna-num-cell">{{ r.zile }}</td>
+                <td class="text-end pna-num-cell">{{ r.cost_total|floatformat:0 }}</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -296,15 +304,15 @@
           <thead>
             <tr>
               <th>Capitol</th>
-              <th class="text-end">Proiecte</th>
-              <th class="text-end">Neinițiate</th>
-              <th class="text-end">În procedură la Guvern</th>
-              <th class="text-end">În procedură la Parlament</th>
-              <th class="text-end">Adoptat final</th>
-              <th class="text-end">Depășite</th>
-              <th class="text-end">&lt;60 zile</th>
-              <th class="text-end">Zile</th>
-              <th class="text-end">Cost total</th>
+              <th class="text-end pna-num-col">Proiecte</th>
+              <th class="text-end pna-num-col">Neinițiate</th>
+              <th class="text-end pna-num-col">În procedură la Guvern</th>
+              <th class="text-end pna-num-col">În procedură la Parlament</th>
+              <th class="text-end pna-num-col">Adoptat final</th>
+              <th class="text-end pna-num-col">Depășite</th>
+              <th class="text-end pna-num-col">&lt;60 zile</th>
+              <th class="text-end pna-num-col">Zile</th>
+              <th class="text-end pna-num-col">Cost total</th>
             </tr>
           </thead>
           <tbody>
@@ -313,15 +321,15 @@
               {% for r in grp.rows %}
                 <tr>
                   <td><a href="{{ r.dashboard_url }}">{{ r.label }}</a> <a class="text-muted ms-2" href="{{ r.filter_url }}" title="Listă filtrată"><i class="bi bi-funnel"></i></a></td>
-                  <td class="text-end fw-semibold">{{ r.total }}</td>
-                  <td class="text-end">{{ r.neinitiate }}</td>
-                  <td class="text-end">{{ r.guvern }}</td>
-                  <td class="text-end">{{ r.parlament }}</td>
-                  <td class="text-end">{{ r.adoptat }}</td>
-                  <td class="text-end">{{ r.overdue }}</td>
-                  <td class="text-end">{{ r.upcoming60 }}</td>
-                  <td class="text-end">{{ r.zile }}</td>
-                  <td class="text-end">{{ r.cost_total|floatformat:0 }}</td>
+                  <td class="text-end fw-semibold pna-num-cell">{{ r.total }}</td>
+                  <td class="text-end pna-num-cell">{{ r.neinitiate }}</td>
+                  <td class="text-end pna-num-cell">{{ r.guvern }}</td>
+                  <td class="text-end pna-num-cell">{{ r.parlament }}</td>
+                  <td class="text-end pna-num-cell">{{ r.adoptat }}</td>
+                  <td class="text-end pna-num-cell">{{ r.overdue }}</td>
+                  <td class="text-end pna-num-cell">{{ r.upcoming60 }}</td>
+                  <td class="text-end pna-num-cell">{{ r.zile }}</td>
+                  <td class="text-end pna-num-cell">{{ r.cost_total|floatformat:0 }}</td>
                 </tr>
               {% endfor %}
             {% endfor %}
@@ -341,30 +349,30 @@
           <thead>
             <tr>
               <th>Foaie de parcurs</th>
-              <th class="text-end">Proiecte</th>
-              <th class="text-end">Neinițiate</th>
-              <th class="text-end">În procedură la Guvern</th>
-              <th class="text-end">În procedură la Parlament</th>
-              <th class="text-end">Adoptat final</th>
-              <th class="text-end">Depășite</th>
-              <th class="text-end">&lt;60 zile</th>
-              <th class="text-end">Zile</th>
-              <th class="text-end">Cost total</th>
+              <th class="text-end pna-num-col">Proiecte</th>
+              <th class="text-end pna-num-col">Neinițiate</th>
+              <th class="text-end pna-num-col">În procedură la Guvern</th>
+              <th class="text-end pna-num-col">În procedură la Parlament</th>
+              <th class="text-end pna-num-col">Adoptat final</th>
+              <th class="text-end pna-num-col">Depășite</th>
+              <th class="text-end pna-num-col">&lt;60 zile</th>
+              <th class="text-end pna-num-col">Zile</th>
+              <th class="text-end pna-num-col">Cost total</th>
             </tr>
           </thead>
           <tbody>
             {% for r in resource_criteria_rows %}
               <tr>
                 <td><a href="{{ r.dashboard_url }}">{{ r.label }}</a> <a class="text-muted ms-2" href="{{ r.filter_url }}" title="Listă filtrată"><i class="bi bi-funnel"></i></a></td>
-                <td class="text-end fw-semibold">{{ r.total }}</td>
-                <td class="text-end">{{ r.neinitiate }}</td>
-                <td class="text-end">{{ r.guvern }}</td>
-                <td class="text-end">{{ r.parlament }}</td>
-                <td class="text-end">{{ r.adoptat }}</td>
-                <td class="text-end">{{ r.overdue }}</td>
-                <td class="text-end">{{ r.upcoming60 }}</td>
-                <td class="text-end">{{ r.zile }}</td>
-                <td class="text-end">{{ r.cost_total|floatformat:0 }}</td>
+                <td class="text-end fw-semibold pna-num-cell">{{ r.total }}</td>
+                <td class="text-end pna-num-cell">{{ r.neinitiate }}</td>
+                <td class="text-end pna-num-cell">{{ r.guvern }}</td>
+                <td class="text-end pna-num-cell">{{ r.parlament }}</td>
+                <td class="text-end pna-num-cell">{{ r.adoptat }}</td>
+                <td class="text-end pna-num-cell">{{ r.overdue }}</td>
+                <td class="text-end pna-num-cell">{{ r.upcoming60 }}</td>
+                <td class="text-end pna-num-cell">{{ r.zile }}</td>
+                <td class="text-end pna-num-cell">{{ r.cost_total|floatformat:0 }}</td>
               </tr>
             {% endfor %}
           </tbody>

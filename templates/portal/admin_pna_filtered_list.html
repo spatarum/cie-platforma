@@ -56,15 +56,6 @@
         <input type="number" name="month" value="{{ month }}" class="form-control" placeholder="1-12" min="1" max="12">
       </div>
 
-      <div class="col-6 col-lg-1">
-        <label class="form-label small text-muted">Stagnare ≥ (zile)</label>
-        <input type="number" name="stale_days" value="{{ stale_days }}" class="form-control" placeholder="ex: 60" min="1" max="3650">
-      </div>
-      <div class="col-6 col-lg-1">
-        <label class="form-label small text-muted">Schimbări status (zile)</label>
-        <input type="number" name="status_changed_days" value="{{ status_changed_days }}" class="form-control" placeholder="ex: 30" min="1" max="3650">
-      </div>
-
       <div class="col-12">
         <div class="d-flex flex-wrap gap-3 mt-2">
           <div class="form-check">
@@ -87,52 +78,12 @@
             <input class="form-check-input" type="checkbox" name="overdue" value="1" id="fOverdue" {% if overdue == '1' %}checked{% endif %}>
             <label class="form-check-label" for="fOverdue">Deadline depășit</label>
           </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_deadline" value="1" id="fNoDl" {% if missing_deadline == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoDl">Fără deadline</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_cost" value="1" id="fNoCost" {% if missing_cost == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoCost">Fără costuri</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_volum" value="1" id="fNoVol" {% if missing_volum == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoVol">Fără estimare volum</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_institution" value="1" id="fNoInst" {% if missing_institution == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoInst">Fără instituție principală</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_acts" value="1" id="fNoActs" {% if missing_acts == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoActs">Fără acte UE</label>
-          </div>
 
-          <div class="vr d-none d-lg-block"></div>
+          
 
           <div class="form-check">
             <input class="form-check-input" type="checkbox" name="has_contrib" value="1" id="fHasContrib" {% if has_contrib == '1' %}checked{% endif %}>
             <label class="form-check-label" for="fHasContrib">Are contribuții experți</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_contrib" value="1" id="fNoContrib" {% if missing_contrib == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoContrib">Fără contribuții</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_flex" value="1" id="fNoFlex" {% if missing_flex == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoFlex">Fără Flexibilitate</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_comp" value="1" id="fNoComp" {% if missing_comp == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoComp">Fără Compensare</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_tran" value="1" id="fNoTran" {% if missing_tran == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoTran">Fără Tranziție</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="missing_all_dims" value="1" id="fNoAllDims" {% if missing_all_dims == '1' %}checked{% endif %}>
-            <label class="form-check-label" for="fNoAllDims">Nu are toate 3 dimensiunile</label>
           </div>
         </div>
       </div>
