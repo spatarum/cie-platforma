@@ -3591,13 +3591,24 @@ def admin_pna_detail(request, pk: int):
         obj.deadline_history.select_related("changed_by").all()[:100]
     )
 
-    last_status_dt = status_hist[0].changed_at if status_hist else None
-    zile_in_status = None
-    if last_status_dt:
-        try:
-            zile_in_status = (timezone.now().date() - last_status_dt.date()).days
-        except Exception:
-            zile_in_status = None
+    contributii_rows = []
+    contributii_qs = (
+        PnaExpertContribution.objects.filter(project=obj)
+        .select_related("expert", "expert__profil_expert")
+        .order_by("expert__last_name", "expert__first_name", "expert__username")
+    )
+    for c in contributii_qs:
+        if not c.are_orice:
+            continue
+        profil = getattr(c.expert, "profil_expert", None)
+        contributii_rows.append({
+            "expert": c.expert,
+            "profil": profil,
+            "contrib": c,
+            "has_flex": bool((c.flexibilitate or "").strip()),
+            "has_comp": bool((c.compensare or "").strip()),
+            "has_tran": bool((c.tranzitie or "").strip()),
+        })
 
     return render(
         request,
@@ -3607,7 +3618,7 @@ def admin_pna_detail(request, pk: int):
             "acts": acts,
             "status_hist": status_hist,
             "deadline_hist": deadline_hist,
-            "zile_in_status": zile_in_status,
+            "contributii_rows": contributii_rows,
             "can_edit_pna": can_edit_pna(request.user),
         },
     )

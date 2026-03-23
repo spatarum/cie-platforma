@@ -192,7 +192,6 @@
     <div class="card shadow-sm">
       <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
         <strong><i class="bi bi-chat-square-text me-1"></i>Progres contribuții experți</strong>
-        <a class="btn btn-outline-primary btn-sm" href="{{ contrib_missing_url }}">Vezi proiecte fără contribuții</a>
       </div>
       <div class="card-body">
 
@@ -208,11 +207,6 @@
                 <div class="progress mt-1" style="height: 6px;">
                   <div class="progress-bar" role="progressbar" style="width: {{ c.pct }}%" aria-valuenow="{{ c.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
-                {% if c.href and c.href_mode == 'missing' %}
-                  <div class="mt-1 small">
-                    <a class="text-decoration-none" href="{{ c.href }}">Vezi proiecte unde lipsește</a>
-                  </div>
-                {% endif %}
               </div>
             </div>
           {% endfor %}
@@ -240,50 +234,6 @@
               {% endfor %}
             </div>
             <div class="text-muted small mt-2">"Completat" = există cel puțin o contribuție cu text, pe dimensiunea respectivă.</div>
-          </div>
-
-          <div class="col-lg-7">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-              <div>
-                <div class="fw-semibold">Top proiecte fără contribuții</div>
-                <div class="text-muted small">Ordine: deadline (cel mai apropiat), apoi prioritate.</div>
-              </div>
-              <a class="btn btn-outline-secondary btn-sm" href="{{ contrib_missing_url }}">Vezi toate</a>
-            </div>
-
-            {% if contrib_missing_top %}
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Denumire</th>
-                      <th>Foaie / Capitol</th>
-                      <th class="text-nowrap">Deadline</th>
-                      <th class="text-end">Experți eligibili</th>
-                      <th class="text-end">Acțiune</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for r in contrib_missing_top %}
-                      <tr>
-                        <td style="min-width: 320px;">
-                          <a href="{% url 'admin_pna_detail' pk=r.project.pk %}">{{ r.project.titlu }}</a>
-                          <div class="text-muted small">{{ r.project.get_status_implementare_display }}</div>
-                        </td>
-                        <td class="text-muted">{{ r.project.atasare_label }}</td>
-                        <td class="text-nowrap">{% if r.deadline %}{{ r.deadline|luna_an }}{% else %}—{% endif %}</td>
-                        <td class="text-end">{{ r.eligible }}</td>
-                        <td class="text-end">
-                          <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_contributii' r.project.pk %}">Contribuții</a>
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              <div class="text-muted">Toate proiectele au cel puțin o contribuție.</div>
-            {% endif %}
           </div>
         </div>
 
@@ -416,134 +366,6 @@
 
         </div>
 
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12" id="activitate">
-    <div class="card shadow-sm">
-      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <strong><i class="bi bi-clock-history me-1"></i>Activitate & stagnare</strong>
-        <span class="text-muted small">Prag stagnare: {{ stale_days_threshold }} zile</span>
-      </div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-lg-6">
-            <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-              <div>
-                <div class="fw-semibold">Schimbări de status (ultimele 12 luni)</div>
-                <div class="text-muted small">Excludem intrarea de bază (creare/baseline) – numărăm doar schimbările reale de status.</div>
-              </div>
-              <div class="text-muted small">Ultimele 30 zile: <span class="fw-semibold">{{ status_moves_30 }}</span></div>
-            </div>
-
-            <style>
-              .pna-mini-chart { height: 150px; align-items: stretch !important; overflow-x: auto; padding-bottom: .25rem; }
-              .pna-mini-col { min-width: 70px; height: 100%; display: flex; flex-direction: column; }
-              .pna-mini-box { height: 100%; display: flex; align-items: flex-end; padding: .25rem; }
-              .pna-mini-bar { width: 100%; border-radius: 0.35rem; background: var(--bs-info); }
-              .pna-mini-label { font-size: .78rem; line-height: 1.1rem; }
-            </style>
-
-            <div class="d-flex align-items-end gap-2 pna-mini-chart">
-              {% for r in months_activity %}
-                <div class="pna-mini-col text-center">
-                  <div class="border rounded d-flex align-items-end pna-mini-box">
-                    <div class="pna-mini-bar" style="height: {{ r.bar_h }}%;{% if r.nr > 0 %} min-height: 6px;{% endif %}" title="{{ r.month|date:'m.Y' }}: {{ r.nr }} schimbări"></div>
-                  </div>
-                  <div class="mt-1 fw-semibold">{{ r.nr }}</div>
-                  <div class="pna-mini-label text-muted">{{ r.month|date:'M' }}</div>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-
-          <div class="col-lg-6">
-            <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-              <div>
-                <div class="fw-semibold">Proiecte stagnante</div>
-                <div class="text-muted small">Stagnant = fără schimbare status ≥ {{ stale_days_threshold }} zile (excludem „Adoptat în lectura finală”).</div>
-              </div>
-              <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_filtered_list' %}?stale_days={{ stale_days_threshold }}{% if scope_params %}&{{ scope_params }}{% endif %}">Vezi lista</a>
-            </div>
-
-            <div class="row g-2 mb-2">
-              <div class="col-6">
-                <div class="border rounded p-2">
-                  <div class="text-muted small">Total stagnante</div>
-                  <div class="h4 mb-0">{{ stale_total }}</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="border rounded p-2">
-                  <div class="text-muted small">% din total</div>
-                  <div class="h4 mb-0">{{ stale_pct_total }}%</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="table table-sm align-middle mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th>Status</th>
-                    <th class="text-end">Nr</th>
-                    <th class="text-end">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for s in stale_status_rows %}
-                    {% if s.nr > 0 %}
-                      <tr>
-                        <td>{{ s.label }}</td>
-                        <td class="text-end">{{ s.nr }}</td>
-                        <td class="text-end">{{ s.pct }}%</td>
-                      </tr>
-                    {% endif %}
-                  {% endfor %}
-                  {% if stale_total == 0 %}
-                    <tr><td colspan="3" class="text-muted">Nu sunt proiecte stagnante conform pragului selectat.</td></tr>
-                  {% endif %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <hr class="my-3">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-          <div class="fw-semibold">Top proiecte stagnante</div>
-          <span class="text-muted small">Primele {{ stale_projects_top|length }} (din {{ stale_total }})</span>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-sm table-hover align-middle mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>Proiect</th>
-                <th>Status</th>
-                <th class="text-end">Zile în status</th>
-                <th>Deadline</th>
-                <th>Instituție</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in stale_projects_top %}
-                <tr>
-                  <td>
-                    <a href="{% url 'admin_pna_detail' r.project.id %}">{{ r.project.titlu|truncatechars:80 }}</a>
-                    <div class="text-muted small">{{ r.project.atasare_label }}</div>
-                  </td>
-                  <td class="text-muted">{{ r.project.get_status_implementare_display }}</td>
-                  <td class="text-end fw-semibold">{{ r.days }}</td>
-                  <td class="text-muted">{% if r.project.termen_deadline %}{{ r.project.termen_deadline|luna_an }}{% else %}—{% endif %}</td>
-                  <td class="text-muted">{% if r.project.institutie_principala_ref %}{{ r.project.institutie_principala_ref.nume }}{% elif r.project.institutie_principala %}{{ r.project.institutie_principala }}{% else %}—{% endif %}</td>
-                </tr>
-              {% empty %}
-                <tr><td colspan="5" class="text-muted">Nu sunt proiecte stagnante.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   </div>

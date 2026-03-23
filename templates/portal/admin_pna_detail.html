@@ -17,7 +17,6 @@
 
   <div class="d-flex flex-wrap gap-2">
     <a href="{% url 'admin_pna_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
-    <a href="{% url 'admin_pna_contributii' obj.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chat-square-text me-1"></i>Contribuții experți</a>
 
     {% if can_edit_pna %}
       <a href="{% url 'admin_pna_edit' obj.id %}" class="btn btn-primary btn-sm"><i class="bi bi-pencil me-1"></i>Editează</a>
@@ -44,15 +43,7 @@
       <div class="card-body">
         <dl class="row mb-0">
           <dt class="col-sm-5 text-muted">Status implementare</dt>
-          <dd class="col-sm-7">
-            {{ obj.get_status_implementare_display|default:"—" }}
-            {% if zile_in_status is not None %}
-              <div class="text-muted small">Zile în status: <strong>{{ zile_in_status }}</strong></div>
-            {% endif %}
-            {% if status_hist %}
-              <div class="text-muted small">Ultima schimbare: {{ status_hist.0.changed_at|date:"d.m.Y H:i" }}{% if status_hist.0.changed_by %} · {{ status_hist.0.changed_by.get_full_name|default:status_hist.0.changed_by.username }}{% endif %}</div>
-            {% endif %}
-          </dd>
+          <dd class="col-sm-7">{{ obj.get_status_implementare_display|default:"—" }}</dd>
 
           <dt class="col-sm-5 text-muted">Necesită avizare Comisia Europeană</dt>
           <dd class="col-sm-7">{% if obj.necesita_avizare_comisia_europeana %}Da{% else %}Nu{% endif %}</dd>
@@ -220,6 +211,52 @@
           </div>
         {% else %}
           <div class="text-muted">Nu sunt atașate acte UE.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+
+  <div class="col-12" id="contributii-experti">
+    <div class="card shadow-sm gov-card">
+      <div class="card-header bg-white"><strong><i class="bi bi-chat-square-text me-1"></i>Contribuții experți</strong></div>
+      <div class="card-body">
+        {% if contributii_rows %}
+          <div class="vstack gap-3">
+            {% for r in contributii_rows %}
+              <div class="border rounded p-3">
+                <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+                  <div>
+                    <div class="fw-semibold">{{ r.expert.get_full_name|default:r.expert.username }}</div>
+                    <div class="text-muted small">
+                      {% if r.profil %}
+                        {% if r.profil.organizatie %}{{ r.profil.organizatie }}{% endif %}
+                        {% if r.profil.functie %}<span class="ms-1">· {{ r.profil.functie }}</span>{% endif %}
+                      {% else %}—{% endif %}
+                    </div>
+                  </div>
+                  <div class="text-muted small">Actualizat: {{ r.contrib.updated_at|date:"d.m.Y H:i" }}</div>
+                </div>
+
+                <div class="row g-3">
+                  <div class="col-lg-4">
+                    <div class="small text-muted mb-1">Flexibilitate</div>
+                    <div>{% if r.has_flex %}{{ r.contrib.flexibilitate|linebreaksbr }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                  </div>
+                  <div class="col-lg-4">
+                    <div class="small text-muted mb-1">Compensare</div>
+                    <div>{% if r.has_comp %}{{ r.contrib.compensare|linebreaksbr }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                  </div>
+                  <div class="col-lg-4">
+                    <div class="small text-muted mb-1">Tranziție</div>
+                    <div>{% if r.has_tran %}{{ r.contrib.tranzitie|linebreaksbr }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted">Nu există contribuții ale experților pentru acest proiect.</div>
         {% endif %}
       </div>
     </div>
