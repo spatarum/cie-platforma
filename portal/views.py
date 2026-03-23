@@ -2175,12 +2175,26 @@ def admin_pna_list(request):
         return bool(d and d < today)
 
     total = len(proiecte)
-    nr_overdue = sum(1 for p in proiecte if (_gov_overdue(p) or _parl_overdue(p)))
-    nr_fara_termene = sum(
+    nr_neinitiate = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_NEINITIAT)
+    nr_in_procedura_guvern = sum(
         1
         for p in proiecte
-        if not p.termen_guvern_efectiv and not p.termen_aprobare_parlament
+        if p.status_implementare in {
+            PnaProject.STATUS_INITIAT_GUVERN,
+            PnaProject.STATUS_AVIZARE_GUVERN,
+            PnaProject.STATUS_COORDONARE_CE,
+            PnaProject.STATUS_APROBARE_GUVERN,
+        }
     )
+    nr_in_procedura_parlament = sum(
+        1
+        for p in proiecte
+        if p.status_implementare in {
+            PnaProject.STATUS_INITIAT_PARLAMENT,
+            PnaProject.STATUS_AVIZARE_PARLAMENT,
+        }
+    )
+    nr_adoptate_final = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
 
     # Upcoming (următoarele 60 zile) pe termenul "cel mai apropiat" dintre Guvern/Parlament
     def _next_deadline(p: PnaProject):
@@ -2227,9 +2241,10 @@ def admin_pna_list(request):
             "q": q,
             "can_edit_pna": can_edit_pna(request.user),
             "total": total,
-            "nr_overdue": nr_overdue,
-            "nr_upcoming_60": nr_upcoming_60,
-            "nr_fara_termene": nr_fara_termene,
+            "nr_neinitiate": nr_neinitiate,
+            "nr_in_procedura_guvern": nr_in_procedura_guvern,
+            "nr_in_procedura_parlament": nr_in_procedura_parlament,
+            "nr_adoptate_final": nr_adoptate_final,
             "criterii_groups": criterii_groups,
             "chapter_groups": chapter_groups,
         },
@@ -3978,7 +3993,6 @@ def admin_pna_institution_list(request):
             "q": q,
             "institutii": list(qs),
             "can_edit_pna": can_edit_pna(request.user),
-            "can_view_history": can_view_history,
         },
     )
 
