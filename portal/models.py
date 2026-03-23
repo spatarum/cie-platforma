@@ -689,6 +689,7 @@ class PnaProject(models.Model):
 
     volum_munca_zile = models.PositiveIntegerField(null=True, blank=True)
     necesita_expertiza_externa = models.BooleanField(default=False)
+    este_identificata_expertiza_externa = models.BooleanField(default=False)
     disponibilitate_expertiza_externa = models.TextField(blank=True)
     parteneri_societate_civila = models.TextField(blank=True)
 

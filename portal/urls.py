@@ -132,6 +132,7 @@ urlpatterns = [
     ),
     path("administrare/pna/scop/", views.admin_pna_scope_list, name="admin_pna_scope_list"),
     path("administrare/pna/filtru/", views.admin_pna_filtered_list, name="admin_pna_filtered_list"),
+    path("administrare/pna/contributii/", views.admin_pna_all_contributions, name="admin_pna_all_contributions"),
     path("administrare/pna/institutii/", views.admin_pna_institution_list, name="admin_pna_institution_list"),
     path("administrare/pna/institutii/nou/", views.admin_pna_institution_create, name="admin_pna_institution_create"),
     path("administrare/pna/institutii/<int:pk>/edit/", views.admin_pna_institution_edit, name="admin_pna_institution_edit"),

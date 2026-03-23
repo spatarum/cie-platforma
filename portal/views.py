@@ -2502,6 +2502,34 @@ def _render_pna_dashboard(
     def _pct(n: int) -> float:
         return round((n / total) * 100, 1) if total else 0.0
 
+    # Ultimele contribuții ale experților (max 20) – pentru dashboard
+    latest_contribution_rows = []
+    latest_contrib_qs = (
+        PnaExpertContribution.objects.filter(project_id__in=project_ids)
+        .select_related("project", "expert", "expert__profil_expert")
+        .order_by("-updated_at")
+    )
+    for c in latest_contrib_qs:
+        if not c.are_orice:
+            continue
+        latest_contribution_rows.append(
+            {
+                "project": c.project,
+                "expert": c.expert,
+                "profil": getattr(c.expert, "profil_expert", None),
+                "contrib": c,
+                "has_flex": bool((c.flexibilitate or "").strip()),
+                "has_comp": bool((c.compensare or "").strip()),
+                "has_tran": bool((c.tranzitie or "").strip()),
+            }
+        )
+        if len(latest_contribution_rows) >= 20:
+            break
+
+    all_contributions_url = reverse("admin_pna_all_contributions")
+    if scope_params:
+        all_contributions_url += f"?{scope_params}"
+
     contrib_summary_cards = [
         {
             "key": "any",
@@ -2840,7 +2868,7 @@ def _render_pna_dashboard(
 
         if p.necesita_expertiza_externa:
             nr_expertiza_externa += 1
-            if not (p.disponibilitate_expertiza_externa or "").strip():
+            if not p.este_identificata_expertiza_externa:
                 nr_expertiza_externa_fara_furnizor += 1
 
         if p.expertiza_interna == 1:
@@ -2933,9 +2961,9 @@ def _render_pna_dashboard(
         if p.necesita_expertiza_externa:
             score += 2
             flags.append("Expertiză externă necesară")
-            if not (p.disponibilitate_expertiza_externa or "").strip():
+            if not p.este_identificata_expertiza_externa:
                 score += 2
-                flags.append("Fără furnizor expertiză externă")
+                flags.append("Fără expertiză externă identificată")
         if p.necesita_avizare_comisia_europeana:
             score += 2
             flags.append("Necesită avizare/coord. CE")
@@ -3046,6 +3074,62 @@ def _render_pna_dashboard(
     risk_rows.sort(key=lambda r: (r["score"], (r["project"].termen_deadline or datetime.max.date())), reverse=True)
     top_risks = risk_rows[:20]
 
+    def _stage_bucket(status_code: str) -> str:
+        if status_code == PnaProject.STATUS_NEINITIAT:
+            return "neinitiate"
+        if status_code in {
+            PnaProject.STATUS_INITIAT_GUVERN,
+            PnaProject.STATUS_AVIZARE_GUVERN,
+            PnaProject.STATUS_COORDONARE_CE,
+            PnaProject.STATUS_APROBARE_GUVERN,
+        }:
+            return "guvern"
+        if status_code in {
+            PnaProject.STATUS_INITIAT_PARLAMENT,
+            PnaProject.STATUS_AVIZARE_PARLAMENT,
+        }:
+            return "parlament"
+        if status_code == PnaProject.STATUS_ADOPTAT_FINAL:
+            return "adoptat"
+        return "other"
+
+    def _empty_resource_row(label, filter_url=None, dashboard_url=None):
+        return {
+            "label": label,
+            "filter_url": filter_url,
+            "dashboard_url": dashboard_url,
+            "total": 0,
+            "neinitiate": 0,
+            "guvern": 0,
+            "parlament": 0,
+            "adoptat": 0,
+            "overdue": 0,
+            "upcoming60": 0,
+            "zile": 0,
+            "cost_total": Decimal("0"),
+        }
+
+    def _update_resource_row(row, p):
+        row["total"] += 1
+        row[_stage_bucket(p.status_implementare)] = row.get(_stage_bucket(p.status_implementare), 0) + 1
+        dl = p.termen_deadline
+        if dl and dl < today:
+            row["overdue"] += 1
+        if dl and today <= dl <= (today + timedelta(days=60)):
+            row["upcoming60"] += 1
+        if p.volum_munca_zile:
+            try:
+                row["zile"] += int(p.volum_munca_zile)
+            except Exception:
+                pass
+        for y in (2026, 2027, 2028, 2029):
+            val = getattr(p, f"cost_{y}")
+            if val is not None:
+                try:
+                    row["cost_total"] += Decimal(str(val))
+                except Exception:
+                    pass
+
     # top instituții
     inst_agg = {}
     for p in proiecte:
@@ -3057,44 +3141,20 @@ def _render_pna_dashboard(
             {
                 "id": inst.id if inst else None,
                 "name": name,
-                "nr": 0,
-                "overdue": 0,
-                "upcoming60": 0,
-                "zile": 0,
-                "insuf": 0,
-                "ext": 0,
-                "ext_fara": 0,
-                "cost_total": Decimal("0"),
+                **_empty_resource_row(
+                    name,
+                    filter_url=(reverse("admin_pna_filtered_list") + f"?institution={inst.id}{'&' + scope_params if scope_params else ''}") if inst else _filtered_list_url({"missing_institution": 1}),
+                    dashboard_url=reverse("admin_pna_dashboard_institution", kwargs={"pk": inst.id}) if inst else None,
+                ),
+                "id": inst.id if inst else None,
+                "name": name,
             },
         )
-        row["nr"] += 1
-        dl = p.termen_deadline
-        if dl and dl < today:
-            row["overdue"] += 1
-        if dl and today <= dl <= (today + timedelta(days=60)):
-            row["upcoming60"] += 1
-        if p.volum_munca_zile:
-            try:
-                row["zile"] += int(p.volum_munca_zile)
-            except Exception:
-                pass
-        if p.expertiza_interna == 1:
-            row["insuf"] += 1
-        if p.necesita_expertiza_externa:
-            row["ext"] += 1
-            if not (p.disponibilitate_expertiza_externa or "").strip():
-                row["ext_fara"] += 1
-        for y in (2026, 2027, 2028, 2029):
-            val = getattr(p, f"cost_{y}")
-            if val is not None:
-                try:
-                    row["cost_total"] += Decimal(str(val))
-                except Exception:
-                    pass
+        _update_resource_row(row, p)
 
     inst_rows = list(inst_agg.values())
-    inst_rows.sort(key=lambda r: (r["nr"], r["zile"]), reverse=True)
-    top_institutii = inst_rows[:15]
+    inst_rows.sort(key=lambda r: (r["total"], r["zile"]), reverse=True)
+    resource_institution_rows = inst_rows[:20]
 
     # Pentru dashboard-ul per instituție, un breakdown mai util este pe capitole/foi de parcurs.
     top_scopes = None
@@ -3123,34 +3183,56 @@ def _render_pna_dashboard(
                     "label": label,
                     "dashboard_url": dashboard_url,
                     "filter_url": _filtered_list_url({"chapter": sid}) if kind == "CH" else _filtered_list_url({"criterion": sid}),
-                    "nr": 0,
-                    "overdue": 0,
-                    "upcoming60": 0,
-                    "zile": 0,
-                    "ext": 0,
-                    "ext_fara": 0,
+                    **_empty_resource_row(
+                        label,
+                        filter_url=_filtered_list_url({"chapter": sid}) if kind == "CH" else _filtered_list_url({"criterion": sid}),
+                        dashboard_url=dashboard_url,
+                    ),
+                    "kind": kind,
+                    "id": sid,
+                    "label": label,
                 },
             )
-
-            row["nr"] += 1
-            dl = p.termen_deadline
-            if dl and dl < today:
-                row["overdue"] += 1
-            if dl and today <= dl <= (today + timedelta(days=60)):
-                row["upcoming60"] += 1
-            if p.volum_munca_zile:
-                try:
-                    row["zile"] += int(p.volum_munca_zile)
-                except Exception:
-                    pass
-            if p.necesita_expertiza_externa:
-                row["ext"] += 1
-                if not (p.disponibilitate_expertiza_externa or "").strip():
-                    row["ext_fara"] += 1
+            _update_resource_row(row, p)
 
         rows = list(scope_agg.values())
-        rows.sort(key=lambda r: (r["nr"], r["zile"]), reverse=True)
+        rows.sort(key=lambda r: (r["total"], r["zile"]), reverse=True)
         top_scopes = rows[:20]
+
+    # Resurse & expertiză pe capitole și foi de parcurs
+    resource_chapter_groups = []
+    for cl, chapters in grouped_chapters:
+        rows = []
+        for ch in chapters:
+            projects_for_ch = [p for p in proiecte if p.chapter_id == ch.id]
+            if not projects_for_ch:
+                continue
+            row = _empty_resource_row(
+                f"Cap. {ch.numar} — {ch.denumire}",
+                filter_url=_filtered_list_url({"chapter": ch.id}),
+                dashboard_url=reverse("admin_pna_dashboard_chapter", kwargs={"pk": ch.id}),
+            )
+            row["obj"] = ch
+            for p in projects_for_ch:
+                _update_resource_row(row, p)
+            rows.append(row)
+        if rows:
+            resource_chapter_groups.append({"cluster": cl, "rows": rows})
+
+    resource_criteria_rows = []
+    for cr in Criterion.objects.all().order_by("cod"):
+        projects_for_cr = [p for p in proiecte if p.criterion_id == cr.id]
+        if not projects_for_cr:
+            continue
+        row = _empty_resource_row(
+            f"{cr.cod} — {cr.denumire}",
+            filter_url=_filtered_list_url({"criterion": cr.id}),
+            dashboard_url=reverse("admin_pna_dashboard_criterion", kwargs={"pk": cr.id}),
+        )
+        row["obj"] = cr
+        for p in projects_for_cr:
+            _update_resource_row(row, p)
+        resource_criteria_rows.append(row)
 
     # Top acte UE (după nr proiecte)
     top_acte = []
@@ -3214,7 +3296,7 @@ def _render_pna_dashboard(
             "href": _filtered_list_url({"needs_external": 1}),
         },
         {
-            "label": "Expertiză externă necesară (fără furnizor)",
+            "label": "Expertiză externă necesară (neidentificată)",
             "nr": nr_expertiza_externa_fara_furnizor,
             "href": _filtered_list_url({"external_provider_missing": 1}),
         },
@@ -3313,12 +3395,16 @@ def _render_pna_dashboard(
             "upcoming": upcoming[:50],
             "top_risks": top_risks,
             "derapaje_top": derapaje_top,
-            "top_institutii": top_institutii,
+            "resource_institution_rows": resource_institution_rows,
+            "resource_chapter_groups": resource_chapter_groups,
+            "resource_criteria_rows": resource_criteria_rows,
             "top_scopes": top_scopes,
             "acte_tip_rows": acte_tip_rows,
             "transp_rows": transp_rows,
             "top_acte_rows": top_acte_rows,
             "actions": actions,
+            "latest_contribution_rows": latest_contribution_rows,
+            "all_contributions_url": all_contributions_url,
 
             # --- contribuții experți (etapa 2) ---
             "contrib_summary_cards": contrib_summary_cards,
@@ -3644,6 +3730,81 @@ def admin_pna_detail(request, pk: int):
             "can_view_history": can_view_history,
         },
     )
+
+
+
+
+@user_passes_test(is_internal)
+def admin_pna_all_contributions(request):
+    """Listă cu toate contribuțiile experților la proiecte PNA, filtrabilă după scope-ul dashboardului."""
+    qs = PnaProject.objects.filter(arhivat=False)
+
+    institution = (request.GET.get("institution") or "").strip()
+    chapter_id = (request.GET.get("chapter") or "").strip()
+    criterion_id = (request.GET.get("criterion") or "").strip()
+    include_co = (request.GET.get("include_co") or "").strip()
+
+    scope_title = None
+    back_url = reverse("admin_pna_dashboard")
+    back_label = "Înapoi la dashboard"
+
+    if institution:
+        try:
+            inst = get_object_or_404(PnaInstitution, pk=int(institution))
+            if include_co == "1":
+                qs = qs.filter(Q(institutie_principala_ref=inst) | Q(institutii_responsabile=inst)).distinct()
+            else:
+                qs = qs.filter(institutie_principala_ref=inst)
+            scope_title = inst.nume
+            back_url = reverse("admin_pna_dashboard_institution", kwargs={"pk": inst.pk}) + ("?include_co=1" if include_co == "1" else "")
+            back_label = "Înapoi la dashboard instituție"
+        except Exception:
+            pass
+    elif chapter_id:
+        try:
+            ch = get_object_or_404(Chapter, pk=int(chapter_id))
+            qs = qs.filter(chapter=ch)
+            scope_title = f"Cap. {ch.numar} — {ch.denumire}"
+            back_url = reverse("admin_pna_dashboard_chapter", kwargs={"pk": ch.pk})
+            back_label = "Înapoi la dashboard capitol"
+        except Exception:
+            pass
+    elif criterion_id:
+        try:
+            cr = get_object_or_404(Criterion, pk=int(criterion_id))
+            qs = qs.filter(criterion=cr)
+            scope_title = f"{cr.cod} — {cr.denumire}"
+            back_url = reverse("admin_pna_dashboard_criterion", kwargs={"pk": cr.pk})
+            back_label = "Înapoi la dashboard foaie de parcurs"
+        except Exception:
+            pass
+
+    project_ids = list(qs.values_list("id", flat=True))
+    contribs = (
+        PnaExpertContribution.objects.filter(project_id__in=project_ids)
+        .select_related("project", "expert", "expert__profil_expert")
+        .order_by("-updated_at")
+    )
+    rows = []
+    for c in contribs:
+        if not c.are_orice:
+            continue
+        rows.append({
+            "project": c.project,
+            "expert": c.expert,
+            "profil": getattr(c.expert, "profil_expert", None),
+            "contrib": c,
+            "has_flex": bool((c.flexibilitate or "").strip()),
+            "has_comp": bool((c.compensare or "").strip()),
+            "has_tran": bool((c.tranzitie or "").strip()),
+        })
+
+    return render(request, "portal/admin_pna_all_contributions.html", {
+        "rows": rows,
+        "scope_title": scope_title,
+        "back_url": back_url,
+        "back_label": back_label,
+    })
 
 
 @user_passes_test(is_internal)
@@ -4129,7 +4290,7 @@ def admin_pna_filtered_list(request):
         qs = qs.filter(cost_2026__isnull=True, cost_2027__isnull=True, cost_2028__isnull=True, cost_2029__isnull=True)
 
     if external_provider_missing == "1":
-        qs = qs.filter(necesita_expertiza_externa=True).filter(Q(disponibilitate_expertiza_externa__isnull=True) | Q(disponibilitate_expertiza_externa=""))
+        qs = qs.filter(necesita_expertiza_externa=True, este_identificata_expertiza_externa=False)
 
     if ce_status_mismatch == "1":
         qs = qs.filter(necesita_avizare_comisia_europeana=True).exclude(status_implementare=PnaProject.STATUS_COORDONARE_CE)
