@@ -1,0 +1,61 @@
+{% extends 'portal/base.html' %}
+{% block content %}
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">Toate contribuțiile experților{% if scope_title %} — {{ scope_title }}{% endif %}</h1>
+    <div class="text-muted small">Listă cronologică a contribuțiilor la proiectele PNA.</div>
+  </div>
+  <div>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>{{ back_label }}</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if rows %}
+      <div class="vstack gap-3">
+        {% for r in rows %}
+          <div class="border rounded p-3">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+              <div>
+                <div class="fw-semibold"><a href="{% url 'admin_pna_detail' pk=r.project.pk %}#contributii-experti">{{ r.project.titlu }}</a></div>
+                <div class="text-muted small">
+                  {{ r.project.atasare_label }} · {{ r.expert.get_full_name|default:r.expert.username }}
+                  {% if r.profil %}
+                    {% if r.profil.organizatie %}<span class="ms-1">· {{ r.profil.organizatie }}</span>{% endif %}
+                    {% if r.profil.functie %}<span class="ms-1">· {{ r.profil.functie }}</span>{% endif %}
+                  {% endif %}
+                </div>
+              </div>
+              <div class="text-muted small">{{ r.contrib.updated_at|date:"d.m.Y H:i" }}</div>
+            </div>
+            <div class="row g-3">
+              {% if r.has_flex %}
+                <div class="col-12 col-lg-4">
+                  <div class="small text-muted fw-semibold mb-1">Flexibilitate</div>
+                  <div class="small">{{ r.contrib.flexibilitate|linebreaksbr }}</div>
+                </div>
+              {% endif %}
+              {% if r.has_comp %}
+                <div class="col-12 col-lg-4">
+                  <div class="small text-muted fw-semibold mb-1">Compensare</div>
+                  <div class="small">{{ r.contrib.compensare|linebreaksbr }}</div>
+                </div>
+              {% endif %}
+              {% if r.has_tran %}
+                <div class="col-12 col-lg-4">
+                  <div class="small text-muted fw-semibold mb-1">Tranziție</div>
+                  <div class="small">{{ r.contrib.tranzitie|linebreaksbr }}</div>
+                </div>
+              {% endif %}
+            </div>
+            <div class="mt-2"><a class="btn btn-sm btn-outline-primary" href="{% url 'admin_pna_detail' pk=r.project.pk %}#contributii-experti">Vezi proiectul</a></div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted">Nu există contribuții pentru acest scope.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

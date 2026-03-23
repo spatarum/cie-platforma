@@ -148,6 +148,9 @@
           <dt class="col-sm-6 text-muted">Necesită expertiză externă</dt>
           <dd class="col-sm-6">{% if obj.necesita_expertiza_externa %}Da{% else %}Nu{% endif %}</dd>
 
+          <dt class="col-sm-6 text-muted">Este identificată expertiză externă</dt>
+          <dd class="col-sm-6">{% if obj.este_identificata_expertiza_externa %}Da{% else %}Nu{% endif %}</dd>
+
           <dt class="col-sm-6 text-muted">Expertiză externă (cine)</dt>
           <dd class="col-sm-6">{{ obj.disponibilitate_expertiza_externa|default:"—"|linebreaksbr }}</dd>
 
