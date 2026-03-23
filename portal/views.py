@@ -2452,6 +2452,22 @@ def _render_pna_dashboard(
     total = len(proiecte)
     today = timezone.localdate()
 
+    # -------------------- KPI header dashboard --------------------
+    nr_neinitiate = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_NEINITIAT)
+    statusuri_guvern = {
+        PnaProject.STATUS_INITIAT_GUVERN,
+        PnaProject.STATUS_AVIZARE_GUVERN,
+        PnaProject.STATUS_COORDONARE_CE,
+        PnaProject.STATUS_APROBARE_GUVERN,
+    }
+    nr_in_procedura_guvern = sum(1 for p in proiecte if p.status_implementare in statusuri_guvern)
+    statusuri_parlament = {
+        PnaProject.STATUS_INITIAT_PARLAMENT,
+        PnaProject.STATUS_AVIZARE_PARLAMENT,
+    }
+    nr_in_procedura_parlament = sum(1 for p in proiecte if p.status_implementare in statusuri_parlament)
+    nr_adoptate_final = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
+
     # -------------------- progres contribuții experți --------------------
     # La nivel de proiect: considerăm "completat" dacă există cel puțin o contribuție non-goală.
     nr_contrib_any = 0
@@ -3260,6 +3276,10 @@ def _render_pna_dashboard(
             "back_label": back_label,
             "filtered_list_url": _filtered_list_url(),
             "total": total,
+            "nr_neinitiate": nr_neinitiate,
+            "nr_in_procedura_guvern": nr_in_procedura_guvern,
+            "nr_in_procedura_parlament": nr_in_procedura_parlament,
+            "nr_adoptate_final": nr_adoptate_final,
             "stale_days_threshold": stale_days_threshold,
             "stale_total": stale_total,
             "stale_pct_total": stale_pct_total,
@@ -3974,6 +3994,7 @@ def admin_pna_filtered_list(request):
     # -------------------- parametri --------------------
     q = (request.GET.get("q") or "").strip()
     status = (request.GET.get("status") or "").strip()
+    stage = (request.GET.get("stage") or "").strip()
     institution = (request.GET.get("institution") or "").strip()
     include_co = (request.GET.get("include_co") or "").strip()
 
@@ -4021,6 +4042,23 @@ def admin_pna_filtered_list(request):
 
     if status:
         qs = qs.filter(status_implementare=status)
+    elif stage:
+        if stage == "neinitiate":
+            qs = qs.filter(status_implementare=PnaProject.STATUS_NEINITIAT)
+        elif stage == "guvern":
+            qs = qs.filter(status_implementare__in=[
+                PnaProject.STATUS_INITIAT_GUVERN,
+                PnaProject.STATUS_AVIZARE_GUVERN,
+                PnaProject.STATUS_COORDONARE_CE,
+                PnaProject.STATUS_APROBARE_GUVERN,
+            ])
+        elif stage == "parlament":
+            qs = qs.filter(status_implementare__in=[
+                PnaProject.STATUS_INITIAT_PARLAMENT,
+                PnaProject.STATUS_AVIZARE_PARLAMENT,
+            ])
+        elif stage == "adoptat_final":
+            qs = qs.filter(status_implementare=PnaProject.STATUS_ADOPTAT_FINAL)
 
     inst_obj = None
     if institution:

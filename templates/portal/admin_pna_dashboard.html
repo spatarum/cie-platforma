@@ -49,8 +49,8 @@
   <a class="btn btn-outline-secondary btn-sm" href="#date"><i class="bi bi-check2-square me-1"></i>Calitate date</a>
 </div>
 
-<div class="row g-3 mb-3">
-  <div class="col-6 col-lg-3">
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-3">
+  <div class="col">
     <a class="text-decoration-none" href="{{ filtered_list_url }}">
       <div class="card shadow-sm h-100">
         <div class="card-body">
@@ -60,80 +60,47 @@
       </div>
     </a>
   </div>
-  <div class="col-6 col-lg-3">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?overdue=1{% if scope_params %}&{{ scope_params }}{% endif %}">
-      <div class="card shadow-sm h-100 border-danger">
-        <div class="card-body">
-          <div class="text-muted small">Deadline-uri depășite</div>
-          <div class="display-6 fw-semibold">{{ nr_overdue }}</div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-lg-3">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?upcoming_days=60{% if scope_params %}&{{ scope_params }}{% endif %}">
-      <div class="card shadow-sm h-100 border-warning">
-        <div class="card-body">
-          <div class="text-muted small">Deadline &lt; 60 zile</div>
-          <div class="display-6 fw-semibold">{{ nr_upcoming_60 }}</div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-lg-3">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?missing_deadline=1{% if scope_params %}&{{ scope_params }}{% endif %}">
-      <div class="card shadow-sm h-100 border-secondary">
-        <div class="card-body">
-          <div class="text-muted small">Fără deadline</div>
-          <div class="display-6 fw-semibold">{{ nr_no_deadline }}</div>
-        </div>
-      </div>
-    </a>
-  </div>
-
-  <div class="col-6 col-lg-3">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?needs_ce=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=neinitiate{% if scope_params %}&{{ scope_params }}{% endif %}">
       <div class="card shadow-sm h-100">
         <div class="card-body">
-          <div class="text-muted small">Necesită coordonare/avizare CE</div>
-          <div class="display-6 fw-semibold">{{ nr_necesita_ce }}</div>
+          <div class="text-muted small">Neinițiate</div>
+          <div class="display-6 fw-semibold">{{ nr_neinitiate }}</div>
         </div>
       </div>
     </a>
   </div>
-  <div class="col-6 col-lg-3">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?needs_external=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=guvern{% if scope_params %}&{{ scope_params }}{% endif %}">
       <div class="card shadow-sm h-100">
         <div class="card-body">
-          <div class="text-muted small">Necesită expertiză externă</div>
-          <div class="display-6 fw-semibold">{{ nr_expertiza_externa }}</div>
+          <div class="text-muted small">În procedură la Guvern</div>
+          <div class="display-6 fw-semibold">{{ nr_in_procedura_guvern }}</div>
         </div>
       </div>
     </a>
   </div>
-  <div class="col-6 col-lg-3">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?internal_expertise=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=parlament{% if scope_params %}&{{ scope_params }}{% endif %}">
       <div class="card shadow-sm h-100">
         <div class="card-body">
-          <div class="text-muted small">Expertiză internă insuficientă</div>
-          <div class="display-6 fw-semibold">{{ nr_expertiza_interna_insuf }}</div>
+          <div class="text-muted small">În procedură la Parlament</div>
+          <div class="display-6 fw-semibold">{{ nr_in_procedura_parlament }}</div>
         </div>
       </div>
     </a>
   </div>
-  <div class="col-6 col-lg-3">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?missing_cost=1{% if scope_params %}&{{ scope_params }}{% endif %}">
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=adoptat_final{% if scope_params %}&{{ scope_params }}{% endif %}">
       <div class="card shadow-sm h-100">
         <div class="card-body">
-          <div class="text-muted small">Fără costuri (2026–2029)</div>
-          <div class="display-6 fw-semibold">{{ nr_missing_cost }}</div>
+          <div class="text-muted small">Adoptat în lectura finală</div>
+          <div class="display-6 fw-semibold">{{ nr_adoptate_final }}</div>
         </div>
       </div>
     </a>
   </div>
 </div>
-
-<div class="row g-3">
   <div class="col-12" id="status">
     <div class="card shadow-sm">
       <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
