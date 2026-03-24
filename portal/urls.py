@@ -17,6 +17,7 @@ urlpatterns = [
     path("expert/newslettere/", views.expert_newsletters, name="expert_newsletters"),
     path("expert/newslettere/<int:pk>/", views.expert_newsletter_detail, name="expert_newsletter_detail"),
     path("expert/pna/", views.expert_pna_list, name="expert_pna_list"),
+    path("expert/pna/consultari/", views.expert_pna_consultari, name="expert_pna_consultari"),
     path("expert/pna/<int:pk>/", views.expert_pna_detail, name="expert_pna_detail"),
     path("expert/chestionar/<int:pk>/", views.expert_questionnaire, name="expert_chestionar"),
 
@@ -115,6 +116,7 @@ urlpatterns = [
     # PNA (etapa 1 – doar admin)
     path("administrare/pna/", views.admin_pna_list, name="admin_pna_list"),
     path("administrare/pna/dashboard/", views.admin_pna_dashboard, name="admin_pna_dashboard"),
+    path("administrare/pna/consultari/", views.admin_pna_consultari, name="admin_pna_consultari"),
     path(
         "administrare/pna/dashboard/institutie/<int:pk>/",
         views.admin_pna_dashboard_institution,

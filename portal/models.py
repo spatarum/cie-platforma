@@ -660,6 +660,9 @@ class PnaProject(models.Model):
     # Alte termene / etape (Parlament)
     intrare_planificata_vigoare = models.CharField(max_length=300, blank=True, default="")
     consultari_publice_parlament = models.DateField(null=True, blank=True)
+    consultari_publice_ora = models.CharField(max_length=100, blank=True, default="")
+    consultari_publice_locatie = models.CharField(max_length=255, blank=True, default="")
+    consultari_publice_descriere = models.TextField(blank=True, default="")
 
     status_implementare = models.CharField(
         max_length=40,

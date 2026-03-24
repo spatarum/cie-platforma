@@ -384,6 +384,52 @@ def expert_newsletter_detail(request, pk: int):
     return render(request, "portal/expert_newsletter_detail.html", {"nl": nl})
 
 
+@user_passes_test(is_internal)
+def admin_pna_consultari(request):
+    proiecte = list(
+        PnaProject.objects.filter(arhivat=False, consultari_publice_parlament__isnull=False)
+        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .order_by("consultari_publice_parlament", "titlu")
+    )
+    upcoming_groups, past_groups = _build_consultari_month_groups(proiecte, "admin_pna_detail")
+    return render(
+        request,
+        "portal/pna_consultari_calendar.html",
+        {
+            "page_title": "Calendar consultări publice în Parlament",
+            "page_subtitle": "Consultări publice realizate și planificate pentru proiectele PNA.",
+            "upcoming_groups": upcoming_groups,
+            "past_groups": past_groups,
+            "is_internal_view": True,
+            "back_url": reverse("admin_pna_list"),
+            "back_label": "Înapoi la PNA",
+        },
+    )
+
+
+@user_passes_test(is_expert)
+def expert_pna_consultari(request):
+    proiecte = list(
+        _expert_pna_accessible_qs(request.user)
+        .filter(consultari_publice_parlament__isnull=False)
+        .order_by("consultari_publice_parlament", "titlu")
+    )
+    upcoming_groups, past_groups = _build_consultari_month_groups(proiecte, "expert_pna_detail")
+    return render(
+        request,
+        "portal/pna_consultari_calendar.html",
+        {
+            "page_title": "Calendar consultări publice în Parlament",
+            "page_subtitle": "Vezi doar consultările din capitolele și foile de parcurs alocate ție.",
+            "upcoming_groups": upcoming_groups,
+            "past_groups": past_groups,
+            "is_internal_view": False,
+            "back_url": reverse("expert_pna_list"),
+            "back_label": "Înapoi la PNA",
+        },
+    )
+
+
 @user_passes_test(is_expert)
 def expert_pna_list(request):
     """Lista proiectelor PNA vizibile expertului (după alocările sale)."""
