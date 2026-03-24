@@ -4,7 +4,8 @@ import csv
 import io
 import secrets
 import re
-from datetime import datetime, timedelta
+import calendar as pycalendar
+from datetime import datetime, timedelta, date
 from urllib.parse import urlencode
 
 import openpyxl
@@ -171,6 +172,99 @@ def _expert_pna_accessible_qs(user: User):
         .prefetch_related("acte_ue_legaturi__eu_act")
         .order_by("titlu")
     )
+
+
+def _pna_scope_label(proiect: PnaProject) -> str:
+    if getattr(proiect, 'chapter_id', None) and getattr(proiect, 'chapter', None):
+        return f"Cap. {proiect.chapter.numar} — {proiect.chapter.denumire}"
+    if getattr(proiect, 'criterion_id', None) and getattr(proiect, 'criterion', None):
+        return f"{proiect.criterion.cod} — {proiect.criterion.denumire}"
+    return "—"
+
+
+def _shift_year_month(year: int, month: int, delta_months: int) -> tuple[int, int]:
+    month0 = month - 1 + delta_months
+    year += month0 // 12
+    month = month0 % 12 + 1
+    return year, month
+
+
+def _build_consultari_calendar_context(proiecte, detail_url_name: str, year: int | None = None, month: int | None = None):
+    today = timezone.localdate()
+    year = year or today.year
+    month = month or today.month
+
+    first_weekday, num_days = pycalendar.monthrange(year, month)  # Mon=0
+    month_first = date(year, month, 1)
+    start_date = month_first - timedelta(days=first_weekday)
+
+    events_by_day: dict[date, list[dict]] = {}
+    future_events = []
+    past_events = []
+
+    for proiect in proiecte:
+        consult_date = getattr(proiect, 'consultari_publice_parlament', None)
+        if not consult_date:
+            continue
+        item = {
+            'project': proiect,
+            'date': consult_date,
+            'time': (getattr(proiect, 'consultari_publice_ora', '') or '').strip(),
+            'location': (getattr(proiect, 'consultari_publice_locatie', '') or '').strip(),
+            'description': (getattr(proiect, 'consultari_publice_descriere', '') or '').strip(),
+            'scope_label': _pna_scope_label(proiect),
+            'detail_url': reverse(detail_url_name, kwargs={'pk': proiect.pk}),
+        }
+        events_by_day.setdefault(consult_date, []).append(item)
+        if consult_date >= today:
+            future_events.append(item)
+        else:
+            past_events.append(item)
+
+    for items in events_by_day.values():
+        items.sort(key=lambda x: ((x['time'] or '99:99'), x['project'].titlu.lower()))
+    future_events.sort(key=lambda x: (x['date'], x['time'] or '99:99', x['project'].titlu.lower()))
+    past_events.sort(key=lambda x: (x['date'], x['time'] or '99:99', x['project'].titlu.lower()), reverse=True)
+
+    weeks = []
+    cursor = start_date
+    for _ in range(6):
+        row = []
+        for _ in range(7):
+            day_events = events_by_day.get(cursor, [])
+            row.append({
+                'date': cursor,
+                'day': cursor.day,
+                'in_month': cursor.month == month,
+                'is_today': cursor == today,
+                'events': day_events,
+                'count': len(day_events),
+            })
+            cursor += timedelta(days=1)
+        weeks.append(row)
+
+    prev_year, prev_month = _shift_year_month(year, month, -1)
+    next_year, next_month = _shift_year_month(year, month, 1)
+
+    month_event_count = sum(len(events_by_day.get(date(year, month, d), [])) for d in range(1, num_days + 1))
+
+    return {
+        'selected_year': year,
+        'selected_month': month,
+        'calendar_weeks': weeks,
+        'weekday_names': ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'],
+        'month_options': [(1, 'Ianuarie'), (2, 'Februarie'), (3, 'Martie'), (4, 'Aprilie'), (5, 'Mai'), (6, 'Iunie'), (7, 'Iulie'), (8, 'August'), (9, 'Septembrie'), (10, 'Octombrie'), (11, 'Noiembrie'), (12, 'Decembrie')],
+        'month_label': month_first,
+        'month_event_count': month_event_count,
+        'upcoming_events': future_events[:12],
+        'past_events': past_events[:12],
+        'prev_year': prev_year,
+        'prev_month': prev_month,
+        'next_year': next_year,
+        'next_month': next_month,
+        'today_year': today.year,
+        'today_month': today.month,
+    }
 
 
 @login_required
@@ -391,20 +485,23 @@ def admin_pna_consultari(request):
         .select_related("chapter", "criterion", "institutie_principala_ref")
         .order_by("consultari_publice_parlament", "titlu")
     )
-    upcoming_groups, past_groups = _build_consultari_month_groups(proiecte, "admin_pna_detail")
-    return render(
-        request,
-        "portal/pna_consultari_calendar.html",
-        {
-            "page_title": "Calendar consultări publice în Parlament",
-            "page_subtitle": "Consultări publice realizate și planificate pentru proiectele PNA.",
-            "upcoming_groups": upcoming_groups,
-            "past_groups": past_groups,
-            "is_internal_view": True,
-            "back_url": reverse("admin_pna_list"),
-            "back_label": "Înapoi la PNA",
-        },
-    )
+    try:
+        year = int((request.GET.get("year") or "").strip()) if request.GET.get("year") else None
+    except Exception:
+        year = None
+    try:
+        month = int((request.GET.get("month") or "").strip()) if request.GET.get("month") else None
+    except Exception:
+        month = None
+    ctx = _build_consultari_calendar_context(proiecte, "admin_pna_detail", year, month)
+    ctx.update({
+        "page_title": "Calendar consultări publice în Parlament",
+        "page_subtitle": "Consultări publice planificate și realizate pentru proiectele PNA.",
+        "is_internal_view": True,
+        "back_url": reverse("admin_pna_list"),
+        "back_label": "Înapoi la PNA",
+    })
+    return render(request, "portal/pna_consultari_calendar.html", ctx)
 
 
 @user_passes_test(is_expert)
@@ -414,20 +511,23 @@ def expert_pna_consultari(request):
         .filter(consultari_publice_parlament__isnull=False)
         .order_by("consultari_publice_parlament", "titlu")
     )
-    upcoming_groups, past_groups = _build_consultari_month_groups(proiecte, "expert_pna_detail")
-    return render(
-        request,
-        "portal/pna_consultari_calendar.html",
-        {
-            "page_title": "Calendar consultări publice în Parlament",
-            "page_subtitle": "Vezi doar consultările din capitolele și foile de parcurs alocate ție.",
-            "upcoming_groups": upcoming_groups,
-            "past_groups": past_groups,
-            "is_internal_view": False,
-            "back_url": reverse("expert_pna_list"),
-            "back_label": "Înapoi la PNA",
-        },
-    )
+    try:
+        year = int((request.GET.get("year") or "").strip()) if request.GET.get("year") else None
+    except Exception:
+        year = None
+    try:
+        month = int((request.GET.get("month") or "").strip()) if request.GET.get("month") else None
+    except Exception:
+        month = None
+    ctx = _build_consultari_calendar_context(proiecte, "expert_pna_detail", year, month)
+    ctx.update({
+        "page_title": "Calendar consultări publice în Parlament",
+        "page_subtitle": "Vezi doar consultările din capitolele și foile de parcurs alocate ție.",
+        "is_internal_view": False,
+        "back_url": reverse("expert_pna_list"),
+        "back_label": "Înapoi la PNA",
+    })
+    return render(request, "portal/pna_consultari_calendar.html", ctx)
 
 
 @user_passes_test(is_expert)
