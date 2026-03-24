@@ -43,6 +43,16 @@
             {% elif obj.institutie_principala %}{{ obj.institutie_principala }}
             {% else %}—{% endif %}
           </dd>
+
+          <dt class="col-sm-5 text-muted">Consultări publice în Parlament</dt>
+          <dd class="col-sm-7">
+            {% if obj.consultari_publice_parlament %}
+              <div>{{ obj.consultari_publice_parlament|date:"d.m.Y" }}</div>
+              {% if obj.consultari_publice_ora %}<div class="small text-muted">Ora: {{ obj.consultari_publice_ora }}</div>{% endif %}
+              {% if obj.consultari_publice_locatie %}<div class="small text-muted">Locație: {{ obj.consultari_publice_locatie }}</div>{% endif %}
+              {% if obj.consultari_publice_descriere %}<div class="small mt-1">{{ obj.consultari_publice_descriere|linebreaksbr }}</div>{% endif %}
+            {% else %}—{% endif %}
+          </dd>
         </dl>
       </div>
     </div>

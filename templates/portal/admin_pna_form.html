@@ -106,12 +106,24 @@
       </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-3">
       <div class="col-12 col-md-4">
         <label class="form-label">{{ form.consultari_publice_parlament.label }}</label>
         {{ form.consultari_publice_parlament }}
       </div>
-      <div class="col-12 col-md-8">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.consultari_publice_ora.label }}</label>
+        {{ form.consultari_publice_ora }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form.consultari_publice_locatie.label }}</label>
+        {{ form.consultari_publice_locatie }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ form.consultari_publice_descriere.label }}</label>
+        {{ form.consultari_publice_descriere }}
+      </div>
+      <div class="col-12">
         <label class="form-label">{{ form.intrare_planificata_vigoare.label }}</label>
         {{ form.intrare_planificata_vigoare }}
       </div>

@@ -13,6 +13,7 @@
   <div class="d-flex flex-wrap gap-2">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard' %}"><i class="bi bi-graph-up me-1"></i>Dashboard</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_list' %}"><i class="bi bi-building me-1"></i>Instituții</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_consultari' %}"><i class="bi bi-calendar-event me-1"></i>Consultări publice</a>
     {% if can_edit_pna %}
       <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
       <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_create' %}"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>

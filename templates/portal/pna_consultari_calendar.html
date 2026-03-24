@@ -1,0 +1,98 @@
+{% extends "portal/base.html" %}
+{% load portal_extras %}
+
+{% block title %}{{ page_title }} | PNA{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">{{ page_title }}</h1>
+    <div class="text-muted small">{{ page_subtitle }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ back_url }}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>{{ back_label }}</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-7">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between">
+        <strong><i class="bi bi-calendar-event me-1"></i>Consultări planificate</strong>
+        <span class="text-muted small">Ordine cronologică</span>
+      </div>
+      <div class="card-body">
+        {% if upcoming_groups %}
+          {% for group in upcoming_groups %}
+            <div class="mb-4">
+              <div class="fw-semibold mb-2">{{ group.month|luna_an }}</div>
+              <div class="d-flex flex-column gap-3">
+                {% for item in group.items %}
+                  <div class="border rounded p-3">
+                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                      <div>
+                        <div class="fw-semibold"><a href="{{ item.detail_url }}" class="text-decoration-none">{{ item.project.titlu }}</a></div>
+                        <div class="text-muted small">{{ item.scope_label }}</div>
+                      </div>
+                      <span class="badge text-bg-primary">{{ item.date|date:"d.m.Y" }}</span>
+                    </div>
+                    <div class="mt-2 small">
+                      {% if item.time %}<span class="me-3"><i class="bi bi-clock me-1"></i>{{ item.time }}</span>{% endif %}
+                      {% if item.location %}<span><i class="bi bi-geo-alt me-1"></i>{{ item.location }}</span>{% endif %}
+                    </div>
+                    {% if item.description %}
+                      <div class="mt-2 text-muted">{{ item.description|linebreaksbr }}</div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted">Nu există consultări publice planificate.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-5">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between">
+        <strong><i class="bi bi-calendar-check me-1"></i>Consultări realizate</strong>
+        <span class="text-muted small">Cele mai recente sus</span>
+      </div>
+      <div class="card-body">
+        {% if past_groups %}
+          {% for group in past_groups %}
+            <div class="mb-4">
+              <div class="fw-semibold mb-2">{{ group.month|luna_an }}</div>
+              <div class="d-flex flex-column gap-3">
+                {% for item in group.items %}
+                  <div class="border rounded p-3">
+                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                      <div>
+                        <div class="fw-semibold"><a href="{{ item.detail_url }}" class="text-decoration-none">{{ item.project.titlu }}</a></div>
+                        <div class="text-muted small">{{ item.scope_label }}</div>
+                      </div>
+                      <span class="badge text-bg-light border">{{ item.date|date:"d.m.Y" }}</span>
+                    </div>
+                    <div class="mt-2 small">
+                      {% if item.time %}<span class="me-3"><i class="bi bi-clock me-1"></i>{{ item.time }}</span>{% endif %}
+                      {% if item.location %}<span><i class="bi bi-geo-alt me-1"></i>{{ item.location }}</span>{% endif %}
+                    </div>
+                    {% if item.description %}
+                      <div class="mt-2 text-muted">{{ item.description|linebreaksbr }}</div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted">Nu există consultări publice realizate.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
