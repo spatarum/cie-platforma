@@ -2,7 +2,15 @@
 
 {% load portal_extras %}
 
-{% block title %}{{ obj.titlu }} | PNA{% endblock %}
+{% block title %}{{ obj.titlu }} | PNA<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+    if (window.bootstrap) new bootstrap.Tooltip(el);
+  });
+});
+</script>
+
+{% endblock %}
 
 {% block content %}
 
@@ -15,6 +23,26 @@
   </div>
   <div class="d-flex flex-wrap gap-2">
     <a href="{% url 'expert_pna_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
+  </div>
+</div>
+
+<div class="card shadow-sm gov-card mb-3 border-info-subtle">
+  <div class="card-body">
+    <div class="fw-semibold mb-2"><i class="bi bi-info-circle me-1"></i>Cum sunt structurate contribuțiile</div>
+    <div class="row g-3 small">
+      <div class="col-md-4">
+        <div class="fw-semibold mb-1">Flexibilitate</div>
+        <div class="text-muted">Se urmărește spațiul de manevră permis de actele UE: unde există opțiuni de transpunere și care variantă este mai potrivită pentru Republica Moldova, mai ușor de implementat sau mai puțin costisitoare.</div>
+      </div>
+      <div class="col-md-4">
+        <div class="fw-semibold mb-1">Compensare</div>
+        <div class="text-muted">Se urmărește impactul asupra actorilor afectați și măsurile recomandate pentru reducerea efectelor negative: companii, angajați, instituții publice, consumatori sau alte categorii concrete.</div>
+      </div>
+      <div class="col-md-4">
+        <div class="fw-semibold mb-1">Tranziție</div>
+        <div class="text-muted">Se urmărește ritmul realist de implementare: dacă este necesară etapizare, perioadă de adaptare sau argumente pentru perioade tranzitorii în raport cu UE.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -91,19 +119,19 @@
           {% csrf_token %}
 
           <div class="mb-3">
-            <label class="form-label fw-semibold" for="{{ form.flexibilitate.id_for_label }}">{{ form.flexibilitate.label }}</label>
+            <label class="form-label fw-semibold" for="{{ form.flexibilitate.id_for_label }}">{{ form.flexibilitate.label }} <span class="text-muted" data-bs-toggle="tooltip" title="Unde există opțiuni de alegere în limitele actelor UE și care este varianta optimă pentru Moldova?"><i class="bi bi-question-circle"></i></span></label><div class="form-text mb-1">Ex.: alegerea variantei de transpunere care reduce costurile administrative și rămâne conformă actului UE.</div>
             {{ form.flexibilitate }}
             {{ form.flexibilitate.errors }}
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-semibold" for="{{ form.compensare.id_for_label }}">{{ form.compensare.label }}</label>
+            <label class="form-label fw-semibold" for="{{ form.compensare.id_for_label }}">{{ form.compensare.label }} <span class="text-muted" data-bs-toggle="tooltip" title="Cine este afectat și ce măsuri de sprijin, adaptare sau reducere a costurilor sunt necesare?"><i class="bi bi-question-circle"></i></span></label><div class="form-text mb-1">Ex.: costuri suplimentare pentru IMM-uri, nevoia de digitalizare sau măsuri de sprijin pentru anumite categorii.</div>
             {{ form.compensare }}
             {{ form.compensare.errors }}
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-semibold" for="{{ form.tranzitie.id_for_label }}">{{ form.tranzitie.label }}</label>
+            <label class="form-label fw-semibold" for="{{ form.tranzitie.id_for_label }}">{{ form.tranzitie.label }} <span class="text-muted" data-bs-toggle="tooltip" title="Care este calendarul realist de implementare și dacă este necesară etapizare ori perioadă tranzitorie?"><i class="bi bi-question-circle"></i></span></label><div class="form-text mb-1">Ex.: implementare etapizată în 1–2 ani sau solicitarea unei perioade tranzitorii argumentate.</div>
             {{ form.tranzitie }}
             {{ form.tranzitie.errors }}
           </div>
@@ -118,5 +146,13 @@
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+    if (window.bootstrap) new bootstrap.Tooltip(el);
+  });
+});
+</script>
 
 {% endblock %}
