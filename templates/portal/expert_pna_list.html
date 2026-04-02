@@ -17,6 +17,7 @@
 </div>
 
 <form method="get" class="row g-2 align-items-end mb-3">
+  {% if stage %}<input type="hidden" name="stage" value="{{ stage }}">{% endif %}
   <div class="col-12 col-md-6">
     <label class="form-label small text-muted">Caută</label>
     <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Caută după denumire, instituție sau act UE...">
@@ -35,6 +36,60 @@
   <div class="fw-semibold mb-1"><i class="bi bi-chat-square-text me-1"></i>Contribuție expert (3 dimensiuni)</div>
   <div class="text-muted">Pentru fiecare proiect poți salva comentarii la: <strong>Flexibilitate</strong>, <strong>Compensare</strong> și <strong>Tranziție</strong>.</div>
 </div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-3">
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}{% if q %}?q={{ q|urlencode }}{% endif %}">
+      <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #0b3d91;">
+        <div class="card-body">
+          <div class="stat-label">Total proiecte</div>
+          <div class="stat-value">{{ total }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=neinitiate{% if q %}&q={{ q|urlencode }}{% endif %}">
+      <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #475569;">
+        <div class="card-body">
+          <div class="stat-label">Neinițiate</div>
+          <div class="stat-value">{{ nr_neinitiate }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=guvern{% if q %}&q={{ q|urlencode }}{% endif %}">
+      <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #a16207;">
+        <div class="card-body">
+          <div class="stat-label">În procedură la Guvern</div>
+          <div class="stat-value">{{ nr_in_procedura_guvern }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=parlament{% if q %}&q={{ q|urlencode }}{% endif %}">
+      <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #2563eb;">
+        <div class="card-body">
+          <div class="stat-label">În procedură la Parlament</div>
+          <div class="stat-value">{{ nr_in_procedura_parlament }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=adoptat_final{% if q %}&q={{ q|urlencode }}{% endif %}">
+      <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #16a34a;">
+        <div class="card-body">
+          <div class="stat-label">Adoptat în lectura finală</div>
+          <div class="stat-value">{{ nr_adoptate_final }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+{% if stage %}<div class="alert alert-info py-2 small">Filtru activ: <strong>{% if stage == 'neinitiate' %}Neinițiate{% elif stage == 'guvern' %}În procedură la Guvern{% elif stage == 'parlament' %}În procedură la Parlament{% elif stage == 'adoptat_final' %}Adoptat în lectura finală{% endif %}</strong>. <a href="{% url 'expert_pna_list' %}{% if q %}?q={{ q|urlencode }}{% endif %}">Resetează filtrul</a>.</div>{% endif %}
 
 <div class="card shadow-sm gov-card mb-3">
   <div class="card-header bg-white d-flex align-items-center justify-content-between">
@@ -63,6 +118,7 @@
                         <th class="text-nowrap">Guvern</th>
                         <th class="text-nowrap">Parlament</th>
                         <th>Instituție responsabilă</th>
+                        <th class="text-nowrap">Status</th>
                         <th>Acte UE transpuse</th>
                         <th class="text-center">F</th>
                         <th class="text-center">C</th>
@@ -84,6 +140,7 @@
                           <td class="text-muted">
                             {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
                           </td>
+                          <td class="text-nowrap small">{{ p.get_status_implementare_display|default:"—" }}</td>
                           <td class="small">
                             {% if p.acte_ue_legaturi.all %}
                               <ul class="mb-0 ps-3">
@@ -171,6 +228,7 @@
                             <th class="text-nowrap">Guvern</th>
                             <th class="text-nowrap">Parlament</th>
                             <th>Instituție responsabilă</th>
+                            <th class="text-nowrap">Status</th>
                             <th>Acte UE transpuse</th>
                             <th class="text-center">F</th>
                             <th class="text-center">C</th>
@@ -192,6 +250,7 @@
                               <td class="text-muted">
                                 {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
                               </td>
+                              <td class="text-nowrap small">{{ p.get_status_implementare_display|default:"—" }}</td>
                               <td class="small">
                                 {% if p.acte_ue_legaturi.all %}
                                   <ul class="mb-0 ps-3">

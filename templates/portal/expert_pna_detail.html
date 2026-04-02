@@ -31,6 +31,9 @@
           <hr>
         {% endif %}
         <dl class="row mb-0">
+          <dt class="col-sm-5 text-muted">Status implementare</dt>
+          <dd class="col-sm-7">{{ obj.get_status_implementare_display|default:"—" }}</dd>
+
           <dt class="col-sm-5 text-muted">Termen Guvern</dt>
           <dd class="col-sm-7">{% if obj.termen_aprobare_guvern %}{{ obj.termen_aprobare_guvern|luna_an }}{% else %}—{% endif %}</dd>
 

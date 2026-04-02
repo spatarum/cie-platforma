@@ -20,7 +20,8 @@
     {% if scope_kind != 'global' %}
       <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard' %}"><i class="bi bi-graph-up me-1"></i>Dashboard general</a>
     {% endif %}
-    <a class="btn btn-outline-secondary btn-sm" href="{{ filtered_list_url }}"><i class="bi bi-funnel me-1"></i>Listă filtrată</a>
+    <a class="btn btn-outline-secondary btn-sm" href="?{% if scope_params %}{{ scope_params }}&{% endif %}{% if scope_kind == 'institution' and include_co %}include_co=1&{% endif %}{% if mode %}mode={{ mode }}&{% endif %}{% if selected_year %}year={{ selected_year }}&{% endif %}"><i class="bi bi-funnel me-1"></i>Listă filtrată</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ all_contributions_url }}"><i class="bi bi-chat-square-text me-1"></i>Contribuții experți</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_list' %}"><i class="bi bi-building me-1"></i>Instituții</a>
     {% if can_edit_pna %}
       <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
@@ -53,31 +54,32 @@
 
 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-3">
   <div class="col">
-    <a class="text-decoration-none" href="{{ filtered_list_url }}">
+    <a class="text-decoration-none" href="?{% if scope_params %}{{ scope_params }}&{% endif %}{% if scope_kind == 'institution' and include_co %}include_co=1&{% endif %}{% if mode %}mode={{ mode }}&{% endif %}{% if selected_year %}year={{ selected_year }}&{% endif %}">
       <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total proiecte</div><div class="display-6 fw-semibold">{{ total }}</div></div></div>
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=neinitiate{% if scope_params %}&{{ scope_params }}{% endif %}">
+    <a class="text-decoration-none" href="?stage=neinitiate{% if scope_params %}&{{ scope_params }}{% endif %}{% if scope_kind == 'institution' and include_co %}&include_co=1{% endif %}{% if mode %}&mode={{ mode }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}">
       <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Neinițiate</div><div class="display-6 fw-semibold">{{ nr_neinitiate }}</div></div></div>
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=guvern{% if scope_params %}&{{ scope_params }}{% endif %}">
+    <a class="text-decoration-none" href="?stage=guvern{% if scope_params %}&{{ scope_params }}{% endif %}{% if scope_kind == 'institution' and include_co %}&include_co=1{% endif %}{% if mode %}&mode={{ mode }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}">
       <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">În procedură la Guvern</div><div class="display-6 fw-semibold">{{ nr_in_procedura_guvern }}</div></div></div>
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=parlament{% if scope_params %}&{{ scope_params }}{% endif %}">
+    <a class="text-decoration-none" href="?stage=parlament{% if scope_params %}&{{ scope_params }}{% endif %}{% if scope_kind == 'institution' and include_co %}&include_co=1{% endif %}{% if mode %}&mode={{ mode }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}">
       <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">În procedură la Parlament</div><div class="display-6 fw-semibold">{{ nr_in_procedura_parlament }}</div></div></div>
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'admin_pna_filtered_list' %}?stage=adoptat_final{% if scope_params %}&{{ scope_params }}{% endif %}">
+    <a class="text-decoration-none" href="?stage=adoptat_final{% if scope_params %}&{{ scope_params }}{% endif %}{% if scope_kind == 'institution' and include_co %}&include_co=1{% endif %}{% if mode %}&mode={{ mode }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}">
       <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Adoptat în lectura finală</div><div class="display-6 fw-semibold">{{ nr_adoptate_final }}</div></div></div>
     </a>
   </div>
 </div>
+{% if stage %}<div class="alert alert-info py-2 small">Filtru activ pe dashboard: <strong>{% if stage == 'neinitiate' %}Neinițiate{% elif stage == 'guvern' %}În procedură la Guvern{% elif stage == 'parlament' %}În procedură la Parlament{% elif stage == 'adoptat_final' %}Adoptat în lectura finală{% endif %}</strong>. <a href="?{% if scope_params %}{{ scope_params }}&{% endif %}{% if scope_kind == 'institution' and include_co %}include_co=1&{% endif %}{% if mode %}mode={{ mode }}&{% endif %}{% if selected_year %}year={{ selected_year }}{% endif %}">Resetează filtrul</a>.</div>{% endif %}
 
 <div class="card shadow-sm mb-3" id="status">
   <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -115,6 +117,7 @@
       <div class="text-muted small">Deadline = termen actualizat Guvern (dacă există), altfel termen Parlament. (Fallback: termen Guvern)</div>
     </div>
     <form method="get" class="d-flex align-items-center gap-2">
+      {% if stage %}<input type="hidden" name="stage" value="{{ stage }}">{% endif %}
       {% if scope_kind == 'institution' and include_co %}<input type="hidden" name="include_co" value="1">{% endif %}
       <label class="small text-muted" for="modeSelect">Mod:</label>
       <select id="modeSelect" name="mode" class="form-select form-select-sm" onchange="this.form.submit()">
