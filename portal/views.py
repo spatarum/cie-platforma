@@ -1289,7 +1289,36 @@ def admin_questionnaire_edit(request, pk: int):
 @user_passes_test(is_internal)
 def admin_expert_list(request):
     experti = User.objects.filter(is_staff=False, is_active=True).order_by("last_name", "first_name")
-    return render(request, "portal/admin_experti_list.html", {"experti": experti})
+
+    expert_rows = []
+    for expert in experti:
+        profil = _get_or_create_profile(expert)
+
+        q_qs = _expert_accessible_qs(expert)
+        q_total = q_qs.count()
+        q_trimise = Submission.objects.filter(
+            expert=expert,
+            questionnaire__in=q_qs,
+            status=Submission.STATUS_TRIMIS,
+        ).count()
+
+        pna_qs = _expert_pna_accessible_qs(expert)
+        pna_total = pna_qs.count()
+        pna_contrib_qs = PnaExpertContribution.objects.filter(expert=expert, project__in=pna_qs)
+        pna_contrib_total = sum(1 for c in pna_contrib_qs if c.are_orice)
+
+        expert_rows.append(
+            {
+                "user": expert,
+                "profil": profil,
+                "q_total": q_total,
+                "q_trimise": q_trimise,
+                "pna_total": pna_total,
+                "pna_contrib_total": pna_contrib_total,
+            }
+        )
+
+    return render(request, "portal/admin_experti_list.html", {"expert_rows": expert_rows})
 
 
 # -------------------- STAFF users (administrare) --------------------
