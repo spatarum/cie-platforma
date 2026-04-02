@@ -182,6 +182,40 @@ def _pna_scope_label(proiect: PnaProject) -> str:
     return "—"
 
 
+
+
+def _apply_pna_stage_filter_to_qs(qs, stage: str):
+    """Aplică filtrul agregat de etapă pentru liste/dashboard PNA.
+
+    stage acceptat:
+    - neinitiate
+    - guvern
+    - parlament
+    - adoptat_final
+    orice altă valoare => fără filtrare
+    """
+    stage = (stage or "").strip()
+    if not stage:
+        return qs
+    if stage == "neinitiate":
+        return qs.filter(status_implementare=PnaProject.STATUS_NEINITIAT)
+    if stage == "guvern":
+        return qs.filter(status_implementare__in=[
+            PnaProject.STATUS_INITIAT_GUVERN,
+            PnaProject.STATUS_AVIZARE_GUVERN,
+            PnaProject.STATUS_COORDONARE_CE,
+            PnaProject.STATUS_APROBARE_GUVERN,
+        ])
+    if stage == "parlament":
+        return qs.filter(status_implementare__in=[
+            PnaProject.STATUS_INITIAT_PARLAMENT,
+            PnaProject.STATUS_AVIZARE_PARLAMENT,
+        ])
+    if stage == "adoptat_final":
+        return qs.filter(status_implementare=PnaProject.STATUS_ADOPTAT_FINAL)
+    return qs
+
+
 def _shift_year_month(year: int, month: int, delta_months: int) -> tuple[int, int]:
     month0 = month - 1 + delta_months
     year += month0 // 12
