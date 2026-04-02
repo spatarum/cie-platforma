@@ -535,8 +535,10 @@ def expert_pna_list(request):
     """Lista proiectelor PNA vizibile expertului (după alocările sale)."""
 
     q = (request.GET.get("q") or "").strip()
+    stage = (request.GET.get("stage") or "").strip()
 
-    proiecte_qs = _expert_pna_accessible_qs(request.user)
+    base_qs = _expert_pna_accessible_qs(request.user)
+    proiecte_qs = base_qs
     if q:
         proiecte_qs = proiecte_qs.filter(
             Q(titlu__icontains=q)
@@ -546,6 +548,18 @@ def expert_pna_list(request):
             | Q(acte_ue_legaturi__eu_act__celex__icontains=q)
         ).distinct()
 
+    all_projects = list(base_qs)
+    total = len(all_projects)
+    nr_neinitiate = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_NEINITIAT)
+    nr_in_procedura_guvern = sum(1 for p in all_projects if p.status_implementare in {
+        PnaProject.STATUS_INITIAT_GUVERN, PnaProject.STATUS_AVIZARE_GUVERN, PnaProject.STATUS_COORDONARE_CE, PnaProject.STATUS_APROBARE_GUVERN
+    })
+    nr_in_procedura_parlament = sum(1 for p in all_projects if p.status_implementare in {
+        PnaProject.STATUS_INITIAT_PARLAMENT, PnaProject.STATUS_AVIZARE_PARLAMENT
+    })
+    nr_adoptate_final = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
+
+    proiecte_qs = _apply_pna_stage_filter_to_qs(proiecte_qs, stage)
     proiecte = list(proiecte_qs)
 
     # map contribuții (per expert)
@@ -593,6 +607,13 @@ def expert_pna_list(request):
             "criterii_groups": criterii_groups,
             "chapter_groups": chapter_groups,
             "contribs": contribs,
+            "stage": stage,
+            "total": total,
+            "nr_neinitiate": nr_neinitiate,
+            "nr_in_procedura_guvern": nr_in_procedura_guvern,
+            "nr_in_procedura_parlament": nr_in_procedura_parlament,
+            "nr_adoptate_final": nr_adoptate_final,
+            "stage": stage,
         },
     )
 
@@ -2291,6 +2312,7 @@ def admin_pna_list(request):
     """Pagina PNA (admin): listă + tabel structurat pe capitole/foi de parcurs."""
 
     q = (request.GET.get("q") or "").strip()
+    stage = (request.GET.get("stage") or "").strip()
 
     proiecte_qs = (
         PnaProject.objects.filter(arhivat=False)
@@ -2307,7 +2329,7 @@ def admin_pna_list(request):
             | Q(institutii_responsabile__nume__icontains=q)
         ).distinct()
 
-    proiecte = list(proiecte_qs)
+    all_projects = list(proiecte_qs)
 
     # Statistici rapide (dashboard)
     today = timezone.localdate()
@@ -2320,11 +2342,11 @@ def admin_pna_list(request):
         d = p.termen_aprobare_parlament
         return bool(d and d < today)
 
-    total = len(proiecte)
-    nr_neinitiate = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_NEINITIAT)
+    total = len(all_projects)
+    nr_neinitiate = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_NEINITIAT)
     nr_in_procedura_guvern = sum(
         1
-        for p in proiecte
+        for p in all_projects
         if p.status_implementare in {
             PnaProject.STATUS_INITIAT_GUVERN,
             PnaProject.STATUS_AVIZARE_GUVERN,
@@ -2334,21 +2356,24 @@ def admin_pna_list(request):
     )
     nr_in_procedura_parlament = sum(
         1
-        for p in proiecte
+        for p in all_projects
         if p.status_implementare in {
             PnaProject.STATUS_INITIAT_PARLAMENT,
             PnaProject.STATUS_AVIZARE_PARLAMENT,
         }
     )
-    nr_adoptate_final = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
+    nr_adoptate_final = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
 
     # Upcoming (următoarele 60 zile) pe termenul "cel mai apropiat" dintre Guvern/Parlament
     def _next_deadline(p: PnaProject):
         cands = [d for d in [p.termen_guvern_efectiv, p.termen_aprobare_parlament] if d]
         return min(cands) if cands else None
 
-    upcoming_60 = [p for p in proiecte if _next_deadline(p) and today <= _next_deadline(p) <= (today + timedelta(days=60))]
+    upcoming_60 = [p for p in all_projects if _next_deadline(p) and today <= _next_deadline(p) <= (today + timedelta(days=60))]
     nr_upcoming_60 = len(upcoming_60)
+
+    proiecte_qs = _apply_pna_stage_filter_to_qs(proiecte_qs, stage)
+    proiecte = list(proiecte_qs)
 
     # Grupare pe criterii (foi de parcurs)
     by_criterion = {}
@@ -2393,6 +2418,7 @@ def admin_pna_list(request):
             "nr_adoptate_final": nr_adoptate_final,
             "criterii_groups": criterii_groups,
             "chapter_groups": chapter_groups,
+            "stage": stage,
         },
     )
 
@@ -2505,7 +2531,16 @@ def _render_pna_dashboard(
     mode = (request.GET.get("mode") or "count").strip().lower()
     if mode not in {"count", "days"}:
         mode = "count"
+    stage = (request.GET.get("stage") or "").strip()
 
+    base_qs = proiecte_qs
+    all_projects = list(
+        base_qs.select_related("chapter", "criterion", "institutie_principala_ref")
+        .prefetch_related("institutii_responsabile", "acte_ue_legaturi__eu_act")
+        .order_by("-actualizat_la")
+    )
+
+    proiecte_qs = _apply_pna_stage_filter_to_qs(proiecte_qs, stage)
     proiecte = list(
         proiecte_qs.select_related("chapter", "criterion", "institutie_principala_ref")
         .prefetch_related("institutii_responsabile", "acte_ue_legaturi__eu_act")
@@ -2610,24 +2645,24 @@ def _render_pna_dashboard(
         qs = urlencode(params)
         return reverse("admin_pna_filtered_list") + (f"?{qs}" if qs else "")
 
-    total = len(proiecte)
+    total = len(all_projects)
     today = timezone.localdate()
 
     # -------------------- KPI header dashboard --------------------
-    nr_neinitiate = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_NEINITIAT)
+    nr_neinitiate = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_NEINITIAT)
     statusuri_guvern = {
         PnaProject.STATUS_INITIAT_GUVERN,
         PnaProject.STATUS_AVIZARE_GUVERN,
         PnaProject.STATUS_COORDONARE_CE,
         PnaProject.STATUS_APROBARE_GUVERN,
     }
-    nr_in_procedura_guvern = sum(1 for p in proiecte if p.status_implementare in statusuri_guvern)
+    nr_in_procedura_guvern = sum(1 for p in all_projects if p.status_implementare in statusuri_guvern)
     statusuri_parlament = {
         PnaProject.STATUS_INITIAT_PARLAMENT,
         PnaProject.STATUS_AVIZARE_PARLAMENT,
     }
-    nr_in_procedura_parlament = sum(1 for p in proiecte if p.status_implementare in statusuri_parlament)
-    nr_adoptate_final = sum(1 for p in proiecte if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
+    nr_in_procedura_parlament = sum(1 for p in all_projects if p.status_implementare in statusuri_parlament)
+    nr_adoptate_final = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
 
     # -------------------- progres contribuții experți --------------------
     # La nivel de proiect: considerăm "completat" dacă există cel puțin o contribuție non-goală.
