@@ -946,17 +946,14 @@ class PnaExpertContributionForm(forms.ModelForm):
             "flexibilitate": forms.Textarea(attrs={
                 "class": "form-control",
                 "rows": 6,
-                "placeholder": "Ex.: Directiva permite mai multe opțiuni. Varianta X ar reduce costurile administrative și este mai potrivită capacității instituționale actuale.",
             }),
             "compensare": forms.Textarea(attrs={
                 "class": "form-control",
                 "rows": 6,
-                "placeholder": "Ex.: IMM-urile sau anumite categorii de lucrători vor suporta costuri suplimentare. Se recomandă măsuri de sprijin, simplificări sau etapizare.",
             }),
             "tranzitie": forms.Textarea(attrs={
                 "class": "form-control",
                 "rows": 6,
-                "placeholder": "Ex.: Implementarea completă necesită timp suplimentar. Se poate argumenta o perioadă tranzitorie sau o aplicare etapizată.",
             }),
         }
         labels = {
