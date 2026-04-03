@@ -1,0 +1,70 @@
+{% load portal_extras %}
+{% for thread in threads %}
+  <div class="card chat-thread shadow-sm mb-3" id="msg-{{ thread.id }}">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <div class="fw-semibold">{{ thread.author|display_name }}</div>
+          <div class="small text-muted">
+            <span class="badge text-bg-light border me-1">{{ thread.author|role_label }}</span>
+            {{ thread.created_at|date:"d.m.Y H:i" }}
+            {% if thread.updated_at and thread.updated_at|date:"U" != thread.created_at|date:"U" %}
+              · editat
+            {% endif %}
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          {% if thread.is_question %}<span class="badge text-bg-primary">Întrebare</span>{% endif %}
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#reply-{{ thread.id }}">Răspunde</button>
+        </div>
+      </div>
+
+      {% if thread.has_tags %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          {% for ch in thread.tagged_chapters.all %}<span class="badge text-bg-light border">{{ ch }}</span>{% endfor %}
+          {% for cr in thread.tagged_criteria.all %}<span class="badge text-bg-info-subtle border">{{ cr.cod }} · {{ cr.denumire }}</span>{% endfor %}
+          {% for u in thread.tagged_users.all %}<span class="badge text-bg-warning-subtle border">@{{ u|display_name }}</span>{% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="chat-text mt-3">{{ thread.text|linebreaksbr }}</div>
+
+      <div class="collapse mt-3" id="reply-{{ thread.id }}">
+        <form method="post" action="{% url 'chat_reply_create' thread.id %}" class="chat-reply-form" data-ajax-form="1">
+          {% csrf_token %}
+          <input type="hidden" name="parent_id" value="{{ thread.id }}">
+          <label class="form-label small fw-semibold">Răspuns</label>
+          <textarea name="text" rows="3" class="form-control" placeholder="Scrie răspunsul tău..."></textarea>
+          <div class="d-flex justify-content-end mt-2">
+            <button class="btn btn-sm btn-primary" type="submit">Publică răspunsul</button>
+          </div>
+        </form>
+      </div>
+
+      {% if thread.replies.all %}
+        <div class="chat-replies mt-4 ps-lg-4 border-start">
+          {% for reply in thread.replies.all %}
+            <div class="chat-reply py-3 {% if not forloop.last %}border-bottom{% endif %}">
+              <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                <div>
+                  <div class="fw-semibold">{{ reply.author|display_name }}</div>
+                  <div class="small text-muted">
+                    <span class="badge text-bg-light border me-1">{{ reply.author|role_label }}</span>
+                    {{ reply.created_at|date:"d.m.Y H:i" }}
+                  </div>
+                </div>
+              </div>
+              <div class="chat-text mt-2">{{ reply.text|linebreaksbr }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% empty %}
+  <div class="card shadow-sm">
+    <div class="card-body text-muted">
+      Nu există încă mesaje în chat. Poți începe tu prima discuție.
+    </div>
+  </div>
+{% endfor %}

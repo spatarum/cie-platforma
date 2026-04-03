@@ -1,0 +1,27 @@
+{% csrf_token %}
+<div class="mb-3">
+  <label class="form-label fw-semibold" for="id_text">{{ form.text.label }}</label>
+  {{ form.text }}
+  {% if form.text.errors %}<div class="text-danger small mt-1">{{ form.text.errors|join:", " }}</div>{% endif %}
+</div>
+<div class="form-check mb-3">
+  {{ form.is_question }}
+  <label class="form-check-label" for="id_is_question">{{ form.is_question.label }}</label>
+</div>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <label class="form-label small text-muted">{{ form.tagged_chapters.label }}</label>
+    {{ form.tagged_chapters }}
+  </div>
+  <div class="col-lg-4">
+    <label class="form-label small text-muted">{{ form.tagged_criteria.label }}</label>
+    {{ form.tagged_criteria }}
+  </div>
+  <div class="col-lg-4">
+    <label class="form-label small text-muted">{{ form.tagged_users.label }}</label>
+    {{ form.tagged_users }}
+  </div>
+</div>
+<div class="form-text mt-2">
+  Poți eticheta capitole, foi de parcurs sau colegi relevanți, pentru a face discuția mai ușor de urmărit.
+</div>

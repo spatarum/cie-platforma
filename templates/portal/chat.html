@@ -1,0 +1,117 @@
+{% extends 'portal/base.html' %}
+{% load portal_extras %}
+
+{% block title %}Chat{% endblock %}
+
+{% block head %}
+<style>
+.chat-thread .chat-text { white-space: pre-wrap; }
+.chat-replies { margin-left: .5rem; }
+.chat-compose select { min-height: 9rem; }
+@media (max-width: 991px) { .chat-replies { margin-left: 0; padding-left: .75rem; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+  <div>
+    <h1 class="h3 mb-1">Chat</h1>
+    <p class="text-muted mb-0">Spațiu comun de întrebări și răspunsuri pentru toți utilizatorii platformei. Mesajele se actualizează automat.</p>
+  </div>
+  <div class="small text-muted">Actualizare automată la fiecare 5 secunde</div>
+</div>
+
+<div class="card shadow-sm mb-4 chat-compose">
+  <div class="card-header fw-semibold"><i class="bi bi-chat-square-dots me-2"></i>Mesaj nou</div>
+  <div class="card-body">
+    <div class="alert alert-light border small mb-3">
+      Poți publica o <strong>întrebare</strong> sau un <strong>mesaj de discuție</strong>. Etichetele te ajută să atragi atenția asupra unui capitol, a unei foi de parcurs sau a unor colegi relevanți.
+    </div>
+    <form method="post" action="{% url 'chat_message_create' %}" id="chat-compose-form" data-ajax-form="1">
+      {% include 'portal/chat_compose_form.html' with form=form %}
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-send me-1"></i>Publică în chat</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h5 mb-0">Discuții</h2>
+  <span class="text-muted small">Ordine: cele mai noi discuții sus; răspunsurile sunt afișate sub întrebarea inițială.</span>
+</div>
+
+<div id="chat-messages-container">
+  {% include 'portal/chat_messages.html' with threads=threads reply_form=reply_form %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const container = document.getElementById('chat-messages-container');
+  const composeForm = document.getElementById('chat-compose-form');
+  const fragmentUrl = "{% url 'chat_messages_fragment' %}";
+
+  async function refreshChat() {
+    try {
+      const res = await fetch(fragmentUrl, {headers: {'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache'}});
+      if (!res.ok) return;
+      const data = await res.json();
+      container.innerHTML = data.html;
+      bindReplyForms();
+    } catch (e) {
+      console.error('Nu am putut actualiza chatul.', e);
+    }
+  }
+
+  async function submitAjaxForm(form) {
+    const formData = new FormData(form);
+    const res = await fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      if (data.html) {
+        container.innerHTML = data.html;
+        bindReplyForms();
+      }
+      if (form.id === 'chat-compose-form') {
+        form.reset();
+      }
+      return;
+    }
+    if (data.form_html && form.id === 'chat-compose-form') {
+      form.innerHTML = data.form_html + '<div class="d-flex justify-content-end mt-3"><button class="btn btn-primary" type="submit"><i class="bi bi-send me-1"></i>Publică în chat</button></div>';
+      bindComposeForm();
+      return;
+    }
+    alert('Mesajul nu a putut fi salvat. Verifică dacă ai completat textul.');
+  }
+
+  function bindComposeForm() {
+    const form = document.getElementById('chat-compose-form');
+    if (!form) return;
+    form.addEventListener('submit', function(ev) {
+      ev.preventDefault();
+      submitAjaxForm(form);
+    }, {once: true});
+  }
+
+  function bindReplyForms() {
+    document.querySelectorAll('.chat-reply-form').forEach((form) => {
+      form.addEventListener('submit', function(ev) {
+        ev.preventDefault();
+        submitAjaxForm(form);
+      }, {once: true});
+    });
+  }
+
+  bindComposeForm();
+  bindReplyForms();
+  setInterval(refreshChat, 5000);
+})();
+</script>
+{% endblock %}
