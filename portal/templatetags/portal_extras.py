@@ -39,3 +39,29 @@ def luna_an(value):
     if not m or not y:
         return ""
     return f"{months.get(m, str(m))} {y}"
+
+
+
+@register.filter
+def role_label(user):
+    try:
+        if not user:
+            return ""
+        if getattr(user, "is_superuser", False):
+            return "Administrator"
+        if getattr(user, "is_staff", False):
+            profil = getattr(user, "profil_expert", None)
+            if profil and getattr(profil, "este_staff_comisie", False):
+                return "Staff comisie"
+            return "Staff"
+        return "Expert"
+    except Exception:
+        return ""
+
+
+@register.filter
+def display_name(user):
+    try:
+        return user.get_full_name() or user.username
+    except Exception:
+        return ""

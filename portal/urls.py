@@ -8,6 +8,10 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(next_page="login"), name="logout"),
 
     path("", views.home, name="home"),
+    path("chat/", views.chat_page, name="chat_page"),
+    path("chat/mesaje/", views.chat_messages_fragment, name="chat_messages_fragment"),
+    path("chat/trimite/", views.chat_message_create, name="chat_message_create"),
+    path("chat/raspunde/<int:parent_id>/", views.chat_reply_create, name="chat_reply_create"),
 
     # Expert
     path("expert/", views.expert_dashboard, name="expert_dashboard"),

@@ -983,3 +983,70 @@ class PnaProjectDeadlineHistory(models.Model):
 
     def __str__(self) -> str:
         return f"PNA#{self.project_id}: {self.field}"
+
+
+
+class ChatMessage(models.Model):
+    """Mesaje din chatul comun al platformei.
+
+    Suportă mesaje principale (întrebări/discuții) și răspunsuri (parent != null),
+    plus etichete pe capitole, foi de parcurs și utilizatori.
+    """
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_messages",
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="replies",
+    )
+    text = models.TextField()
+    is_question = models.BooleanField(default=False)
+
+    tagged_chapters = models.ManyToManyField(
+        Chapter,
+        blank=True,
+        related_name="chat_messages",
+    )
+    tagged_criteria = models.ManyToManyField(
+        Criterion,
+        blank=True,
+        related_name="chat_messages",
+    )
+    tagged_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="tagged_in_chat_messages",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Mesaj chat"
+        verbose_name_plural = "Mesaje chat"
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        who = self.author.get_full_name() or self.author.username
+        return f"Chat #{self.pk} – {who}"
+
+    @property
+    def is_reply(self) -> bool:
+        return bool(self.parent_id)
+
+    @property
+    def has_tags(self) -> bool:
+        return self.tagged_chapters.exists() or self.tagged_criteria.exists() or self.tagged_users.exists()
+
+    def clean(self):
+        super().clean()
+        if not (self.text or "").strip():
+            raise ValidationError({"text": "Mesajul nu poate fi gol."})
+        if self.parent_id:
+            self.is_question = False

@@ -20,6 +20,7 @@ from .models import (
     EUAct,
     PnaProjectEUAct,
     PnaExpertContribution,
+    ChatMessage,
 )
 
 
@@ -943,18 +944,9 @@ class PnaExpertContributionForm(forms.ModelForm):
         model = PnaExpertContribution
         fields = ["flexibilitate", "compensare", "tranzitie"]
         widgets = {
-            "flexibilitate": forms.Textarea(attrs={
-                "class": "form-control",
-                "rows": 6,
-            }),
-            "compensare": forms.Textarea(attrs={
-                "class": "form-control",
-                "rows": 6,
-            }),
-            "tranzitie": forms.Textarea(attrs={
-                "class": "form-control",
-                "rows": 6,
-            }),
+            "flexibilitate": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+            "compensare": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+            "tranzitie": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
         }
         labels = {
             "flexibilitate": "Flexibilitate: opțiuni recomandate care se înscriu în limitele permise de actele UE",
@@ -1027,3 +1019,60 @@ class PnaImportXLSXForm(forms.Form):
         label="Fișier Excel PNA (.xlsx)",
         help_text="Acceptă atât fișierul sursă PNA (sheet: Acțiuni_PNA), cât și template-ul complet de import.",
     )
+
+
+
+class ChatMessageForm(forms.ModelForm):
+    class Meta:
+        model = ChatMessage
+        fields = ["text", "is_question", "tagged_chapters", "tagged_criteria", "tagged_users"]
+        widgets = {
+            "text": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "Scrie întrebarea sau mesajul tău pentru membrii platformei..."}),
+            "is_question": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "tagged_chapters": forms.SelectMultiple(attrs={"class": "form-select", "size": 6}),
+            "tagged_criteria": forms.SelectMultiple(attrs={"class": "form-select", "size": 4}),
+            "tagged_users": forms.SelectMultiple(attrs={"class": "form-select", "size": 8}),
+        }
+        labels = {
+            "text": "Mesaj",
+            "is_question": "Marchează drept întrebare",
+            "tagged_chapters": "Tag capitole",
+            "tagged_criteria": "Tag foi de parcurs",
+            "tagged_users": "Tag experți / staff",
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.fields["tagged_chapters"].queryset = Chapter.objects.all()
+        self.fields["tagged_criteria"].queryset = Criterion.objects.all()
+        users_qs = User.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        self.fields["tagged_users"].queryset = users_qs
+
+        def _label(user):
+            role = "Admin" if user.is_superuser else ("Staff" if user.is_staff else "Expert")
+            return f"{user.get_full_name() or user.username} ({role})"
+
+        self.fields["tagged_users"].label_from_instance = _label
+
+    def clean_text(self):
+        value = (self.cleaned_data.get("text") or "").strip()
+        if not value:
+            raise forms.ValidationError("Mesajul nu poate fi gol.")
+        return value
+
+
+class ChatReplyForm(forms.ModelForm):
+    class Meta:
+        model = ChatMessage
+        fields = ["text"]
+        widgets = {
+            "text": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Scrie răspunsul tău..."}),
+        }
+        labels = {"text": "Răspuns"}
+
+    def clean_text(self):
+        value = (self.cleaned_data.get("text") or "").strip()
+        if not value:
+            raise forms.ValidationError("Răspunsul nu poate fi gol.")
+        return value

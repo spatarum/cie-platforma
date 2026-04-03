@@ -17,11 +17,12 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Q, Count, Max
+from django.db.models import Q, Count, Max, Prefetch
 from django.db.models.functions import Coalesce
 from django.forms import formset_factory
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
@@ -43,6 +44,8 @@ from .forms import (
     PnaEUActAttachForm,
     PnaImportXLSXForm,
     PnaExpertContributionForm,
+    ChatMessageForm,
+    ChatReplyForm,
 )
 from .models import (
     Answer,
@@ -63,6 +66,7 @@ from .models import (
     PnaExpertContribution,
     PnaProjectStatusHistory,
     PnaProjectDeadlineHistory,
+    ChatMessage,
 )
 from .notifications import send_new_questionnaire_emails, send_newsletter_emails
 from .stats import get_questionnaire_rate_and_counts, ensure_scope_snapshot
@@ -214,6 +218,124 @@ def _apply_pna_stage_filter_to_qs(qs, stage: str):
     if stage == "adoptat_final":
         return qs.filter(status_implementare=PnaProject.STATUS_ADOPTAT_FINAL)
     return qs
+
+
+
+
+def _user_role_label(user: User) -> str:
+    if getattr(user, "is_superuser", False):
+        return "Administrator"
+    if getattr(user, "is_staff", False):
+        profil = getattr(user, "profil_expert", None)
+        if profil and getattr(profil, "este_staff_comisie", False):
+            return "Staff comisie"
+        return "Staff"
+    return "Expert"
+
+
+def _chat_threads_qs(limit: int = 50):
+    return (
+        ChatMessage.objects.filter(parent__isnull=True)
+        .select_related("author")
+        .prefetch_related(
+            "tagged_chapters",
+            "tagged_criteria",
+            "tagged_users",
+            Prefetch(
+                "replies",
+                queryset=ChatMessage.objects.select_related("author")
+                .prefetch_related("tagged_chapters", "tagged_criteria", "tagged_users")
+                .order_by("created_at", "id"),
+            ),
+        )
+        .order_by("-created_at", "-id")[:limit]
+    )
+
+
+def _render_chat_threads_html(request) -> str:
+    threads = _chat_threads_qs()
+    return render_to_string(
+        "portal/chat_messages.html",
+        {"threads": threads, "reply_form": ChatReplyForm()},
+        request=request,
+    )
+
+
+@login_required
+def chat_page(request):
+    form = ChatMessageForm(user=request.user)
+    return render(
+        request,
+        "portal/chat.html",
+        {
+            "form": form,
+            "threads": _chat_threads_qs(),
+            "reply_form": ChatReplyForm(),
+        },
+    )
+
+
+@login_required
+def chat_messages_fragment(request):
+    html = _render_chat_threads_html(request)
+    return JsonResponse({"html": html})
+
+
+@login_required
+def chat_message_create(request):
+    if request.method != "POST":
+        return redirect("chat_page")
+
+    form = ChatMessageForm(request.POST, user=request.user)
+    if form.is_valid():
+        msg = form.save(commit=False)
+        msg.author = request.user
+        msg.parent = None
+        msg.save()
+        form.save_m2m()
+        messages.success(request, "Mesajul a fost publicat în chat.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "html": _render_chat_threads_html(request)})
+        return redirect(f"{reverse('chat_page')}#msg-{msg.id}")
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        html = render_to_string("portal/chat_compose_form.html", {"form": form}, request=request)
+        return JsonResponse({"ok": False, "form_html": html}, status=400)
+
+    return render(
+        request,
+        "portal/chat.html",
+        {"form": form, "threads": _chat_threads_qs(), "reply_form": ChatReplyForm()},
+        status=400,
+    )
+
+
+@login_required
+def chat_reply_create(request, parent_id: int):
+    parent = get_object_or_404(ChatMessage.objects.select_related("author"), pk=parent_id, parent__isnull=True)
+    if request.method != "POST":
+        return redirect(f"{reverse('chat_page')}#msg-{parent.id}")
+
+    form = ChatReplyForm(request.POST)
+    if form.is_valid():
+        reply = form.save(commit=False)
+        reply.author = request.user
+        reply.parent = parent
+        reply.is_question = False
+        reply.save()
+        # moștenim etichetele de context ale întrebării/discuției principale
+        reply.tagged_chapters.set(parent.tagged_chapters.all())
+        reply.tagged_criteria.set(parent.tagged_criteria.all())
+        reply.tagged_users.set(parent.tagged_users.all())
+        messages.success(request, "Răspunsul a fost publicat.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "html": _render_chat_threads_html(request)})
+        return redirect(f"{reverse('chat_page')}#msg-{parent.id}")
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": False, "errors": form.errors}, status=400)
+    messages.error(request, "Răspunsul nu a putut fi salvat. Verifică textul introdus.")
+    return redirect(f"{reverse('chat_page')}#msg-{parent.id}")
 
 
 def _shift_year_month(year: int, month: int, delta_months: int) -> tuple[int, int]:
@@ -1289,36 +1411,7 @@ def admin_questionnaire_edit(request, pk: int):
 @user_passes_test(is_internal)
 def admin_expert_list(request):
     experti = User.objects.filter(is_staff=False, is_active=True).order_by("last_name", "first_name")
-
-    expert_rows = []
-    for expert in experti:
-        profil = _get_or_create_profile(expert)
-
-        q_qs = _expert_accessible_qs(expert)
-        q_total = q_qs.count()
-        q_trimise = Submission.objects.filter(
-            expert=expert,
-            questionnaire__in=q_qs,
-            status=Submission.STATUS_TRIMIS,
-        ).count()
-
-        pna_qs = _expert_pna_accessible_qs(expert)
-        pna_total = pna_qs.count()
-        pna_contrib_qs = PnaExpertContribution.objects.filter(expert=expert, project__in=pna_qs)
-        pna_contrib_total = sum(1 for c in pna_contrib_qs if c.are_orice)
-
-        expert_rows.append(
-            {
-                "user": expert,
-                "profil": profil,
-                "q_total": q_total,
-                "q_trimise": q_trimise,
-                "pna_total": pna_total,
-                "pna_contrib_total": pna_contrib_total,
-            }
-        )
-
-    return render(request, "portal/admin_experti_list.html", {"expert_rows": expert_rows})
+    return render(request, "portal/admin_experti_list.html", {"experti": experti})
 
 
 # -------------------- STAFF users (administrare) --------------------
