@@ -15,6 +15,7 @@
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_institution_list' %}"><i class="bi bi-building me-1"></i>Instituții</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_consultari' %}"><i class="bi bi-calendar-event me-1"></i>Consultări publice</a>
     {% if can_edit_pna %}
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_bulk_update' %}"><i class="bi bi-pencil-square me-1"></i>Update</a>
       <a class="btn btn-outline-primary btn-sm" href="{% url 'admin_pna_import' %}"><i class="bi bi-upload me-1"></i>Import</a>
       <a class="btn btn-primary btn-sm" href="{% url 'admin_pna_create' %}"><i class="bi bi-plus-lg me-1"></i>Proiect nou</a>
     {% endif %}

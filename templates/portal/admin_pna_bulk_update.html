@@ -1,0 +1,91 @@
+{% extends "portal/base.html" %}
+{% load portal_extras %}
+{% block title %}Update PNA{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">Update PNA</h1>
+    <div class="text-muted small">Actualizează în masă un singur parametru pentru proiectele din clusterele, capitolele sau foile de parcurs selectate.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi la PNA</a>
+  </div>
+</div>
+
+<form method="get" class="card shadow-sm gov-card mb-3">
+  <div class="card-header bg-white"><strong><i class="bi bi-funnel me-1"></i>Selecție</strong></div>
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-12 col-xl-4">
+        <label class="form-label fw-semibold">Clustere</label>
+        <div class="border rounded p-2" style="max-height: 260px; overflow:auto;">{{ select_form.cluster_ids }}</div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <label class="form-label fw-semibold">Capitole</label>
+        <div class="border rounded p-2" style="max-height: 260px; overflow:auto;">{{ select_form.chapter_ids }}</div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <label class="form-label fw-semibold">Foi de parcurs</label>
+        <div class="border rounded p-2" style="max-height: 260px; overflow:auto;">{{ select_form.criterion_ids }}</div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label fw-semibold">Parametru</label>
+        {{ select_form.field_name }}
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary"><i class="bi bi-search me-1"></i>Afișează proiectele</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+{% if field_name %}
+<form method="post" class="card shadow-sm gov-card">
+  {% csrf_token %}
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <strong><i class="bi bi-table me-1"></i>Proiecte afișate</strong>
+    <span class="text-muted small">{{ projects_count }} proiecte</span>
+  </div>
+  <div class="card-body p-0">
+    {% for value in selected_cluster_ids %}<input type="hidden" name="cluster_ids" value="{{ value }}">{% endfor %}
+    {% for value in selected_chapter_ids %}<input type="hidden" name="chapter_ids" value="{{ value }}">{% endfor %}
+    {% for value in selected_criterion_ids %}<input type="hidden" name="criterion_ids" value="{{ value }}">{% endfor %}
+    <input type="hidden" name="field_name" value="{{ field_name }}">
+    {% if rows %}
+      <div class="p-3 border-bottom bg-light d-flex justify-content-end">
+        <button class="btn btn-primary"><i class="bi bi-save me-1"></i>Actualizează</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width: 340px;">Proiect</th>
+              <th>Scope</th>
+              <th style="min-width: 220px;">Valoare actuală</th>
+              <th style="min-width: 240px;">Valoare nouă</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  <a class="text-decoration-none fw-semibold" href="{% url 'admin_pna_detail' row.project.id %}">{{ row.project.titlu }}</a>
+                </td>
+                <td class="small text-muted">{{ row.project.atasare_label }}</td>
+                <td>{{ row.current_display }}</td>
+                <td>{{ row.form.value }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="p-3 border-top bg-light d-flex justify-content-end">
+        <button class="btn btn-primary"><i class="bi bi-save me-1"></i>Actualizează</button>
+      </div>
+    {% else %}
+      <div class="p-4 text-muted">Nu există proiecte pentru selecția și parametrul ales.</div>
+    {% endif %}
+  </div>
+</form>
+{% endif %}
+{% endblock %}
