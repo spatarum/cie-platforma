@@ -9,6 +9,7 @@ from django.utils import timezone
 from .models import (
     Answer,
     Chapter,
+    Cluster,
     Criterion,
     ExpertProfile,
     Question,
@@ -845,6 +846,96 @@ class PnaProjectForm(forms.ModelForm):
             joined = ", ".join([o.nume for o in others if o and o.nume])
             obj.institutie_coreponsabila = (joined or "")[:300]
         obj.save(update_fields=["institutie_principala", "institutie_coreponsabila"])
+
+
+class PnaBulkUpdateSelectForm(forms.Form):
+    cluster_ids = forms.ModelMultipleChoiceField(
+        queryset=Cluster.objects.all().order_by("ordonare", "cod"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Clustere",
+    )
+    chapter_ids = forms.ModelMultipleChoiceField(
+        queryset=Chapter.objects.select_related("cluster").all().order_by("numar"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Capitole",
+    )
+    criterion_ids = forms.ModelMultipleChoiceField(
+        queryset=Criterion.objects.all().order_by("cod"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Foi de parcurs",
+    )
+    field_name = forms.ChoiceField(
+        required=False,
+        label="Parametru",
+        widget=forms.Select(attrs={"class": "form-select"}),
+        choices=[
+            ("", "— Selectează parametrul —"),
+            ("status_implementare", "Status implementare"),
+            ("necesita_avizare_comisia_europeana", "Necesită avizare Comisia Europeană"),
+            ("complexitate", "Complexitate"),
+            ("prioritate", "Prioritate"),
+            ("expertiza_interna", "Expertiză internă"),
+            ("necesita_expertiza_externa", "Necesită expertiză externă"),
+            ("este_identificata_expertiza_externa", "Este identificată expertiză externă"),
+            ("institutie_principala_ref", "Instituția principală"),
+        ],
+    )
+
+
+class PnaBulkUpdateValueForm(forms.Form):
+    def __init__(self, *args, field_name=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.field_name = field_name
+        if not field_name:
+            return
+        if field_name == "status_implementare":
+            self.fields["value"] = forms.ChoiceField(
+                label="Valoare",
+                choices=PnaProject.STATUS_IMPLEMENTARE_CHOICES,
+                widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+            )
+        elif field_name == "complexitate":
+            self.fields["value"] = forms.TypedChoiceField(
+                label="Valoare",
+                coerce=lambda x: int(x) if x not in ("", None) else None,
+                empty_value=None,
+                choices=[("", "—")] + [(str(k), v) for k, v in PnaProject.COMPLEXITATE_CHOICES],
+                widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+            )
+        elif field_name == "prioritate":
+            self.fields["value"] = forms.TypedChoiceField(
+                label="Valoare",
+                coerce=lambda x: int(x) if x not in ("", None) else None,
+                empty_value=None,
+                choices=[("", "—")] + [(str(k), v) for k, v in PnaProject.PRIORITATE_CHOICES],
+                widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+            )
+        elif field_name == "expertiza_interna":
+            self.fields["value"] = forms.TypedChoiceField(
+                label="Valoare",
+                coerce=lambda x: int(x) if x not in ("", None) else None,
+                empty_value=None,
+                choices=[("", "—")] + [(str(k), v) for k, v in PnaProject.EXPERTIZA_INTERNA_CHOICES],
+                widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+            )
+        elif field_name == "institutie_principala_ref":
+            self.fields["value"] = forms.ModelChoiceField(
+                label="Valoare",
+                required=False,
+                queryset=PnaInstitution.objects.all().order_by("nume"),
+                widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+            )
+        elif field_name in {"necesita_avizare_comisia_europeana", "necesita_expertiza_externa", "este_identificata_expertiza_externa"}:
+            self.fields["value"] = forms.TypedChoiceField(
+                label="Valoare",
+                coerce=lambda x: True if x == "1" else False if x == "0" else None,
+                empty_value=None,
+                choices=[("1", "Da"), ("0", "Nu")],
+                widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+            )
 
 
 class PnaInstitutionForm(forms.ModelForm):
