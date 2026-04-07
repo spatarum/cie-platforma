@@ -44,15 +44,12 @@ from .forms import (
     PnaEUActAttachForm,
     PnaImportXLSXForm,
     PnaExpertContributionForm,
-    PnaBulkUpdateSelectForm,
-    PnaBulkUpdateValueForm,
     ChatMessageForm,
     ChatReplyForm,
 )
 from .models import (
     Answer,
     AnswerComment,
-    Cluster,
     Chapter,
     Criterion,
     ExpertProfile,
@@ -190,35 +187,44 @@ def _pna_scope_label(proiect: PnaProject) -> str:
 
 
 
-
-def _pna_stage_statuses(stage: str):
-    stage = (stage or "").strip()
-    if stage == "neinitiate":
-        return [PnaProject.STATUS_NEINITIAT]
-    if stage == "guvern":
-        return [
-            PnaProject.STATUS_INITIAT_GUVERN,
-            PnaProject.STATUS_AVIZARE_GUVERN,
-            PnaProject.STATUS_COORDONARE_CE,
-            PnaProject.STATUS_APROBARE_GUVERN,
-        ]
-    if stage == "parlament":
-        return [
-            PnaProject.STATUS_INITIAT_PARLAMENT,
-            PnaProject.STATUS_AVIZARE_PARLAMENT,
-            PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA,
-        ]
-    if stage == "adoptat_final":
-        return [PnaProject.STATUS_ADOPTAT_FINAL]
-    return []
+PNA_STAGE_GROUP_NEINITIATE = [PnaProject.STATUS_NEINITIAT]
+PNA_STAGE_GROUP_GUVERN = [
+    PnaProject.STATUS_INITIAT_GUVERN,
+    PnaProject.STATUS_AVIZARE_GUVERN,
+    PnaProject.STATUS_COORDONARE_CE,
+    PnaProject.STATUS_APROBARE_GUVERN,
+]
+PNA_STAGE_GROUP_PARLAMENT = [
+    PnaProject.STATUS_INITIAT_PARLAMENT,
+    PnaProject.STATUS_AVIZARE_PARLAMENT,
+    PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA,
+]
+PNA_STAGE_GROUP_FINAL = [PnaProject.STATUS_ADOPTAT_FINAL]
+PNA_STAGE_PRE_PARLAMENT = PNA_STAGE_GROUP_NEINITIATE + PNA_STAGE_GROUP_GUVERN
 
 
 def _apply_pna_stage_filter_to_qs(qs, stage: str):
-    """Aplică filtrul agregat de etapă pentru liste/dashboard PNA."""
-    statuses = _pna_stage_statuses(stage)
-    if not statuses:
+    """Aplică filtrul agregat de etapă pentru liste/dashboard PNA.
+
+    stage acceptat:
+    - neinitiate
+    - guvern
+    - parlament
+    - adoptat_final
+    orice altă valoare => fără filtrare
+    """
+    stage = (stage or "").strip()
+    if not stage:
         return qs
-    return qs.filter(status_implementare__in=statuses)
+    if stage == "neinitiate":
+        return qs.filter(status_implementare__in=PNA_STAGE_GROUP_NEINITIATE)
+    if stage == "guvern":
+        return qs.filter(status_implementare__in=PNA_STAGE_GROUP_GUVERN)
+    if stage == "parlament":
+        return qs.filter(status_implementare__in=PNA_STAGE_GROUP_PARLAMENT)
+    if stage == "adoptat_final":
+        return qs.filter(status_implementare__in=PNA_STAGE_GROUP_FINAL)
+    return qs
 
 
 
@@ -479,6 +485,71 @@ def expert_dashboard(request):
         for s in Submission.objects.filter(expert=request.user, questionnaire__in=qs)
     }
 
+    # --- Dashboard personalizat PNA pentru expert ---
+    pna_qs = _expert_pna_accessible_qs(request.user)
+    accessible_pna = list(pna_qs)
+    accessible_pna_ids = [p.id for p in accessible_pna]
+
+    prev_seen_at = profil.expert_dashboard_seen_at
+    recent_since = prev_seen_at or (now - timedelta(days=30))
+
+    parliament_entry_rows = []
+    seen_projects = set()
+    if accessible_pna_ids:
+        history_qs = (
+            PnaProjectStatusHistory.objects.filter(
+                project_id__in=accessible_pna_ids,
+                changed_at__gte=recent_since,
+                from_status__in=PNA_STAGE_PRE_PARLAMENT,
+                to_status__in=PNA_STAGE_GROUP_PARLAMENT,
+            )
+            .select_related("project")
+            .order_by("-changed_at")
+        )
+        for h in history_qs:
+            if h.project_id in seen_projects:
+                continue
+            seen_projects.add(h.project_id)
+            parliament_entry_rows.append({
+                "project": h.project,
+                "changed_at": h.changed_at,
+                "from_label": h.from_label,
+                "to_label": h.to_label,
+            })
+            if len(parliament_entry_rows) >= 8:
+                break
+
+    contrib_rows = (
+        PnaExpertContribution.objects.filter(expert=request.user, project_id__in=accessible_pna_ids)
+        .exclude(flexibilitate="", compensare="", tranzitie="")
+        .values_list("project_id", flat=True)
+    ) if accessible_pna_ids else []
+    contributed_project_ids = set(contrib_rows)
+
+    pna_parliament_pending = [
+        p for p in accessible_pna
+        if p.status_implementare in PNA_STAGE_GROUP_PARLAMENT and p.id not in contributed_project_ids
+    ]
+    pna_parliament_pending.sort(key=lambda p: (p.termen_deadline or datetime.max.date(), p.titlu or ""))
+
+    upcoming_consultations = [
+        p for p in accessible_pna
+        if p.consultari_publice_parlament and p.consultari_publice_parlament >= now.date()
+    ]
+    upcoming_consultations.sort(key=lambda p: (p.consultari_publice_parlament, (p.consultari_publice_ora or "99:99"), p.titlu or ""))
+
+    pna_stats = {
+        "accessible": len(accessible_pna),
+        "in_parliament": sum(1 for p in accessible_pna if p.status_implementare in PNA_STAGE_GROUP_PARLAMENT),
+        "parliament_pending": len(pna_parliament_pending),
+        "adopted_final": sum(1 for p in accessible_pna if p.status_implementare in PNA_STAGE_GROUP_FINAL),
+        "new_parliament_entries": len(parliament_entry_rows),
+    }
+
+    # Actualizăm momentul ultimei vizualizări după calculul notificărilor.
+    profil.expert_dashboard_seen_at = now
+    profil.save(update_fields=["expert_dashboard_seen_at"])
+
     return render(
         request,
         "portal/expert_dashboard.html",
@@ -491,6 +562,12 @@ def expert_dashboard(request):
             "active_capitol": active_cap_id,
             "active_criteriu": active_cr_id,
             "active_general": active_general,
+            "pna_stats": pna_stats,
+            "parliament_entry_rows": parliament_entry_rows,
+            "parliament_entry_since": recent_since,
+            "pna_parliament_pending": pna_parliament_pending[:8],
+            "pna_parliament_pending_count": len(pna_parliament_pending),
+            "upcoming_consultations": upcoming_consultations[:6],
         },
     )
 
@@ -693,6 +770,7 @@ def expert_pna_list(request):
 
     q = (request.GET.get("q") or "").strip()
     stage = (request.GET.get("stage") or "").strip()
+    pending = (request.GET.get("pending") or "").strip() == "1"
 
     base_qs = _expert_pna_accessible_qs(request.user)
     proiecte_qs = base_qs
@@ -707,16 +785,20 @@ def expert_pna_list(request):
 
     all_projects = list(base_qs)
     total = len(all_projects)
-    nr_neinitiate = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_NEINITIAT)
-    nr_in_procedura_guvern = sum(1 for p in all_projects if p.status_implementare in {
-        PnaProject.STATUS_INITIAT_GUVERN, PnaProject.STATUS_AVIZARE_GUVERN, PnaProject.STATUS_COORDONARE_CE, PnaProject.STATUS_APROBARE_GUVERN
-    })
-    nr_in_procedura_parlament = sum(1 for p in all_projects if p.status_implementare in {
-        PnaProject.STATUS_INITIAT_PARLAMENT, PnaProject.STATUS_AVIZARE_PARLAMENT, PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA
-    })
-    nr_adoptate_final = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
+    nr_neinitiate = sum(1 for p in all_projects if p.status_implementare in PNA_STAGE_GROUP_NEINITIATE)
+    nr_in_procedura_guvern = sum(1 for p in all_projects if p.status_implementare in PNA_STAGE_GROUP_GUVERN)
+    nr_in_procedura_parlament = sum(1 for p in all_projects if p.status_implementare in PNA_STAGE_GROUP_PARLAMENT)
+    nr_adoptate_final = sum(1 for p in all_projects if p.status_implementare in PNA_STAGE_GROUP_FINAL)
 
     proiecte_qs = _apply_pna_stage_filter_to_qs(proiecte_qs, stage)
+    if pending:
+        contrib_project_ids = set(
+            PnaExpertContribution.objects.filter(expert=request.user, project__in=proiecte_qs)
+            .exclude(flexibilitate="", compensare="", tranzitie="")
+            .values_list("project_id", flat=True)
+        )
+        proiecte_qs = proiecte_qs.exclude(id__in=contrib_project_ids)
+
     proiecte = list(proiecte_qs)
 
     # map contribuții (per expert)
@@ -771,6 +853,7 @@ def expert_pna_list(request):
             "nr_in_procedura_parlament": nr_in_procedura_parlament,
             "nr_adoptate_final": nr_adoptate_final,
             "stage": stage,
+            "pending": pending,
         },
     )
 
@@ -2514,11 +2597,7 @@ def admin_pna_list(request):
     nr_in_procedura_parlament = sum(
         1
         for p in all_projects
-        if p.status_implementare in {
-            PnaProject.STATUS_INITIAT_PARLAMENT,
-            PnaProject.STATUS_AVIZARE_PARLAMENT,
-            PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA,
-        }
+        if p.status_implementare in set(PNA_STAGE_GROUP_PARLAMENT)
     )
     nr_adoptate_final = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
 
@@ -2579,122 +2658,6 @@ def admin_pna_list(request):
             "stage": stage,
         },
     )
-
-
-@user_passes_test(can_edit_pna)
-def admin_pna_bulk_update(request):
-    """Actualizare în masă a unui singur parametru pentru proiectele PNA selectate pe scope."""
-
-    def _get_scope_qs(cleaned):
-        cluster_ids = list(cleaned.get("cluster_ids") or [])
-        chapter_ids = list(cleaned.get("chapter_ids") or [])
-        criterion_ids = list(cleaned.get("criterion_ids") or [])
-        qs = PnaProject.objects.filter(arhivat=False)
-        scope_q = Q()
-        if cluster_ids:
-            scope_q |= Q(chapter__cluster__in=cluster_ids)
-        if chapter_ids:
-            scope_q |= Q(chapter__in=chapter_ids)
-        if criterion_ids:
-            scope_q |= Q(criterion__in=criterion_ids)
-        if not scope_q:
-            return PnaProject.objects.none()
-        return qs.filter(scope_q).select_related("chapter", "criterion", "institutie_principala_ref").distinct().order_by("titlu")
-
-    def _current_display(project, field_name):
-        if field_name == "status_implementare":
-            return project.get_status_implementare_display() or "—"
-        if field_name == "complexitate":
-            return project.get_complexitate_display() if project.complexitate else "—"
-        if field_name == "prioritate":
-            return project.get_prioritate_display() if project.prioritate else "—"
-        if field_name == "expertiza_interna":
-            return project.get_expertiza_interna_display() if project.expertiza_interna else "—"
-        if field_name == "institutie_principala_ref":
-            return project.institutie_principala_ref.nume if project.institutie_principala_ref_id else "—"
-        value = getattr(project, field_name, None)
-        if value is True:
-            return "Da"
-        if value is False:
-            return "Nu"
-        return value or "—"
-
-    select_data = request.POST if request.method == "POST" else request.GET
-    select_form = PnaBulkUpdateSelectForm(select_data or None)
-    projects = []
-    rows = []
-    field_name = ""
-
-    if request.method == "POST" and select_form.is_valid():
-        field_name = select_form.cleaned_data.get("field_name") or ""
-        projects = list(_get_scope_qs(select_form.cleaned_data)) if field_name else []
-        forms_ok = True
-        row_forms = {}
-        for project in projects:
-            form = PnaBulkUpdateValueForm(request.POST, prefix=f"proj_{project.id}", field_name=field_name)
-            row_forms[project.id] = form
-            if not form.is_valid():
-                forms_ok = False
-        if field_name and projects and forms_ok:
-            updated = 0
-            with transaction.atomic():
-                for project in projects:
-                    form = row_forms[project.id]
-                    new_value = form.cleaned_data.get("value")
-                    old_value = getattr(project, field_name)
-                    compare_new = new_value.id if hasattr(new_value, "id") else new_value
-                    compare_old = old_value.id if hasattr(old_value, "id") else old_value
-                    if compare_new == compare_old:
-                        continue
-                    setattr(project, field_name, new_value)
-                    if field_name == "institutie_principala_ref":
-                        project.institutie_principala = (new_value.nume if new_value else "")[:300]
-                        project.save(update_fields=[field_name, "institutie_principala", "actualizat_la"])
-                    else:
-                        project.save(update_fields=[field_name, "actualizat_la"])
-                    if field_name == "status_implementare":
-                        PnaProjectStatusHistory.objects.create(
-                            project=project,
-                            from_status=old_value or "",
-                            to_status=new_value or "",
-                            changed_by=request.user,
-                            source=PnaProjectStatusHistory.SOURCE_UI,
-                            note="Actualizare în masă",
-                        )
-                    updated += 1
-            messages.success(request, f"Au fost actualizate {updated} proiecte.")
-        elif field_name and projects and not forms_ok:
-            messages.error(request, "Unele valori nu sunt valide. Verifică rândurile marcate.")
-        elif not field_name:
-            messages.warning(request, "Selectează parametrul pe care vrei să îl actualizezi.")
-    elif select_form.is_valid():
-        field_name = select_form.cleaned_data.get("field_name") or ""
-        projects = list(_get_scope_qs(select_form.cleaned_data)) if field_name else []
-
-    if field_name:
-        for project in projects:
-            initial_val = getattr(project, field_name)
-            if field_name in {"necesita_avizare_comisia_europeana", "necesita_expertiza_externa", "este_identificata_expertiza_externa"}:
-                initial_val = "1" if initial_val else "0"
-            rows.append({
-                "project": project,
-                "current_display": _current_display(project, field_name),
-                "form": PnaBulkUpdateValueForm(prefix=f"proj_{project.id}", field_name=field_name, initial={"value": initial_val}),
-            })
-
-    selected_cluster_ids = [str(obj.id) for obj in (select_form.cleaned_data.get("cluster_ids") or [])] if select_form.is_valid() else []
-    selected_chapter_ids = [str(obj.id) for obj in (select_form.cleaned_data.get("chapter_ids") or [])] if select_form.is_valid() else []
-    selected_criterion_ids = [str(obj.id) for obj in (select_form.cleaned_data.get("criterion_ids") or [])] if select_form.is_valid() else []
-
-    return render(request, "portal/admin_pna_bulk_update.html", {
-        "select_form": select_form,
-        "field_name": field_name,
-        "rows": rows,
-        "projects_count": len(projects),
-        "selected_cluster_ids": selected_cluster_ids,
-        "selected_chapter_ids": selected_chapter_ids,
-        "selected_criterion_ids": selected_criterion_ids,
-    })
 
 
 @user_passes_test(is_internal)
@@ -2931,11 +2894,7 @@ def _render_pna_dashboard(
         PnaProject.STATUS_APROBARE_GUVERN,
     }
     nr_in_procedura_guvern = sum(1 for p in all_projects if p.status_implementare in statusuri_guvern)
-    statusuri_parlament = {
-        PnaProject.STATUS_INITIAT_PARLAMENT,
-        PnaProject.STATUS_AVIZARE_PARLAMENT,
-        PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA,
-    }
+    statusuri_parlament = set(PNA_STAGE_GROUP_PARLAMENT)
     nr_in_procedura_parlament = sum(1 for p in all_projects if p.status_implementare in statusuri_parlament)
     nr_adoptate_final = sum(1 for p in all_projects if p.status_implementare == PnaProject.STATUS_ADOPTAT_FINAL)
 
@@ -3555,11 +3514,7 @@ def _render_pna_dashboard(
             PnaProject.STATUS_APROBARE_GUVERN,
         }:
             return "guvern"
-        if status_code in {
-            PnaProject.STATUS_INITIAT_PARLAMENT,
-            PnaProject.STATUS_AVIZARE_PARLAMENT,
-            PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA,
-        }:
+        if status_code in set(PNA_STAGE_GROUP_PARLAMENT):
             return "parlament"
         if status_code == PnaProject.STATUS_ADOPTAT_FINAL:
             return "adoptat"
@@ -4685,11 +4640,7 @@ def admin_pna_filtered_list(request):
                 PnaProject.STATUS_APROBARE_GUVERN,
             ])
         elif stage == "parlament":
-            qs = qs.filter(status_implementare__in=[
-                PnaProject.STATUS_INITIAT_PARLAMENT,
-                PnaProject.STATUS_AVIZARE_PARLAMENT,
-                PnaProject.STATUS_ADOPTAT_PRIMA_LECTURA,
-            ])
+            qs = qs.filter(status_implementare__in=PNA_STAGE_GROUP_PARLAMENT)
         elif stage == "adoptat_final":
             qs = qs.filter(status_implementare=PnaProject.STATUS_ADOPTAT_FINAL)
 

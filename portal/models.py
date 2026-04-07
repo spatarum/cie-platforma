@@ -119,6 +119,11 @@ class ExpertProfile(models.Model):
     # Preferințe UI (expert)
     pref_text_mare = models.BooleanField(default=False)
 
+    # Momentul ultimei vizualizări a dashboardului expert.
+    # Folosit pentru a evidenția proiectele PNA care au intrat recent în procedură la Parlament
+    # și pentru a afișa notificări "noi de la ultima vizită".
+    expert_dashboard_seen_at = models.DateTimeField(null=True, blank=True)
+
     # Rol special pentru utilizatorii Staff: "Staff comisie" (poate edita PNA).
     # Pentru experți este ignorat (rămâne False).
     este_staff_comisie = models.BooleanField(default=False)
