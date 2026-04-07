@@ -8,6 +8,149 @@
   <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Răspunsurile pot fi editate până la termenul limită.</span>
 </div>
 
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-xl-8">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <strong><i class="bi bi-bell me-1"></i>Alerte PNA pentru tine</strong>
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'expert_pna_list' %}?stage=parlament&amp;pending=1"><i class="bi bi-chat-left-text me-1"></i>Vezi proiectele PNA</a>
+      </div>
+      <div class="card-body">
+        {% if parliament_entry_rows %}
+          <div class="alert alert-warning small mb-3">
+            <strong>{{ pna_stats.new_parliament_entries }}</strong> proiect{{ pna_stats.new_parliament_entries|pluralize:"e" }} relevant{{ pna_stats.new_parliament_entries|pluralize:"e" }} a intrat în procedură la Parlament de la ultima ta vizită.
+          </div>
+          <div class="list-group list-group-flush">
+            {% for row in parliament_entry_rows %}
+              <a class="list-group-item list-group-item-action" href="{% url 'expert_pna_detail' row.project.pk %}">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                  <div>
+                    <div class="fw-semibold">{{ row.project.titlu }}</div>
+                    <div class="text-muted small">{{ row.project.atasare_label }}</div>
+                    <div class="small mt-1">
+                      Status: <strong>{{ row.to_label }}</strong>
+                      {% if row.from_label %}<span class="text-muted">(din {{ row.from_label }})</span>{% endif %}
+                    </div>
+                  </div>
+                  <div class="text-end small text-muted text-nowrap">{{ row.changed_at|date:"d.m.Y H:i" }}</div>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted">Nu există proiecte noi intrate în procedură la Parlament de la ultima ta vizită.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-4">
+    <div class="card shadow-sm gov-card h-100">
+      <div class="card-header bg-white"><strong><i class="bi bi-lightning-charge me-1"></i>Scurtături utile</strong></div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <a class="card text-decoration-none h-100 border-0 shadow-sm" href="{% url 'expert_pna_list' %}?stage=parlament&amp;pending=1">
+              <div class="card-body py-3">
+                <div class="text-muted small">PNA fără contribuția ta</div>
+                <div class="h3 mb-0">{{ pna_parliament_pending_count }}</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-6">
+            <a class="card text-decoration-none h-100 border-0 shadow-sm" href="{% url 'expert_pna_list' %}?stage=parlament">
+              <div class="card-body py-3">
+                <div class="text-muted small">Proiecte în Parlament</div>
+                <div class="h3 mb-0">{{ pna_stats.in_parliament }}</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-6">
+            <a class="card text-decoration-none h-100 border-0 shadow-sm" href="{% url 'expert_dashboard' %}">
+              <div class="card-body py-3">
+                <div class="text-muted small">Chestionare deschise</div>
+                <div class="h3 mb-0">{{ deschise|length }}</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-6">
+            <a class="card text-decoration-none h-100 border-0 shadow-sm" href="{% url 'expert_pna_consultari' %}">
+              <div class="card-body py-3">
+                <div class="text-muted small">Consultări viitoare</div>
+                <div class="h3 mb-0">{{ upcoming_consultations|length }}</div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <div class="d-grid gap-2">
+          <a class="btn btn-outline-primary" href="{% url 'expert_pna_list' %}"><i class="bi bi-folder2-open me-1"></i>Deschide PNA</a>
+          <a class="btn btn-outline-secondary" href="{% url 'expert_pna_consultari' %}"><i class="bi bi-calendar-event me-1"></i>Calendar consultări publice</a>
+          <a class="btn btn-outline-secondary" href="{% url 'chat_page' %}"><i class="bi bi-chat-dots me-1"></i>Deschide Chat</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if pna_parliament_pending %}
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <strong><i class="bi bi-file-earmark-text me-1"></i>Proiecte PNA în procedură la Parlament care așteaptă contribuția ta</strong>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'expert_pna_list' %}?stage=parlament&amp;pending=1">Vezi toate</a>
+  </div>
+  <div class="card-body">
+    <div class="list-group list-group-flush">
+      {% for p in pna_parliament_pending %}
+        <a class="list-group-item list-group-item-action" href="{% url 'expert_pna_detail' p.pk %}">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <div class="fw-semibold">{{ p.titlu }}</div>
+              <div class="text-muted small">{{ p.atasare_label }}</div>
+              <div class="small mt-1">Status: <strong>{{ p.get_status_implementare_display }}</strong></div>
+            </div>
+            <div class="text-end small text-muted">
+              <div>Guvern: {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}</div>
+              <div>Parlament: {% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}—{% endif %}</div>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if upcoming_consultations %}
+<div class="card shadow-sm gov-card mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <strong><i class="bi bi-calendar-week me-1"></i>Consultări publice viitoare în ariile tale</strong>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'expert_pna_consultari' %}">Calendar complet</a>
+  </div>
+  <div class="card-body">
+    <div class="list-group list-group-flush">
+      {% for p in upcoming_consultations %}
+        <a class="list-group-item list-group-item-action" href="{% url 'expert_pna_detail' p.pk %}">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <div class="fw-semibold">{{ p.titlu }}</div>
+              <div class="text-muted small">{{ p.atasare_label }}</div>
+              {% if p.consultari_publice_descriere %}<div class="small mt-1 text-muted">{{ p.consultari_publice_descriere|truncatechars:140 }}</div>{% endif %}
+            </div>
+            <div class="text-end small text-muted text-nowrap">
+              <div>{{ p.consultari_publice_parlament|date:"d.m.Y" }}</div>
+              {% if p.consultari_publice_ora %}<div>{{ p.consultari_publice_ora }}</div>{% endif %}
+              {% if p.consultari_publice_locatie %}<div>{{ p.consultari_publice_locatie }}</div>{% endif %}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm gov-card mb-3">
   <div class="card-header bg-white d-flex align-items-center justify-content-between">
     <strong><i class="bi bi-funnel me-1"></i>Filtre rapide</strong>
