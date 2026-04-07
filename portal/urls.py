@@ -15,6 +15,7 @@ urlpatterns = [
 
     # Expert
     path("expert/", views.expert_dashboard, name="expert_dashboard"),
+    path("expert/chestionare/", views.expert_questionnaires_list, name="expert_questionnaires"),
     path("expert/profil/", views.expert_profile, name="expert_profile"),
     path("expert/contacte/", views.expert_contacte, name="expert_contacte"),
     path("expert/preferinte/", views.expert_preferinte, name="expert_preferinte"),
@@ -144,6 +145,7 @@ urlpatterns = [
     path("administrare/pna/institutii/<int:pk>/edit/", views.admin_pna_institution_edit, name="admin_pna_institution_edit"),
     path("administrare/pna/nou/", views.admin_pna_create, name="admin_pna_create"),
     path("administrare/pna/import/", views.admin_pna_import, name="admin_pna_import"),
+    path("administrare/pna/update/", views.admin_pna_bulk_update, name="admin_pna_bulk_update"),
     path("administrare/pna/import/template/", views.admin_pna_import_template_download, name="admin_pna_import_template_download"),
     path("administrare/pna/<int:pk>/", views.admin_pna_detail, name="admin_pna_detail"),
     path(

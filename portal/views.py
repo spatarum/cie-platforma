@@ -229,6 +229,39 @@ def _apply_pna_stage_filter_to_qs(qs, stage: str):
 
 
 
+def _is_truthy(value):
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _pna_bulk_update_field_meta():
+    return {
+        "status_implementare": {"label": "Status implementare", "type": "choice", "choices": PnaProject.STATUS_IMPLEMENTARE_CHOICES},
+        "necesita_avizare_comisia_europeana": {"label": "Necesită avizare Comisia Europeană", "type": "bool"},
+        "complexitate": {"label": "Complexitate", "type": "choice", "choices": PnaProject.COMPLEXITATE_CHOICES},
+        "prioritate": {"label": "Prioritate", "type": "choice", "choices": PnaProject.PRIORITATE_CHOICES},
+        "expertiza_interna": {"label": "Expertiză internă", "type": "choice", "choices": PnaProject.EXPERTIZA_INTERNA_CHOICES},
+        "necesita_expertiza_externa": {"label": "Necesită expertiză externă", "type": "bool"},
+        "este_identificata_expertiza_externa": {"label": "Este identificată expertiză externă", "type": "bool"},
+        "institutie_principala_ref": {"label": "Instituția principală", "type": "institution"},
+    }
+
+
+def _pna_projects_for_bulk_selection(cluster_ids, chapter_ids, criterion_ids):
+    qs = PnaProject.objects.filter(arhivat=False).select_related("chapter", "chapter__cluster", "criterion", "institutie_principala_ref")
+    q = Q()
+    if cluster_ids:
+        q |= Q(chapter__cluster_id__in=cluster_ids)
+    if chapter_ids:
+        q |= Q(chapter_id__in=chapter_ids)
+    if criterion_ids:
+        q |= Q(criterion_id__in=criterion_ids)
+    if q:
+        qs = qs.filter(q)
+    else:
+        qs = qs.none()
+    return qs.order_by("chapter__cluster__ordine", "chapter__numar", "criterion__cod", "titlu").distinct()
+
+
 def _user_role_label(user: User) -> str:
     if getattr(user, "is_superuser", False):
         return "Administrator"
@@ -443,49 +476,8 @@ def home(request):
 @user_passes_test(is_expert)
 def expert_dashboard(request):
     profil = _get_or_create_profile(request.user)
-    qs = _expert_accessible_qs(request.user)
-
-    # Filtre (opțional) după categorie/capitol/criteriu
-    general = request.GET.get("general")
-    cap_id = request.GET.get("capitol")
-    cr_id = request.GET.get("criteriu")
-
-    active_cap_id = None
-    active_cr_id = None
-    active_general = False
-
-    # Prioritate: General -> Capitol -> Criteriu
-    if general:
-        qs = qs.filter(este_general=True).distinct()
-        active_general = True
-    elif cap_id:
-        try:
-            cap_id_int = int(cap_id)
-        except (TypeError, ValueError):
-            cap_id_int = None
-        if cap_id_int and profil.capitole.filter(id=cap_id_int).exists():
-            qs = qs.filter(capitole__id=cap_id_int).distinct()
-            active_cap_id = cap_id_int
-            active_cr_id = None
-    elif cr_id:
-        try:
-            cr_id_int = int(cr_id)
-        except (TypeError, ValueError):
-            cr_id_int = None
-        if cr_id_int and profil.criterii.filter(id=cr_id_int).exists():
-            qs = qs.filter(criterii__id=cr_id_int).distinct()
-            active_cr_id = cr_id_int
-            active_cap_id = None
     now = timezone.now()
-    deschise = qs.filter(termen_limita__gte=now).order_by("termen_limita")
-    inchise = qs.filter(termen_limita__lt=now).order_by("-termen_limita")
 
-    sub_map = {
-        s.questionnaire_id: s
-        for s in Submission.objects.filter(expert=request.user, questionnaire__in=qs)
-    }
-
-    # --- Dashboard personalizat PNA pentru expert ---
     pna_qs = _expert_pna_accessible_qs(request.user)
     accessible_pna = list(pna_qs)
     accessible_pna_ids = [p.id for p in accessible_pna]
@@ -538,30 +530,27 @@ def expert_dashboard(request):
     ]
     upcoming_consultations.sort(key=lambda p: (p.consultari_publice_parlament, (p.consultari_publice_ora or "99:99"), p.titlu or ""))
 
+    questionnaire_qs = _expert_accessible_qs(request.user)
+    deschise_count = questionnaire_qs.filter(termen_limita__gte=now).count()
+    trimise_count = Submission.objects.filter(expert=request.user, questionnaire__in=questionnaire_qs, status="TRIMIS").count()
+
     pna_stats = {
         "accessible": len(accessible_pna),
         "in_parliament": sum(1 for p in accessible_pna if p.status_implementare in PNA_STAGE_GROUP_PARLAMENT),
         "parliament_pending": len(pna_parliament_pending),
         "adopted_final": sum(1 for p in accessible_pna if p.status_implementare in PNA_STAGE_GROUP_FINAL),
         "new_parliament_entries": len(parliament_entry_rows),
+        "questionnaires_open": deschise_count,
+        "questionnaires_submitted": trimise_count,
     }
 
-    # Actualizăm momentul ultimei vizualizări după calculul notificărilor.
     profil.expert_dashboard_seen_at = now
     profil.save(update_fields=["expert_dashboard_seen_at"])
 
     return render(
         request,
-        "portal/expert_dashboard.html",
+        "portal/expert_panou.html",
         {
-            "deschise": deschise,
-            "inchise": inchise,
-            "sub_map": sub_map,
-            "capitole_tile": profil.capitole.all().order_by("numar"),
-            "criterii_tile": profil.criterii.all().order_by("cod"),
-            "active_capitol": active_cap_id,
-            "active_criteriu": active_cr_id,
-            "active_general": active_general,
             "pna_stats": pna_stats,
             "parliament_entry_rows": parliament_entry_rows,
             "parliament_entry_since": recent_since,
@@ -570,6 +559,61 @@ def expert_dashboard(request):
             "upcoming_consultations": upcoming_consultations[:6],
         },
     )
+
+
+@user_passes_test(is_expert)
+def expert_questionnaires_list(request):
+    profil = _get_or_create_profile(request.user)
+    qs = _expert_accessible_qs(request.user)
+
+    general = request.GET.get("general")
+    cap_id = request.GET.get("capitol")
+    cr_id = request.GET.get("criteriu")
+
+    active_cap_id = None
+    active_cr_id = None
+    active_general = False
+
+    if general:
+        qs = qs.filter(este_general=True).distinct()
+        active_general = True
+    elif cap_id:
+        try:
+            cap_id_int = int(cap_id)
+        except (TypeError, ValueError):
+            cap_id_int = None
+        if cap_id_int and profil.capitole.filter(id=cap_id_int).exists():
+            qs = qs.filter(capitole__id=cap_id_int).distinct()
+            active_cap_id = cap_id_int
+            active_cr_id = None
+    elif cr_id:
+        try:
+            cr_id_int = int(cr_id)
+        except (TypeError, ValueError):
+            cr_id_int = None
+        if cr_id_int and profil.criterii.filter(id=cr_id_int).exists():
+            qs = qs.filter(criterii__id=cr_id_int).distinct()
+            active_cr_id = cr_id_int
+            active_cap_id = None
+    now = timezone.now()
+    deschise = qs.filter(termen_limita__gte=now).order_by("termen_limita")
+    inchise = qs.filter(termen_limita__lt=now).order_by("-termen_limita")
+
+    sub_map = {
+        s.questionnaire_id: s
+        for s in Submission.objects.filter(expert=request.user, questionnaire__in=qs)
+    }
+
+    return render(request, "portal/expert_questionnaires.html", {
+        "deschise": deschise,
+        "inchise": inchise,
+        "sub_map": sub_map,
+        "capitole_tile": profil.capitole.all().order_by("numar"),
+        "criterii_tile": profil.criterii.all().order_by("cod"),
+        "active_capitol": active_cap_id,
+        "active_criteriu": active_cr_id,
+        "active_general": active_general,
+    })
 
 
 @user_passes_test(is_expert)
@@ -3843,6 +3887,88 @@ def _render_pna_dashboard(
             "contrib_institution_rows": contrib_institution_rows,
         },
     )
+
+
+@user_passes_test(can_edit_pna)
+def admin_pna_bulk_update(request):
+    clusters = Cluster.objects.all().order_by("ordine", "denumire")
+    chapters = Chapter.objects.select_related("cluster").all().order_by("cluster__ordine", "numar")
+    criteria = Criterion.objects.all().order_by("cod")
+    institutions = PnaInstitution.objects.all().order_by("denumire")
+    field_meta = _pna_bulk_update_field_meta()
+
+    selected_clusters = request.GET.getlist("clusters") or request.POST.getlist("clusters")
+    selected_chapters = request.GET.getlist("chapters") or request.POST.getlist("chapters")
+    selected_criteria = request.GET.getlist("criteria") or request.POST.getlist("criteria")
+    field_name = (request.GET.get("field") or request.POST.get("field") or "status_implementare").strip()
+    if field_name not in field_meta:
+        field_name = "status_implementare"
+    projects = list(_pna_projects_for_bulk_selection(selected_clusters, selected_chapters, selected_criteria))
+
+    meta = field_meta[field_name]
+    if request.method == "POST" and projects:
+        updated = 0
+        changed_ids = []
+        for p in projects:
+            raw = request.POST.get(f"value_{p.id}", "")
+            if meta["type"] == "bool":
+                new_value = _is_truthy(raw)
+                if getattr(p, field_name) != new_value:
+                    setattr(p, field_name, new_value)
+                    p.save(update_fields=[field_name, "actualizat_la"])
+                    updated += 1
+            elif meta["type"] == "institution":
+                new_value = int(raw) if raw else None
+                if (p.institutie_principala_ref_id or None) != new_value:
+                    p.institutie_principala_ref_id = new_value
+                    p.institutie_principala = p.institutie_principala_ref.denumire if p.institutie_principala_ref_id else ""
+                    p.save(update_fields=["institutie_principala_ref", "institutie_principala", "actualizat_la"])
+                    updated += 1
+            else:
+                new_value = int(raw) if raw else None
+                current = getattr(p, field_name)
+                if current != new_value:
+                    setattr(p, field_name, new_value)
+                    p.save(update_fields=[field_name, "actualizat_la"])
+                    updated += 1
+        if updated:
+            messages.success(request, f"Au fost actualizate {updated} proiecte.")
+        else:
+            messages.info(request, "Nu au existat modificări de salvat.")
+        params = []
+        for c in selected_clusters:
+            params.append(("clusters", c))
+        for c in selected_chapters:
+            params.append(("chapters", c))
+        for c in selected_criteria:
+            params.append(("criteria", c))
+        params.append(("field", field_name))
+        return redirect(reverse("admin_pna_bulk_update") + ("?" + urlencode(params, doseq=True) if params else ""))
+
+    for p in projects:
+        if meta["type"] == "institution":
+            p.bulk_current_value = p.institutie_principala_ref_id or ""
+            p.bulk_current_label = p.institutie_principala_label
+        elif meta["type"] == "bool":
+            p.bulk_current_value = "1" if getattr(p, field_name) else "0"
+            p.bulk_current_label = "Da" if getattr(p, field_name) else "Nu"
+        else:
+            p.bulk_current_value = getattr(p, field_name) or ""
+            p.bulk_current_label = dict(meta.get("choices", [])).get(getattr(p, field_name), "—")
+
+    return render(request, "portal/admin_pna_bulk_update.html", {
+        "clusters": clusters,
+        "chapters": chapters,
+        "criteria": criteria,
+        "institutions": institutions,
+        "field_meta": field_meta,
+        "field_name": field_name,
+        "meta": meta,
+        "selected_clusters": [str(x) for x in selected_clusters],
+        "selected_chapters": [str(x) for x in selected_chapters],
+        "selected_criteria": [str(x) for x in selected_criteria],
+        "projects": projects,
+    })
 
 
 @user_passes_test(can_edit_pna)
