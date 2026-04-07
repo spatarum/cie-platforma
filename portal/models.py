@@ -763,6 +763,12 @@ class PnaProject(models.Model):
         return "(neatribuit)"
 
     @property
+    def institutie_principala_label(self) -> str:
+        if self.institutie_principala_ref_id:
+            return self.institutie_principala_ref.denumire
+        return self.institutie_principala or "—"
+
+    @property
     def termen_guvern_efectiv(self):
         """Termenul de guvern folosit în practică (actualizat dacă există)."""
         return self.termen_actualizat_aprobare_guvern or self.termen_aprobare_guvern

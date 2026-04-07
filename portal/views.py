@@ -259,7 +259,7 @@ def _pna_projects_for_bulk_selection(cluster_ids, chapter_ids, criterion_ids):
         qs = qs.filter(q)
     else:
         qs = qs.none()
-    return qs.order_by("chapter__cluster__ordine", "chapter__numar", "criterion__cod", "titlu").distinct()
+    return qs.order_by("chapter__cluster__ordonare", "chapter__numar", "criterion__cod", "titlu").distinct()
 
 
 def _user_role_label(user: User) -> str:
@@ -3891,8 +3891,8 @@ def _render_pna_dashboard(
 
 @user_passes_test(can_edit_pna)
 def admin_pna_bulk_update(request):
-    clusters = Cluster.objects.all().order_by("ordine", "denumire")
-    chapters = Chapter.objects.select_related("cluster").all().order_by("cluster__ordine", "numar")
+    clusters = Cluster.objects.all().order_by("ordonare", "denumire")
+    chapters = Chapter.objects.select_related("cluster").all().order_by("cluster__ordonare", "numar")
     criteria = Criterion.objects.all().order_by("cod")
     institutions = PnaInstitution.objects.all().order_by("denumire")
     field_meta = _pna_bulk_update_field_meta()
