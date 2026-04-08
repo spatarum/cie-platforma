@@ -94,7 +94,7 @@
           <tr>
             <td>
               <div class="fw-semibold">{{ p.titlu }}</div>
-              <div class="small text-muted">{{ p.institutie_principala_label|default:'—' }}</div>
+              <div class="small text-muted">{{ p.institutie_principala_ref.denumire|default:p.institutie_principala|default:'—' }}</div>
             </td>
             <td>{{ p.atasare_label }}</td>
             <td>{{ p.bulk_current_label|default:'—' }}</td>
