@@ -3894,7 +3894,7 @@ def admin_pna_bulk_update(request):
     clusters = Cluster.objects.all().order_by("ordonare", "cod", "denumire")
     chapters = Chapter.objects.select_related("cluster").all().order_by("cluster__ordonare", "numar")
     criteria = Criterion.objects.all().order_by("cod")
-    institutions = PnaInstitution.objects.all().order_by("denumire")
+    institutions = PnaInstitution.objects.all().order_by("nume")
     field_meta = _pna_bulk_update_field_meta()
 
     selected_clusters = request.GET.getlist("clusters") or request.POST.getlist("clusters")
@@ -3921,7 +3921,7 @@ def admin_pna_bulk_update(request):
                 new_value = int(raw) if raw else None
                 if (p.institutie_principala_ref_id or None) != new_value:
                     p.institutie_principala_ref_id = new_value
-                    p.institutie_principala = p.institutie_principala_ref.denumire if p.institutie_principala_ref_id else ""
+                    p.institutie_principala = p.institutie_principala_ref.nume if p.institutie_principala_ref_id else ""
                     p.save(update_fields=["institutie_principala_ref", "institutie_principala", "actualizat_la"])
                     updated += 1
             else:
@@ -3948,7 +3948,7 @@ def admin_pna_bulk_update(request):
     for p in projects:
         if meta["type"] == "institution":
             p.bulk_current_value = p.institutie_principala_ref_id or ""
-            p.bulk_current_label = (p.institutie_principala_ref.denumire if getattr(p, "institutie_principala_ref_id", None) and getattr(p, "institutie_principala_ref", None) else (p.institutie_principala or "—"))
+            p.bulk_current_label = (p.institutie_principala_ref.nume if getattr(p, "institutie_principala_ref_id", None) and getattr(p, "institutie_principala_ref", None) else (p.institutie_principala or "—"))
         elif meta["type"] == "bool":
             p.bulk_current_value = "1" if getattr(p, field_name) else "0"
             p.bulk_current_label = "Da" if getattr(p, field_name) else "Nu"
