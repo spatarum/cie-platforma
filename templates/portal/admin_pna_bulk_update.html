@@ -94,7 +94,7 @@
           <tr>
             <td>
               <div class="fw-semibold">{{ p.titlu }}</div>
-              <div class="small text-muted">{{ p.institutie_principala_ref.denumire|default:p.institutie_principala|default:'—' }}</div>
+              <div class="small text-muted">{{ p.institutie_principala_ref.nume|default:p.institutie_principala|default:'—' }}</div>
             </td>
             <td>{{ p.atasare_label }}</td>
             <td>{{ p.bulk_current_label|default:'—' }}</td>
@@ -115,7 +115,7 @@
                 <select class="form-select form-select-sm" name="value_{{ p.id }}">
                   <option value="">—</option>
                   {% for inst in institutions %}
-                    <option value="{{ inst.id }}" {% if p.bulk_current_value|stringformat:'s' == inst.id|stringformat:'s' %}selected{% endif %}>{{ inst.denumire }}</option>
+                    <option value="{{ inst.id }}" {% if p.bulk_current_value|stringformat:'s' == inst.id|stringformat:'s' %}selected{% endif %}>{{ inst.nume }}</option>
                   {% endfor %}
                 </select>
               {% endif %}
