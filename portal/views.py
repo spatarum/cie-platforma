@@ -51,6 +51,7 @@ from .models import (
     Answer,
     AnswerComment,
     Chapter,
+    Cluster,
     Criterion,
     ExpertProfile,
     ImportRun,
