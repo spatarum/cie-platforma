@@ -20,6 +20,9 @@ from .models import (
     EUAct,
     PnaProjectEUAct,
     PnaExpertContribution,
+    ParliamentCommission,
+    DocumentCategory,
+    PlatformDocument,
     ChatMessage,
 )
 
@@ -714,6 +717,8 @@ class PnaProjectForm(forms.ModelForm):
             "chapter",
             "criterion",
             "status_implementare",
+            "comisie_responsabila",
+            "link_dosar_parlament",
             "institutie_principala_ref",
             "institutii_responsabile",
             "contact_responsabil",
@@ -753,6 +758,8 @@ class PnaProjectForm(forms.ModelForm):
             "chapter": forms.Select(attrs={"class": "form-select"}),
             "criterion": forms.Select(attrs={"class": "form-select"}),
             "status_implementare": forms.Select(attrs={"class": "form-select"}),
+            "comisie_responsabila": forms.Select(attrs={"class": "form-select"}),
+            "link_dosar_parlament": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://www.parlament.md/..."}),
             "institutie_principala_ref": forms.Select(attrs={"class": "form-select"}),
             # Afișăm instituțiile ca listă de bife (mai ușor de selectat decât multi-select).
             "institutii_responsabile": forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
@@ -790,6 +797,8 @@ class PnaProjectForm(forms.ModelForm):
             "chapter": "Capitol (dacă este cazul)",
             "criterion": "Foaie de parcurs (dacă este cazul)",
             "status_implementare": "Status implementare",
+            "comisie_responsabila": "Comisia parlamentară responsabilă",
+            "link_dosar_parlament": "Link dosar proiect pe parlament.md",
             "institutie_principala_ref": "Instituția principală responsabilă",
             "institutii_responsabile": "Alte instituții responsabile (opțional)",
             "contact_responsabil": "Contact persoană responsabilă (nume, funcție)",
@@ -1076,3 +1085,44 @@ class ChatReplyForm(forms.ModelForm):
         if not value:
             raise forms.ValidationError("Răspunsul nu poate fi gol.")
         return value
+
+
+
+class DocumentCategoryForm(forms.ModelForm):
+    class Meta:
+        model = DocumentCategory
+        fields = ["nume", "descriere", "ordine", "activa"]
+        widgets = {
+            "nume": forms.TextInput(attrs={"class": "form-control"}),
+            "descriere": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "ordine": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "activa": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "nume": "Denumire categorie",
+            "descriere": "Descriere",
+            "ordine": "Ordine",
+            "activa": "Activă",
+        }
+
+
+class PlatformDocumentForm(forms.ModelForm):
+    class Meta:
+        model = PlatformDocument
+        fields = ["categorie", "titlu", "descriere", "fisier", "ordine", "publicat"]
+        widgets = {
+            "categorie": forms.Select(attrs={"class": "form-select"}),
+            "titlu": forms.TextInput(attrs={"class": "form-control"}),
+            "descriere": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "fisier": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "ordine": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "publicat": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "categorie": "Categorie",
+            "titlu": "Titlu document",
+            "descriere": "Descriere",
+            "fisier": "Fișier",
+            "ordine": "Ordine",
+            "publicat": "Publicat",
+        }

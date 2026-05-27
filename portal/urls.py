@@ -13,6 +13,14 @@ urlpatterns = [
     path("chat/trimite/", views.chat_message_create, name="chat_message_create"),
     path("chat/raspunde/<int:parent_id>/", views.chat_reply_create, name="chat_reply_create"),
 
+    path("documente/", views.documents_list, name="documents_list"),
+    path("documente/nou/", views.platform_document_create, name="platform_document_create"),
+    path("documente/<int:pk>/editare/", views.platform_document_edit, name="platform_document_edit"),
+    path("documente/<int:pk>/descarca/", views.platform_document_download, name="platform_document_download"),
+    path("documente/categorii/", views.document_category_list, name="document_category_list"),
+    path("documente/categorii/nou/", views.document_category_create, name="document_category_create"),
+    path("documente/categorii/<int:pk>/editare/", views.document_category_edit, name="document_category_edit"),
+
     # Expert
     path("expert/", views.expert_dashboard, name="expert_dashboard"),
     path("expert/chestionare/", views.expert_questionnaires_list, name="expert_questionnaires"),
@@ -131,6 +139,11 @@ urlpatterns = [
         "administrare/pna/dashboard/capitol/<int:pk>/",
         views.admin_pna_dashboard_chapter,
         name="admin_pna_dashboard_chapter",
+    ),
+    path(
+        "administrare/pna/dashboard/comisie/<int:pk>/",
+        views.admin_pna_dashboard_commission,
+        name="admin_pna_dashboard_commission",
     ),
     path(
         "administrare/pna/dashboard/foaie/<int:pk>/",

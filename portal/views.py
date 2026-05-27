@@ -20,7 +20,7 @@ from django.db import transaction
 from django.db.models import Q, Count, Max, Prefetch
 from django.db.models.functions import Coalesce
 from django.forms import formset_factory
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse, FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -46,6 +46,8 @@ from .forms import (
     PnaExpertContributionForm,
     ChatMessageForm,
     ChatReplyForm,
+    DocumentCategoryForm,
+    PlatformDocumentForm,
 )
 from .models import (
     Answer,
@@ -68,6 +70,9 @@ from .models import (
     PnaProjectStatusHistory,
     PnaProjectDeadlineHistory,
     ChatMessage,
+    ParliamentCommission,
+    DocumentCategory,
+    PlatformDocument,
 )
 from .notifications import send_new_questionnaire_emails, send_newsletter_emails
 from .stats import get_questionnaire_rate_and_counts, ensure_scope_snapshot
@@ -110,6 +115,12 @@ def is_staff_comisie(user: User) -> bool:
     profil = getattr(user, "profil_expert", None)
     return bool(profil and getattr(profil, "este_staff_comisie", False))
 
+
+
+
+def can_edit_documents(user: User) -> bool:
+    """Poate administra documentele: superuser sau Staff comisie."""
+    return bool(user.is_authenticated and (user.is_superuser or (user.is_staff and getattr(getattr(user, "profil_expert", None), "este_staff_comisie", False))))
 
 def can_edit_pna(user: User) -> bool:
     """Cine poate edita PNA (proiecte, instituții, import)."""
@@ -173,7 +184,7 @@ def _expert_pna_accessible_qs(user: User):
         PnaProject.objects.filter(arhivat=False)
         .filter(Q(chapter__in=profil.capitole.all()) | Q(criterion__in=profil.criterii.all()))
         .distinct()
-        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("acte_ue_legaturi__eu_act")
         .order_by("titlu")
     )
@@ -244,6 +255,8 @@ def _pna_bulk_update_field_meta():
         "necesita_expertiza_externa": {"label": "Necesită expertiză externă", "type": "bool"},
         "este_identificata_expertiza_externa": {"label": "Este identificată expertiză externă", "type": "bool"},
         "institutie_principala_ref": {"label": "Instituția principală", "type": "institution"},
+        "comisie_responsabila": {"label": "Comisia parlamentară responsabilă", "type": "commission"},
+        "link_dosar_parlament": {"label": "Link dosar proiect pe parlament.md", "type": "text"},
     }
 
 
@@ -761,7 +774,7 @@ def expert_newsletter_detail(request, pk: int):
 def admin_pna_consultari(request):
     proiecte = list(
         PnaProject.objects.filter(arhivat=False, consultari_publice_parlament__isnull=False)
-        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .order_by("consultari_publice_parlament", "titlu")
     )
     try:
@@ -815,6 +828,7 @@ def expert_pna_list(request):
 
     q = (request.GET.get("q") or "").strip()
     stage = (request.GET.get("stage") or "").strip()
+    selected_commissions = [x for x in request.GET.getlist("comisii") if str(x).isdigit()]
     pending = (request.GET.get("pending") or "").strip() == "1"
 
     base_qs = _expert_pna_accessible_qs(request.user)
@@ -826,9 +840,14 @@ def expert_pna_list(request):
             | Q(institutie_principala_ref__nume__icontains=q)
             | Q(acte_ue_legaturi__eu_act__denumire__icontains=q)
             | Q(acte_ue_legaturi__eu_act__celex__icontains=q)
+            | Q(comisie_responsabila__nume__icontains=q)
+            | Q(comisie_responsabila__nume_scurt__icontains=q)
         ).distinct()
 
-    all_projects = list(base_qs)
+    if selected_commissions:
+        proiecte_qs = proiecte_qs.filter(comisie_responsabila_id__in=selected_commissions)
+
+    all_projects = list(proiecte_qs)
     total = len(all_projects)
     nr_neinitiate = sum(1 for p in all_projects if p.status_implementare in PNA_STAGE_GROUP_NEINITIATE)
     nr_in_procedura_guvern = sum(1 for p in all_projects if p.status_implementare in PNA_STAGE_GROUP_GUVERN)
@@ -892,6 +911,8 @@ def expert_pna_list(request):
             "chapter_groups": chapter_groups,
             "contribs": contribs,
             "stage": stage,
+            "commissions": ParliamentCommission.objects.filter(activa=True).order_by("ordine", "nume"),
+            "selected_commissions": [str(x) for x in selected_commissions],
             "total": total,
             "nr_neinitiate": nr_neinitiate,
             "nr_in_procedura_guvern": nr_in_procedura_guvern,
@@ -908,7 +929,7 @@ def expert_pna_detail(request, pk: int):
     """Detaliu proiect PNA (expert) + formular contribuții (3 boxe)."""
 
     proiect = get_object_or_404(
-        PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref")
+        PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("acte_ue_legaturi__eu_act"),
         pk=pk,
         arhivat=False,
@@ -2598,10 +2619,11 @@ def admin_pna_list(request):
 
     q = (request.GET.get("q") or "").strip()
     stage = (request.GET.get("stage") or "").strip()
+    selected_commissions = [x for x in request.GET.getlist("comisii") if str(x).isdigit()]
 
     proiecte_qs = (
         PnaProject.objects.filter(arhivat=False)
-        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("acte_ue_legaturi__eu_act")
         .prefetch_related("institutii_responsabile")
         .order_by("titlu")
@@ -2612,7 +2634,12 @@ def admin_pna_list(request):
             | Q(institutie_principala__icontains=q)
             | Q(institutie_principala_ref__nume__icontains=q)
             | Q(institutii_responsabile__nume__icontains=q)
+            | Q(comisie_responsabila__nume__icontains=q)
+            | Q(comisie_responsabila__nume_scurt__icontains=q)
         ).distinct()
+
+    if selected_commissions:
+        proiecte_qs = proiecte_qs.filter(comisie_responsabila_id__in=selected_commissions)
 
     all_projects = list(proiecte_qs)
 
@@ -2701,6 +2728,8 @@ def admin_pna_list(request):
             "criterii_groups": criterii_groups,
             "chapter_groups": chapter_groups,
             "stage": stage,
+            "commissions": ParliamentCommission.objects.filter(activa=True).order_by("ordine", "nume"),
+            "selected_commissions": [str(x) for x in selected_commissions],
         },
     )
 
@@ -2729,6 +2758,22 @@ def admin_pna_dashboard(request):
         scope_filters={},
         back_url=reverse("admin_pna_list"),
         back_label="Înapoi la PNA",
+    )
+
+
+@user_passes_test(is_internal)
+def admin_pna_dashboard_commission(request, pk: int):
+    commission = get_object_or_404(ParliamentCommission, pk=pk)
+    proiecte_qs = PnaProject.objects.filter(arhivat=False, comisie_responsabila=commission)
+    return _render_pna_dashboard(
+        request,
+        proiecte_qs=proiecte_qs,
+        scope_kind="commission",
+        scope_title=f"{commission.label_scurt} — {commission.nume}",
+        scope_filters={"commission": commission.id},
+        back_url=reverse("admin_pna_list"),
+        back_label="Înapoi la PNA",
+        scope_obj=commission,
     )
 
 
@@ -2817,14 +2862,14 @@ def _render_pna_dashboard(
 
     base_qs = proiecte_qs
     all_projects = list(
-        base_qs.select_related("chapter", "criterion", "institutie_principala_ref")
+        base_qs.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("institutii_responsabile", "acte_ue_legaturi__eu_act")
         .order_by("-actualizat_la")
     )
 
     proiecte_qs = _apply_pna_stage_filter_to_qs(proiecte_qs, stage)
     proiecte = list(
-        proiecte_qs.select_related("chapter", "criterion", "institutie_principala_ref")
+        proiecte_qs.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("institutii_responsabile", "acte_ue_legaturi__eu_act")
         .order_by("-actualizat_la")
     )
@@ -3896,6 +3941,7 @@ def admin_pna_bulk_update(request):
     chapters = Chapter.objects.select_related("cluster").all().order_by("cluster__ordonare", "numar")
     criteria = Criterion.objects.all().order_by("cod")
     institutions = PnaInstitution.objects.all().order_by("nume")
+    commissions = ParliamentCommission.objects.filter(activa=True).order_by("ordine", "nume")
     field_meta = _pna_bulk_update_field_meta()
 
     selected_clusters = request.GET.getlist("clusters") or request.POST.getlist("clusters")
@@ -3925,6 +3971,18 @@ def admin_pna_bulk_update(request):
                     p.institutie_principala = p.institutie_principala_ref.nume if p.institutie_principala_ref_id else ""
                     p.save(update_fields=["institutie_principala_ref", "institutie_principala", "actualizat_la"])
                     updated += 1
+            elif meta["type"] == "commission":
+                new_value = int(raw) if raw else None
+                if (p.comisie_responsabila_id or None) != new_value:
+                    p.comisie_responsabila_id = new_value
+                    p.save(update_fields=["comisie_responsabila", "actualizat_la"])
+                    updated += 1
+            elif meta["type"] == "text":
+                new_value = (raw or "").strip()
+                if (getattr(p, field_name) or "") != new_value:
+                    setattr(p, field_name, new_value)
+                    p.save(update_fields=[field_name, "actualizat_la"])
+                    updated += 1
             else:
                 new_value = int(raw) if raw else None
                 current = getattr(p, field_name)
@@ -3950,6 +4008,12 @@ def admin_pna_bulk_update(request):
         if meta["type"] == "institution":
             p.bulk_current_value = p.institutie_principala_ref_id or ""
             p.bulk_current_label = (p.institutie_principala_ref.nume if getattr(p, "institutie_principala_ref_id", None) and getattr(p, "institutie_principala_ref", None) else (p.institutie_principala or "—"))
+        elif meta["type"] == "commission":
+            p.bulk_current_value = p.comisie_responsabila_id or ""
+            p.bulk_current_label = p.comisie_responsabila.label_scurt if getattr(p, "comisie_responsabila_id", None) and getattr(p, "comisie_responsabila", None) else "—"
+        elif meta["type"] == "text":
+            p.bulk_current_value = getattr(p, field_name) or ""
+            p.bulk_current_label = getattr(p, field_name) or "—"
         elif meta["type"] == "bool":
             p.bulk_current_value = "1" if getattr(p, field_name) else "0"
             p.bulk_current_label = "Da" if getattr(p, field_name) else "Nu"
@@ -3962,6 +4026,7 @@ def admin_pna_bulk_update(request):
         "chapters": chapters,
         "criteria": criteria,
         "institutions": institutions,
+        "commissions": commissions,
         "field_meta": field_meta,
         "field_name": field_name,
         "meta": meta,
@@ -4235,7 +4300,7 @@ def admin_pna_detail(request, pk: int):
     """
 
     obj = get_object_or_404(
-        PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref")
+        PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("acte_ue_legaturi__eu_act")
         .prefetch_related("institutii_responsabile"),
         pk=pk,
@@ -4366,7 +4431,7 @@ def admin_pna_contributii(request, pk: int):
     """Contribuțiile experților (Flexibilitate/Compensare/Tranziție) pentru un proiect PNA."""
 
     proiect = get_object_or_404(
-        PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref")
+        PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("acte_ue_legaturi__eu_act"),
         pk=pk,
     )
@@ -4595,7 +4660,7 @@ def admin_pna_scope_list(request):
 
     qs = (
         PnaProject.objects.filter(arhivat=False)
-        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("institutii_responsabile")
     )
 
@@ -4692,7 +4757,7 @@ def admin_pna_filtered_list(request):
 
     qs = (
         PnaProject.objects.filter(arhivat=False)
-        .select_related("chapter", "criterion", "institutie_principala_ref")
+        .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
         .prefetch_related("institutii_responsabile")
     )
 
@@ -4710,6 +4775,7 @@ def admin_pna_filtered_list(request):
     status = (request.GET.get("status") or "").strip()
     stage = (request.GET.get("stage") or "").strip()
     institution = (request.GET.get("institution") or "").strip()
+    commission = (request.GET.get("commission") or "").strip()
     include_co = (request.GET.get("include_co") or "").strip()
 
     needs_ce = (request.GET.get("needs_ce") or "").strip()
@@ -4782,6 +4848,12 @@ def admin_pna_filtered_list(request):
                 qs = qs.filter(institutie_principala_ref=inst_obj)
         except Exception:
             inst_obj = None
+
+    if commission:
+        try:
+            qs = qs.filter(comisie_responsabila_id=int(commission))
+        except Exception:
+            pass
 
     if needs_ce == "1":
         qs = qs.filter(necesita_avizare_comisia_europeana=True)
@@ -5683,3 +5755,93 @@ def answer_thread_toggle_resolved(request, answer_id: int):
         or "/administrare/"
     )
     return redirect(next_url)
+
+
+# -------------------- Documente --------------------
+
+@login_required
+def documents_list(request):
+    docs_qs = PlatformDocument.objects.filter(publicat=True).select_related("categorie", "incarcat_de")
+    if can_edit_documents(request.user):
+        docs_qs = PlatformDocument.objects.all().select_related("categorie", "incarcat_de")
+    docs = list(docs_qs.order_by("categorie__ordine", "ordine", "titlu"))
+    by_cat = {}
+    for d in docs:
+        key = d.categorie_id or 0
+        if key not in by_cat:
+            by_cat[key] = {"categorie": d.categorie, "documente": []}
+        by_cat[key]["documente"].append(d)
+    groups = sorted(by_cat.values(), key=lambda g: ((g["categorie"].ordine if g["categorie"] else 999999), (g["categorie"].nume if g["categorie"] else "Fără categorie")))
+    return render(request, "portal/documents_list.html", {"groups": groups, "can_edit_documents": can_edit_documents(request.user)})
+
+
+@login_required
+def platform_document_download(request, pk: int):
+    doc = get_object_or_404(PlatformDocument, pk=pk)
+    if not doc.publicat and not can_edit_documents(request.user):
+        raise Http404("Document indisponibil")
+    if not doc.fisier:
+        raise Http404("Fișier indisponibil")
+    return FileResponse(doc.fisier.open("rb"), as_attachment=True, filename=doc.nume_fisier)
+
+
+@user_passes_test(can_edit_documents)
+def document_category_list(request):
+    categories = DocumentCategory.objects.all().order_by("ordine", "nume")
+    return render(request, "portal/document_categories_list.html", {"categories": categories})
+
+
+@user_passes_test(can_edit_documents)
+def document_category_create(request):
+    if request.method == "POST":
+        form = DocumentCategoryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoria a fost creată.")
+            return redirect("document_category_list")
+    else:
+        form = DocumentCategoryForm(initial={"activa": True})
+    return render(request, "portal/document_category_form.html", {"form": form, "titlu_pagina": "Categorie nouă"})
+
+
+@user_passes_test(can_edit_documents)
+def document_category_edit(request, pk: int):
+    obj = get_object_or_404(DocumentCategory, pk=pk)
+    if request.method == "POST":
+        form = DocumentCategoryForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoria a fost actualizată.")
+            return redirect("document_category_list")
+    else:
+        form = DocumentCategoryForm(instance=obj)
+    return render(request, "portal/document_category_form.html", {"form": form, "titlu_pagina": "Editare categorie", "obj": obj})
+
+
+@user_passes_test(can_edit_documents)
+def platform_document_create(request):
+    if request.method == "POST":
+        form = PlatformDocumentForm(request.POST, request.FILES)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.incarcat_de = request.user
+            obj.save()
+            messages.success(request, "Documentul a fost încărcat.")
+            return redirect("documents_list")
+    else:
+        form = PlatformDocumentForm(initial={"publicat": True})
+    return render(request, "portal/document_form.html", {"form": form, "titlu_pagina": "Document nou"})
+
+
+@user_passes_test(can_edit_documents)
+def platform_document_edit(request, pk: int):
+    obj = get_object_or_404(PlatformDocument, pk=pk)
+    if request.method == "POST":
+        form = PlatformDocumentForm(request.POST, request.FILES, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Documentul a fost actualizat.")
+            return redirect("documents_list")
+    else:
+        form = PlatformDocumentForm(instance=obj)
+    return render(request, "portal/document_form.html", {"form": form, "titlu_pagina": "Editare document", "obj": obj})

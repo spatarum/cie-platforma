@@ -505,6 +505,93 @@ class AnswerComment(models.Model):
         return super().save(*args, **kwargs)
 
 
+
+
+# -------------------- Documente publicate pe platformă --------------------
+
+
+class DocumentCategory(models.Model):
+    """Categorie pentru documentele publicate pe platformă."""
+
+    nume = models.CharField(max_length=200, unique=True)
+    descriere = models.TextField(blank=True)
+    ordine = models.PositiveIntegerField(default=0)
+    activa = models.BooleanField(default=True)
+    creat_la = models.DateTimeField(auto_now_add=True)
+    actualizat_la = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Categorie documente"
+        verbose_name_plural = "Categorii documente"
+        ordering = ["ordine", "nume"]
+
+    def __str__(self) -> str:
+        return self.nume
+
+
+class PlatformDocument(models.Model):
+    """Document încărcat pe platformă și disponibil pentru descărcare."""
+
+    categorie = models.ForeignKey(
+        DocumentCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documente",
+    )
+    titlu = models.CharField(max_length=300)
+    descriere = models.TextField(blank=True)
+    fisier = models.FileField(upload_to="documente/%Y/%m/")
+    ordine = models.PositiveIntegerField(default=0)
+    publicat = models.BooleanField(default=True)
+    incarcat_de = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="documente_incarcate",
+    )
+    creat_la = models.DateTimeField(auto_now_add=True)
+    actualizat_la = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Document"
+        verbose_name_plural = "Documente"
+        ordering = ["categorie__ordine", "ordine", "titlu"]
+
+    def __str__(self) -> str:
+        return self.titlu
+
+    @property
+    def nume_fisier(self) -> str:
+        try:
+            return self.fisier.name.split("/")[-1]
+        except Exception:
+            return "document"
+
+
+class ParliamentCommission(models.Model):
+    """Comisie parlamentară responsabilă pentru un proiect PNA."""
+
+    nume = models.CharField(max_length=255, unique=True)
+    nume_scurt = models.CharField(max_length=80, blank=True)
+    pictograma = models.CharField(max_length=100, blank=True, default="bi-building")
+    ordine = models.PositiveIntegerField(default=0)
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Comisie parlamentară"
+        verbose_name_plural = "Comisii parlamentare"
+        ordering = ["ordine", "nume"]
+
+    def __str__(self) -> str:
+        return self.nume
+
+    @property
+    def label_scurt(self) -> str:
+        return self.nume_scurt or self.nume
+
+
 # -------------------- PNA (Programul Național de Aderare) --------------------
 
 
@@ -637,6 +724,20 @@ class PnaProject(models.Model):
         through="PnaProjectEUAct",
         related_name="proiecte_pna",
         blank=True,
+    )
+
+    comisie_responsabila = models.ForeignKey(
+        ParliamentCommission,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="proiecte_pna",
+        help_text="Comisia parlamentară responsabilă pentru examinarea proiectului.",
+    )
+    link_dosar_parlament = models.URLField(
+        blank=True,
+        default="",
+        help_text="Link către dosarul proiectului pe parlament.md.",
     )
 
     # Elemente de bază (tabel PNA)
