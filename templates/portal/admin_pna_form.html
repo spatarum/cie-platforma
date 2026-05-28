@@ -53,6 +53,16 @@
         {{ form.status_implementare }}
         {% if form.status_implementare.errors %}<div class="text-danger small">{{ form.status_implementare.errors }}</div>{% endif %}
       </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.comisie_responsabila.label }}</label>
+        {{ form.comisie_responsabila }}
+        {% if form.comisie_responsabila.errors %}<div class="text-danger small">{{ form.comisie_responsabila.errors }}</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.link_dosar_parlament.label }}</label>
+        {{ form.link_dosar_parlament }}
+        {% if form.link_dosar_parlament.errors %}<div class="text-danger small">{{ form.link_dosar_parlament.errors }}</div>{% endif %}
+      </div>
     </div>
 
     <h2 class="h6">Instituții & contact</h2>

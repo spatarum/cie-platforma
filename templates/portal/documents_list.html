@@ -1,0 +1,49 @@
+{% extends 'portal/base.html' %}
+{% block title %}Documente{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h5 mb-0">Documente</h1>
+    <div class="text-muted small">Documente publicate pe platformă, grupate pe categorii.</div>
+  </div>
+  {% if can_edit_documents %}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'document_category_list' %}"><i class="bi bi-tags me-1"></i>Categorii</a>
+    <a class="btn btn-primary btn-sm" href="{% url 'platform_document_create' %}"><i class="bi bi-upload me-1"></i>Document nou</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if groups %}
+  {% for g in groups %}
+    <div class="card shadow-sm gov-card mb-3">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between">
+        <strong><i class="bi bi-folder2-open me-1"></i>{% if g.categorie %}{{ g.categorie.nume }}{% else %}Fără categorie{% endif %}</strong>
+        <span class="text-muted small">{{ g.documente|length }} documente</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for d in g.documente %}
+          <div class="list-group-item d-flex flex-wrap align-items-start justify-content-between gap-2">
+            <div>
+              <div class="fw-semibold">
+                <a href="{% url 'platform_document_download' d.id %}" class="text-decoration-none">{{ d.titlu }}</a>
+                {% if not d.publicat %}<span class="badge text-bg-secondary ms-2">nepublicat</span>{% endif %}
+              </div>
+              {% if d.descriere %}<div class="text-muted small mt-1">{{ d.descriere }}</div>{% endif %}
+              <div class="text-muted small mt-1"><i class="bi bi-file-earmark me-1"></i>{{ d.nume_fisier }} · Actualizat: {{ d.actualizat_la|date:'d.m.Y H:i' }}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-primary btn-sm" href="{% url 'platform_document_download' d.id %}"><i class="bi bi-download me-1"></i>Descarcă</a>
+              {% if can_edit_documents %}
+                <a class="btn btn-outline-secondary btn-sm" href="{% url 'platform_document_edit' d.id %}"><i class="bi bi-pencil-square me-1"></i>Editează</a>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="card shadow-sm gov-card"><div class="card-body text-muted">Nu există documente publicate.</div></div>
+{% endif %}
+{% endblock %}

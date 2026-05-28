@@ -48,6 +48,18 @@
           <dt class="col-sm-5 text-muted">Necesită avizare Comisia Europeană</dt>
           <dd class="col-sm-7">{% if obj.necesita_avizare_comisia_europeana %}Da{% else %}Nu{% endif %}</dd>
 
+          <dt class="col-sm-5 text-muted">Comisia parlamentară responsabilă</dt>
+          <dd class="col-sm-7">
+            {% if obj.comisie_responsabila %}
+              <a class="text-decoration-none" href="{% url 'admin_pna_dashboard_commission' obj.comisie_responsabila.id %}"><i class="bi {{ obj.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ obj.comisie_responsabila.nume }}</a>
+            {% else %}—{% endif %}
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Dosar pe parlament.md</dt>
+          <dd class="col-sm-7">
+            {% if obj.link_dosar_parlament %}<a href="{{ obj.link_dosar_parlament }}" target="_blank" rel="noopener">Deschide dosarul <i class="bi bi-box-arrow-up-right"></i></a>{% else %}—{% endif %}
+          </dd>
+
           <dt class="col-sm-5 text-muted">Instituție principală</dt>
           <dd class="col-sm-7">
             {% if obj.institutie_principala_ref %}

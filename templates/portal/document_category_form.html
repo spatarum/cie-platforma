@@ -1,0 +1,21 @@
+{% extends 'portal/base.html' %}
+{% block title %}{{ titlu_pagina }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h5 mb-0">{{ titlu_pagina }}</h1>
+  <a class="btn btn-light btn-sm" href="{% url 'document_category_list' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+</div>
+<form method="post" class="card shadow-sm gov-card">
+  {% csrf_token %}
+  <div class="card-body">
+    {{ form.non_field_errors }}
+    <div class="mb-3"><label class="form-label">{{ form.nume.label }}</label>{{ form.nume }}</div>
+    <div class="mb-3"><label class="form-label">{{ form.descriere.label }}</label>{{ form.descriere }}</div>
+    <div class="row g-3">
+      <div class="col-md-3"><label class="form-label">{{ form.ordine.label }}</label>{{ form.ordine }}</div>
+      <div class="col-md-3 d-flex align-items-end"><div class="form-check">{{ form.activa }} <label class="form-check-label" for="{{ form.activa.id_for_label }}">{{ form.activa.label }}</label></div></div>
+    </div>
+  </div>
+  <div class="card-footer bg-white text-end"><button class="btn btn-primary">Salvează</button></div>
+</form>
+{% endblock %}

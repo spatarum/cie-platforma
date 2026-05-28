@@ -29,10 +29,19 @@
     <label class="form-label small text-muted">Caută</label>
     <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Caută după denumire sau instituție...">
   </div>
+  <div class="col-12 col-md-4">
+    <label class="form-label small text-muted">Filtrează după comisie</label>
+    <select name="comisii" class="form-select" multiple size="4">
+      {% for c in commissions %}
+        <option value="{{ c.id }}" {% if c.id|stringformat:'s' in selected_commissions %}selected{% endif %}>{{ c.label_scurt }} — {{ c.nume }}</option>
+      {% endfor %}
+    </select>
+    <div class="form-text">Poți selecta una sau mai multe comisii.</div>
+  </div>
   <div class="col-12 col-md-auto">
     <button class="btn btn-outline-secondary"><i class="bi bi-search me-1"></i>Caută</button>
   </div>
-  {% if q %}
+  {% if q or selected_commissions %}
     <div class="col-12 col-md-auto">
       <a class="btn btn-light" href="{% url 'admin_pna_list' %}">Resetează</a>
     </div>
@@ -104,7 +113,7 @@
         {% for g in criterii_groups %}
           <div class="accordion-item">
             <h2 class="accordion-header" id="crHead{{ g.criteriu.id }}">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#crBody{{ g.criteriu.id }}" aria-expanded="false" aria-controls="crBody{{ g.criteriu.id }}">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#crBody{{ g.criteriu.id }}" aria-expanded="true" aria-controls="crBody{{ g.criteriu.id }}">
                 <span class="me-2" style="color: {{ g.criteriu.culoare_ui }};">
                   <i class="bi {{ g.criteriu.pictograma|default:'bi-flag' }}"></i>
                 </span>
@@ -112,7 +121,7 @@
                 <span class="badge text-bg-light ms-2">{{ g.proiecte|length }}</span>
               </button>
             </h2>
-            <div id="crBody{{ g.criteriu.id }}" class="accordion-collapse collapse" aria-labelledby="crHead{{ g.criteriu.id }}" data-bs-parent="#accCriterii">
+            <div id="crBody{{ g.criteriu.id }}" class="accordion-collapse collapse show" aria-labelledby="crHead{{ g.criteriu.id }}" data-bs-parent="#accCriterii">
               <div class="accordion-body p-0">
                 <div class="p-2 border-bottom bg-white d-flex justify-content-end">
                   <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard_criterion' pk=g.criteriu.id %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard foaie de parcurs</a>
@@ -123,6 +132,8 @@
                       <tr>
                         <th>Denumire proiect</th>
                         <th>Instituție principală</th>
+                        <th class="text-nowrap">Comisia responsabilă</th>
+                        <th class="text-center">Dosar</th>
                         <th class="text-nowrap">Guvern</th>
                         <th class="text-nowrap">Parlament</th>
                         <th class="text-nowrap">Status implementare</th>
@@ -143,6 +154,16 @@
                             {% else %}
                               —
                             {% endif %}
+                          </td>
+                          <td class="text-nowrap">
+                            {% if p.comisie_responsabila %}
+                              <a class="text-decoration-none" href="{% url 'admin_pna_dashboard_commission' p.comisie_responsabila.id %}" title="{{ p.comisie_responsabila.nume }}">
+                                <i class="bi {{ p.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ p.comisie_responsabila.label_scurt }}
+                              </a>
+                            {% else %}<span class="text-muted">—</span>{% endif %}
+                          </td>
+                          <td class="text-center">
+                            {% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}
                           </td>
                           <td class="text-nowrap">
                             {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}
@@ -196,7 +217,7 @@
             {% for chg in cl.chapters %}
               <div class="accordion-item">
                 <h2 class="accordion-header" id="chHead{{ chg.capitol.id }}">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#chBody{{ chg.capitol.id }}" aria-expanded="false" aria-controls="chBody{{ chg.capitol.id }}">
+                  <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#chBody{{ chg.capitol.id }}" aria-expanded="true" aria-controls="chBody{{ chg.capitol.id }}">
                     <span class="me-2" style="color: {{ chg.capitol.culoare_ui }};">
                       <i class="bi {{ chg.capitol.pictograma|default:'bi-journal-text' }}"></i>
                     </span>
@@ -204,7 +225,7 @@
                     <span class="badge text-bg-light ms-2">{{ chg.proiecte|length }}</span>
                   </button>
                 </h2>
-                <div id="chBody{{ chg.capitol.id }}" class="accordion-collapse collapse" aria-labelledby="chHead{{ chg.capitol.id }}" data-bs-parent="#accChapters">
+                <div id="chBody{{ chg.capitol.id }}" class="accordion-collapse collapse show" aria-labelledby="chHead{{ chg.capitol.id }}" data-bs-parent="#accChapters">
                   <div class="accordion-body p-0">
                     <div class="p-2 border-bottom bg-white d-flex justify-content-end">
                       <a class="btn btn-outline-secondary btn-sm" href="{% url 'admin_pna_dashboard_chapter' pk=chg.capitol.id %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard capitol</a>
@@ -215,6 +236,8 @@
                           <tr>
                             <th>Denumire proiect</th>
                             <th>Instituție principală</th>
+                            <th class="text-nowrap">Comisia responsabilă</th>
+                            <th class="text-center">Dosar</th>
                             <th class="text-nowrap">Guvern</th>
                             <th class="text-nowrap">Parlament</th>
                             <th class="text-nowrap">Status implementare</th>
@@ -235,6 +258,16 @@
                                 {% else %}
                                   —
                                 {% endif %}
+                              </td>
+                              <td class="text-nowrap">
+                                {% if p.comisie_responsabila %}
+                                  <a class="text-decoration-none" href="{% url 'admin_pna_dashboard_commission' p.comisie_responsabila.id %}" title="{{ p.comisie_responsabila.nume }}">
+                                    <i class="bi {{ p.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ p.comisie_responsabila.label_scurt }}
+                                  </a>
+                                {% else %}<span class="text-muted">—</span>{% endif %}
+                              </td>
+                              <td class="text-center">
+                                {% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}
                               </td>
                               <td class="text-nowrap">
                                 {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}

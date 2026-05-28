@@ -118,6 +118,15 @@
                     <option value="{{ inst.id }}" {% if p.bulk_current_value|stringformat:'s' == inst.id|stringformat:'s' %}selected{% endif %}>{{ inst.nume }}</option>
                   {% endfor %}
                 </select>
+              {% elif meta.type == 'commission' %}
+                <select class="form-select form-select-sm" name="value_{{ p.id }}">
+                  <option value="">—</option>
+                  {% for com in commissions %}
+                    <option value="{{ com.id }}" {% if p.bulk_current_value|stringformat:'s' == com.id|stringformat:'s' %}selected{% endif %}>{{ com.label_scurt }} — {{ com.nume }}</option>
+                  {% endfor %}
+                </select>
+              {% elif meta.type == 'text' %}
+                <input class="form-control form-control-sm" type="url" name="value_{{ p.id }}" value="{{ p.bulk_current_value }}" placeholder="https://www.parlament.md/...">
               {% endif %}
             </td>
           </tr>

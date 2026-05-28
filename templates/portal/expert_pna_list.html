@@ -22,10 +22,18 @@
     <label class="form-label small text-muted">Caută</label>
     <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Caută după denumire, instituție sau act UE...">
   </div>
+  <div class="col-12 col-md-4">
+    <label class="form-label small text-muted">Filtrează după comisie</label>
+    <select name="comisii" class="form-select" multiple size="4">
+      {% for c in commissions %}
+        <option value="{{ c.id }}" {% if c.id|stringformat:'s' in selected_commissions %}selected{% endif %}>{{ c.label_scurt }} — {{ c.nume }}</option>
+      {% endfor %}
+    </select>
+  </div>
   <div class="col-12 col-md-auto">
     <button class="btn btn-outline-secondary"><i class="bi bi-search me-1"></i>Caută</button>
   </div>
-  {% if q %}
+  {% if q or selected_commissions %}
     <div class="col-12 col-md-auto">
       <a class="btn btn-light" href="{% url 'expert_pna_list' %}">Resetează</a>
     </div>
@@ -119,6 +127,8 @@
                         <th class="text-nowrap">Parlament</th>
                         <th>Instituție responsabilă</th>
                         <th class="text-nowrap">Status</th>
+                        <th class="text-nowrap">Comisie</th>
+                        <th class="text-center">Dosar</th>
                         <th>Acte UE transpuse</th>
                         <th class="text-center">F</th>
                         <th class="text-center">C</th>
@@ -141,6 +151,8 @@
                             {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
                           </td>
                           <td class="text-nowrap small">{{ p.get_status_implementare_display|default:"—" }}</td>
+                          <td class="text-nowrap small">{% if p.comisie_responsabila %}<i class="bi {{ p.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ p.comisie_responsabila.label_scurt }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                          <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                           <td class="small">
                             {% if p.acte_ue_legaturi.all %}
                               <ul class="mb-0 ps-3">
@@ -251,6 +263,8 @@
                                 {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
                               </td>
                               <td class="text-nowrap small">{{ p.get_status_implementare_display|default:"—" }}</td>
+                              <td class="text-nowrap small">{% if p.comisie_responsabila %}<i class="bi {{ p.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ p.comisie_responsabila.label_scurt }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                              <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                               <td class="small">
                                 {% if p.acte_ue_legaturi.all %}
                                   <ul class="mb-0 ps-3">
