@@ -123,16 +123,15 @@
                     <thead class="table-light">
                       <tr>
                         <th>Denumire proiect</th>
-                        <th class="text-nowrap">Guvern</th>
                         <th class="text-nowrap">Parlament</th>
                         <th>Instituție responsabilă</th>
                         <th class="text-nowrap">Status</th>
                         <th class="text-nowrap">Comisie</th>
-                        <th class="text-center">Dosar</th>
                         <th>Acte UE transpuse</th>
                         <th class="text-center">F</th>
                         <th class="text-center">C</th>
                         <th class="text-center">T</th>
+                        <th class="text-center">Dosar</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -145,14 +144,12 @@
                               <div class="text-muted small">{{ p.descriere|truncatewords:18 }}</div>
                             {% endif %}
                           </td>
-                          <td class="text-nowrap">{% if p.termen_aprobare_guvern %}{{ p.termen_aprobare_guvern|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                           <td class="text-nowrap">{% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                           <td class="text-muted">
                             {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
                           </td>
                           <td class="text-nowrap small">{{ p.get_status_implementare_display|default:"—" }}</td>
                           <td class="text-nowrap small">{% if p.comisie_responsabila %}<i class="bi {{ p.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ p.comisie_responsabila.label_scurt }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-                          <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                           <td class="small">
                             {% if p.acte_ue_legaturi.all %}
                               <ul class="mb-0 ps-3">
@@ -180,6 +177,7 @@
                           <td class="text-center">
                             {% if c and c.tranzitie and c.tranzitie|length > 0 %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
                           </td>
+                          <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                         </tr>
                         {% endwith %}
                       {% endfor %}
@@ -237,14 +235,15 @@
                         <thead class="table-light">
                           <tr>
                             <th>Denumire proiect</th>
-                            <th class="text-nowrap">Guvern</th>
                             <th class="text-nowrap">Parlament</th>
                             <th>Instituție responsabilă</th>
                             <th class="text-nowrap">Status</th>
+                            <th class="text-nowrap">Comisie</th>
                             <th>Acte UE transpuse</th>
                             <th class="text-center">F</th>
                             <th class="text-center">C</th>
                             <th class="text-center">T</th>
+                            <th class="text-center">Dosar</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -257,14 +256,12 @@
                                   <div class="text-muted small">{{ p.descriere|truncatewords:18 }}</div>
                                 {% endif %}
                               </td>
-                              <td class="text-nowrap">{% if p.termen_aprobare_guvern %}{{ p.termen_aprobare_guvern|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                               <td class="text-nowrap">{% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                               <td class="text-muted">
                                 {% if p.institutie_principala_ref %}{{ p.institutie_principala_ref.nume }}{% elif p.institutie_principala %}{{ p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}
                               </td>
                               <td class="text-nowrap small">{{ p.get_status_implementare_display|default:"—" }}</td>
                               <td class="text-nowrap small">{% if p.comisie_responsabila %}<i class="bi {{ p.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ p.comisie_responsabila.label_scurt }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-                              <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                               <td class="small">
                                 {% if p.acte_ue_legaturi.all %}
                                   <ul class="mb-0 ps-3">
@@ -292,6 +289,7 @@
                               <td class="text-center">
                                 {% if c and c.tranzitie and c.tranzitie|length > 0 %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
                               </td>
+                              <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                             </tr>
                             {% endwith %}
                           {% endfor %}

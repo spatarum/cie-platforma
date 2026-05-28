@@ -149,7 +149,6 @@
         <thead>
           <tr>
             <th>Proiect</th>
-            <th class="text-nowrap">Termen Guvern</th>
             <th class="text-nowrap">Termen Parlament</th>
             <th>Instituție</th>
             <th class="text-center">F</th>
@@ -167,7 +166,6 @@
                   {% if r.p.criterion %}{{ r.p.criterion.cod }}{% elif r.p.chapter %}Cap. {{ r.p.chapter.numar }}{% endif %}
                 </div>
               </td>
-              <td class="text-nowrap">{% if r.p.termen_aprobare_guvern %}{{ r.p.termen_aprobare_guvern|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
               <td class="text-nowrap">{% if r.p.termen_aprobare_parlament %}{{ r.p.termen_aprobare_parlament|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
               <td class="text-muted">
                 {% if r.p.institutie_principala_ref %}{{ r.p.institutie_principala_ref.nume }}{% elif r.p.institutie_principala %}{{ r.p.institutie_principala }}{% else %}<span class="text-muted">—</span>{% endif %}

@@ -133,10 +133,9 @@
                         <th>Denumire proiect</th>
                         <th>Instituție principală</th>
                         <th class="text-nowrap">Comisia responsabilă</th>
-                        <th class="text-center">Dosar</th>
-                        <th class="text-nowrap">Guvern</th>
                         <th class="text-nowrap">Parlament</th>
                         <th class="text-nowrap">Status implementare</th>
+                        <th class="text-center">Dosar</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -162,16 +161,13 @@
                               </a>
                             {% else %}<span class="text-muted">—</span>{% endif %}
                           </td>
-                          <td class="text-center">
-                            {% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}
-                          </td>
-                          <td class="text-nowrap">
-                            {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}
-                          </td>
                           <td class="text-nowrap">
                             {% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}—{% endif %}
                           </td>
                           <td class="text-nowrap">{{ p.get_status_implementare_display|default:"—" }}</td>
+                          <td class="text-center">
+                            {% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}
+                          </td>
                         </tr>
                       {% endfor %}
                     </tbody>
@@ -237,10 +233,9 @@
                             <th>Denumire proiect</th>
                             <th>Instituție principală</th>
                             <th class="text-nowrap">Comisia responsabilă</th>
-                            <th class="text-center">Dosar</th>
-                            <th class="text-nowrap">Guvern</th>
                             <th class="text-nowrap">Parlament</th>
                             <th class="text-nowrap">Status implementare</th>
+                            <th class="text-center">Dosar</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -266,16 +261,13 @@
                                   </a>
                                 {% else %}<span class="text-muted">—</span>{% endif %}
                               </td>
-                              <td class="text-center">
-                                {% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}
-                              </td>
-                              <td class="text-nowrap">
-                                {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}
-                              </td>
                               <td class="text-nowrap">
                                 {% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}—{% endif %}
                               </td>
                               <td class="text-nowrap">{{ p.get_status_implementare_display|default:"—" }}</td>
+                              <td class="text-center">
+                                {% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}
+                              </td>
                             </tr>
                           {% endfor %}
                         </tbody>
