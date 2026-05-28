@@ -16,19 +16,27 @@
   </div>
 </div>
 
+<style>
+  .pna-commission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: .65rem; }
+  .pna-commission-check { position: absolute; opacity: 0; pointer-events: none; }
+  .pna-commission-tile {
+    min-height: 76px; border: 1px solid #d7dee8; border-radius: .9rem; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem;
+    padding: .65rem .5rem; text-align: center; cursor: pointer; box-shadow: 0 2px 7px rgba(15,23,42,.05);
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease;
+  }
+  .pna-commission-tile:hover { border-color: #8db3ff; box-shadow: 0 4px 12px rgba(37,99,235,.12); transform: translateY(-1px); }
+  .pna-commission-check:checked + .pna-commission-tile { border-color: #2563eb; background: #eff6ff; box-shadow: inset 0 0 0 1px #2563eb; }
+  .pna-commission-tile .bi { font-size: 1.18rem; color: #1d4ed8; }
+  .pna-commission-tile .comm-label { font-weight: 700; font-size: .82rem; line-height: 1.05rem; color: #172033; }
+</style>
+
 <form method="get" class="row g-2 align-items-end mb-3">
   {% if stage %}<input type="hidden" name="stage" value="{{ stage }}">{% endif %}
+  {% for cid in selected_commissions %}<input type="hidden" name="comisii" value="{{ cid }}">{% endfor %}
   <div class="col-12 col-md-6">
     <label class="form-label small text-muted">Caută</label>
     <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Caută după denumire, instituție sau act UE...">
-  </div>
-  <div class="col-12 col-md-4">
-    <label class="form-label small text-muted">Filtrează după comisie</label>
-    <select name="comisii" class="form-select" multiple size="4">
-      {% for c in commissions %}
-        <option value="{{ c.id }}" {% if c.id|stringformat:'s' in selected_commissions %}selected{% endif %}>{{ c.label_scurt }} — {{ c.nume }}</option>
-      {% endfor %}
-    </select>
   </div>
   <div class="col-12 col-md-auto">
     <button class="btn btn-outline-secondary"><i class="bi bi-search me-1"></i>Caută</button>
@@ -47,7 +55,7 @@
 
 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-3">
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}{% if q %}?q={{ q|urlencode }}{% endif %}">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}{% if q or selected_commissions %}?{% if q %}q={{ q|urlencode }}{% endif %}{% for cid in selected_commissions %}{% if q or not forloop.first %}&{% endif %}comisii={{ cid }}{% endfor %}{% endif %}">
       <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #0b3d91;">
         <div class="card-body">
           <div class="stat-label">Total proiecte</div>
@@ -57,7 +65,7 @@
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=neinitiate{% if q %}&q={{ q|urlencode }}{% endif %}">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=neinitiate{% if q %}&q={{ q|urlencode }}{% endif %}{% for cid in selected_commissions %}&comisii={{ cid }}{% endfor %}">
       <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #475569;">
         <div class="card-body">
           <div class="stat-label">Neinițiate</div>
@@ -67,7 +75,7 @@
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=guvern{% if q %}&q={{ q|urlencode }}{% endif %}">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=guvern{% if q %}&q={{ q|urlencode }}{% endif %}{% for cid in selected_commissions %}&comisii={{ cid }}{% endfor %}">
       <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #a16207;">
         <div class="card-body">
           <div class="stat-label">În procedură la Guvern</div>
@@ -77,7 +85,7 @@
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=parlament{% if q %}&q={{ q|urlencode }}{% endif %}">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=parlament{% if q %}&q={{ q|urlencode }}{% endif %}{% for cid in selected_commissions %}&comisii={{ cid }}{% endfor %}">
       <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #2563eb;">
         <div class="card-body">
           <div class="stat-label">În procedură la Parlament</div>
@@ -87,7 +95,7 @@
     </a>
   </div>
   <div class="col">
-    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=adoptat_final{% if q %}&q={{ q|urlencode }}{% endif %}">
+    <a class="text-decoration-none" href="{% url 'expert_pna_list' %}?stage=adoptat_final{% if q %}&q={{ q|urlencode }}{% endif %}{% for cid in selected_commissions %}&comisii={{ cid }}{% endfor %}">
       <div class="card shadow-sm gov-card stat-card h-100" style="--stat-accent: #16a34a;">
         <div class="card-body">
           <div class="stat-label">Adoptat în lectura finală</div>
@@ -97,7 +105,27 @@
     </a>
   </div>
 </div>
-{% if stage %}<div class="alert alert-info py-2 small">Filtru activ: <strong>{% if stage == 'neinitiate' %}Neinițiate{% elif stage == 'guvern' %}În procedură la Guvern{% elif stage == 'parlament' %}În procedură la Parlament{% elif stage == 'adoptat_final' %}Adoptat în lectura finală{% endif %}</strong>. <a href="{% url 'expert_pna_list' %}{% if q %}?q={{ q|urlencode }}{% endif %}">Resetează filtrul</a>.</div>{% endif %}
+
+<form method="get" id="commissionFilterForm" class="mb-3">
+  {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+  {% if stage %}<input type="hidden" name="stage" value="{{ stage }}">{% endif %}
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <div class="small text-muted">Filtrează după comisie</div>
+    {% if selected_commissions %}<a class="small" href="{% url 'expert_pna_list' %}{% if q or stage %}?{% if q %}q={{ q|urlencode }}{% endif %}{% if q and stage %}&{% endif %}{% if stage %}stage={{ stage }}{% endif %}{% endif %}">Resetează comisiile</a>{% endif %}
+  </div>
+  <div class="pna-commission-grid">
+    {% for c in commissions %}
+      <div class="position-relative">
+        <input class="pna-commission-check" type="checkbox" name="comisii" id="comm-{{ c.id }}" value="{{ c.id }}" {% if c.id|stringformat:'s' in selected_commissions %}checked{% endif %} onchange="this.form.submit()">
+        <label class="pna-commission-tile" for="comm-{{ c.id }}" title="{{ c.nume }}">
+          <i class="bi {{ c.pictograma|default:'bi-building' }}"></i>
+          <span class="comm-label">{{ c.label_scurt }}</span>
+        </label>
+      </div>
+    {% endfor %}
+  </div>
+</form>
+{% if stage %}<div class="alert alert-info py-2 small">Filtru activ: <strong>{% if stage == 'neinitiate' %}Neinițiate{% elif stage == 'guvern' %}În procedură la Guvern{% elif stage == 'parlament' %}În procedură la Parlament{% elif stage == 'adoptat_final' %}Adoptat în lectura finală{% endif %}</strong>. <a href="{% url 'expert_pna_list' %}{% if q or selected_commissions %}?{% if q %}q={{ q|urlencode }}{% endif %}{% for cid in selected_commissions %}{% if q or not forloop.first %}&{% endif %}comisii={{ cid }}{% endfor %}{% endif %}">Resetează filtrul</a>.</div>{% endif %}
 
 <div class="card shadow-sm gov-card mb-3">
   <div class="card-header bg-white d-flex align-items-center justify-content-between">
@@ -123,7 +151,7 @@
                     <thead class="table-light">
                       <tr>
                         <th>Denumire proiect</th>
-                        <th class="text-nowrap">Parlament</th>
+                        <th class="text-nowrap">Termen aprobare</th>
                         <th>Instituție responsabilă</th>
                         <th class="text-nowrap">Status</th>
                         <th class="text-nowrap">Comisie</th>
@@ -235,7 +263,7 @@
                         <thead class="table-light">
                           <tr>
                             <th>Denumire proiect</th>
-                            <th class="text-nowrap">Parlament</th>
+                            <th class="text-nowrap">Termen aprobare</th>
                             <th>Instituție responsabilă</th>
                             <th class="text-nowrap">Status</th>
                             <th class="text-nowrap">Comisie</th>
