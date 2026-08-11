@@ -185,3 +185,19 @@ Dacă aplicația rămâne găzduită pe Render și doar mapăm domeniul:
 ## Note
 - Pentru editări în Capitole/Clustere/Foi de parcurs: `/administrare/referinte/` sau `/django-admin/`
 - În producție recomandat: HTTPS + `DJANGO_SECURE_SSL_REDIRECT=true`
+# Stocarea documentelor în Cloudflare R2
+
+În producție, documentele încărcate sunt păstrate în bucketul privat Cloudflare
+R2. Configurați următoarele variabile de mediu în Render:
+
+```text
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=cie-documente
+```
+
+Nu salvați cheile în cod sau în GitHub. Dacă variabilele R2 nu sunt definite,
+aplicația folosește stocarea locală din `media/`, potrivită numai pentru
+dezvoltare. Documentele vechi pierdute de pe discul temporar Render trebuie
+reîncărcate după configurarea R2.

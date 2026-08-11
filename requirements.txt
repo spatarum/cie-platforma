@@ -3,6 +3,9 @@ python-dotenv>=1.0
 whitenoise>=6.6
 gunicorn>=21.2
 
+# Stocare persistentă a documentelor în Cloudflare R2 (API compatibil S3)
+django-storages[s3]>=1.14.4
+
 # DB (Render Postgres)
 dj-database-url>=2.1
 psycopg2-binary>=2.9
