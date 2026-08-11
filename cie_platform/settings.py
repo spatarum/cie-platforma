@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -121,10 +122,47 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Fără această setare, collectstatic nu le va lua.
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Fișierele încărcate sunt păstrate în Cloudflare R2 în producție.
+# Dacă variabilele R2 nu sunt definite (de exemplu, la dezvoltare locală),
+# Django folosește în continuare folderul local MEDIA_ROOT.
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "").strip()
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "").strip()
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "").strip()
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "").strip()
+
+_r2_config = (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME)
+if any(_r2_config) and not all(_r2_config):
+    raise ImproperlyConfigured(
+        "Configurarea Cloudflare R2 este incompletă. Sunt necesare "
+        "R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY și R2_BUCKET_NAME."
+    )
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+if all(_r2_config):
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": R2_ACCESS_KEY_ID,
+            "secret_key": R2_SECRET_ACCESS_KEY,
+            "bucket_name": R2_BUCKET_NAME,
+            "endpoint_url": f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+            "region_name": "auto",
+            "default_acl": None,
+            "querystring_auth": True,
+            "file_overwrite": False,
+        },
+    }
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

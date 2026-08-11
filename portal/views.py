@@ -5782,7 +5782,13 @@ def platform_document_download(request, pk: int):
         raise Http404("Document indisponibil")
     if not doc.fisier:
         raise Http404("Fișier indisponibil")
-    return FileResponse(doc.fisier.open("rb"), as_attachment=True, filename=doc.nume_fisier)
+    try:
+        fisier = doc.fisier.open("rb")
+    except (FileNotFoundError, OSError):
+        # Înregistrarea poate exista în baza de date chiar dacă un fișier vechi,
+        # salvat pe discul temporar Render, s-a pierdut deja.
+        raise Http404("Fișierul nu mai este disponibil și trebuie reîncărcat")
+    return FileResponse(fisier, as_attachment=True, filename=doc.nume_fisier)
 
 
 @user_passes_test(can_edit_documents)
