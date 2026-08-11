@@ -463,9 +463,10 @@ class ChestionarForm(forms.ModelForm):
 
     class Meta:
         model = Questionnaire
-        fields = ["titlu", "descriere", "termen_limita", "este_general", "capitole", "criterii"]
+        fields = ["titlu", "descriere", "linkuri_externe", "termen_limita", "este_general", "capitole", "criterii"]
         widgets = {
             "descriere": forms.Textarea(attrs={"rows": 3}),
+            "linkuri_externe": forms.Textarea(attrs={"rows": 3, "placeholder": "https://www.parlament.md/...\nhttps://gov.md/..."}),
             "termen_limita": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "este_general": forms.CheckboxInput(),
             "capitole": forms.CheckboxSelectMultiple(),
@@ -474,6 +475,7 @@ class ChestionarForm(forms.ModelForm):
         labels = {
             "titlu": "Titlu",
             "descriere": "Descriere (opțional)",
+            "linkuri_externe": "Linkuri către pachetele legislative (opțional)",
             "termen_limita": "Termen limită",
             "este_general": "General (pentru toți experții)",
             "capitole": "Capitole alocate",
@@ -507,6 +509,18 @@ class ChestionarForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        links = (cleaned.get("linkuri_externe") or "").splitlines()
+        validator = forms.URLField()
+        normalized_links = []
+        for line in links:
+            link = line.strip()
+            if not link:
+                continue
+            try:
+                normalized_links.append(validator.clean(link))
+            except forms.ValidationError:
+                self.add_error("linkuri_externe", f"Link invalid: {link}")
+        cleaned["linkuri_externe"] = "\n".join(normalized_links)
         # validare termen (dacă e introdus ca datetime-local fără tz)
         termen = cleaned.get("termen_limita")
         if termen and timezone.is_naive(termen):
@@ -707,6 +721,11 @@ class PnaProjectForm(forms.ModelForm):
         input_formats=["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"],
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"class": "form-control", "type": "date"}),
     )
+    data_coraport_cie = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"class": "form-control", "type": "date"}),
+    )
 
 
     class Meta:
@@ -726,6 +745,7 @@ class PnaProjectForm(forms.ModelForm):
             "termen_aprobare_guvern",
             "termen_aprobare_parlament",
             "termen_actualizat_aprobare_guvern",
+            "data_coraport_cie",
             "intrare_planificata_vigoare",
             "consultari_publice_parlament",
             "consultari_publice_ora",
@@ -806,6 +826,7 @@ class PnaProjectForm(forms.ModelForm):
             "termen_aprobare_guvern": "Termen aprobare în Guvern",
             "termen_aprobare_parlament": "Termen aprobare în Parlament",
             "termen_actualizat_aprobare_guvern": "Termen actualizat aprobare în Guvern",
+            "data_coraport_cie": "Data programată pentru coraport în Comisia pentru integrare europeană",
             "intrare_planificata_vigoare": "Intrare planificată în vigoare",
             "consultari_publice_parlament": "Data consultărilor publice în Parlament",
             "consultari_publice_ora": "Ora consultărilor",
@@ -951,22 +972,18 @@ class PnaExpertContributionForm(forms.ModelForm):
 
     class Meta:
         model = PnaExpertContribution
-        fields = ["flexibilitate", "compensare", "tranzitie"]
+        fields = ["comentariu"]
         widgets = {
-            "flexibilitate": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
-            "compensare": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
-            "tranzitie": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+            "comentariu": forms.Textarea(attrs={"class": "form-control", "rows": 10, "placeholder": "Scrie comentariul tău la proiect..."}),
         }
         labels = {
-            "flexibilitate": "Flexibilitate: opțiuni recomandate care se înscriu în limitele permise de actele UE",
-            "compensare": "Compensare: impact asupra unor categorii concrete + măsuri compensatorii recomandate",
-            "tranzitie": "Tranziție: argumente pentru solicitarea perioadelor tranzitorii",
+            "comentariu": "Comentarii experți",
         }
 
     def clean(self):
         cleaned = super().clean()
         # Normalizăm whitespace pentru a nu număra drept "contribuție" texte goale/spații.
-        for k in ["flexibilitate", "compensare", "tranzitie"]:
+        for k in ["comentariu"]:
             v = cleaned.get(k)
             if v is None:
                 continue

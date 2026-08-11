@@ -143,6 +143,11 @@ class ExpertProfile(models.Model):
 class Questionnaire(models.Model):
     titlu = models.CharField(max_length=255)
     descriere = models.TextField(blank=True)
+    linkuri_externe = models.TextField(
+        blank=True,
+        default="",
+        help_text="Câte un link către pachetul legislativ pe fiecare rând.",
+    )
     termen_limita = models.DateTimeField(help_text="După termen, răspunsurile nu mai pot fi editate.")
 
     # Categorie specială: chestionare pentru toți experții (General)
@@ -761,6 +766,11 @@ class PnaProject(models.Model):
     termen_aprobare_guvern = models.DateField(null=True, blank=True)
     termen_aprobare_parlament = models.DateField(null=True, blank=True)
     termen_actualizat_aprobare_guvern = models.DateField(null=True, blank=True)
+    data_coraport_cie = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Data programată pentru coraport în Comisia pentru integrare europeană.",
+    )
 
 
     # Alte termene / etape (Parlament)
@@ -917,15 +927,7 @@ class PnaProjectEUAct(models.Model):
 
 
 class PnaExpertContribution(models.Model):
-    """Comentarii ale experților la proiecte PNA (etapa 2).
-
-    Un expert poate contribui la un proiect PNA pe 3 dimensiuni:
-      - Flexibilitate (opțiuni recomandate în limitele actelor UE)
-      - Compensare (impact + măsuri compensatorii)
-      - Tranziție (argumente pentru perioade tranzitorii)
-
-    Comentariile sunt atașate per proiect și per expert.
-    """
+    """Comentariul unic al unui expert la un proiect PNA."""
 
     project = models.ForeignKey(
         PnaProject,
@@ -938,6 +940,8 @@ class PnaExpertContribution(models.Model):
         related_name="pna_contributii",
     )
 
+    comentariu = models.TextField(blank=True)
+    # Câmpuri legacy păstrate temporar pentru o migrare sigură; nu mai sunt expuse în interfață.
     flexibilitate = models.TextField(blank=True)
     compensare = models.TextField(blank=True)
     tranzitie = models.TextField(blank=True)
@@ -962,11 +966,24 @@ class PnaExpertContribution(models.Model):
 
     @property
     def are_orice(self) -> bool:
-        return bool(
-            (self.flexibilitate or "").strip()
-            or (self.compensare or "").strip()
-            or (self.tranzitie or "").strip()
-        )
+        return bool((self.comentariu or "").strip())
+
+
+class PnaOpinionPresentationRequest(models.Model):
+    """Solicitarea expertului de a-și prezenta opinia în ședința CIE."""
+
+    project = models.ForeignKey(PnaProject, on_delete=models.CASCADE, related_name="solicitari_prezentare")
+    expert = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="solicitari_prezentare_pna")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["project", "expert"], name="uniq_pna_opinion_presentation_request")
+        ]
+
+    def __str__(self):
+        return f"Solicitare PNA#{self.project_id} – {self.expert}"
 
 
 class PnaProjectStatusHistory(models.Model):

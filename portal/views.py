@@ -67,6 +67,7 @@ from .models import (
     EUAct,
     PnaProjectEUAct,
     PnaExpertContribution,
+    PnaOpinionPresentationRequest,
     PnaProjectStatusHistory,
     PnaProjectDeadlineHistory,
     ChatMessage,
@@ -527,14 +528,14 @@ def expert_dashboard(request):
 
     contrib_rows = (
         PnaExpertContribution.objects.filter(expert=request.user, project_id__in=accessible_pna_ids)
-        .exclude(flexibilitate="", compensare="", tranzitie="")
+        .exclude(comentariu="")
         .values_list("project_id", flat=True)
     ) if accessible_pna_ids else []
     contributed_project_ids = set(contrib_rows)
 
     pna_parliament_pending = [
         p for p in accessible_pna
-        if p.status_implementare in PNA_STAGE_GROUP_PARLAMENT and p.id not in contributed_project_ids
+        if p.status_implementare in PNA_STAGE_GROUP_PARLAMENT
     ]
     pna_parliament_pending.sort(key=lambda p: (p.termen_deadline or datetime.max.date(), p.titlu or ""))
 
@@ -858,7 +859,7 @@ def expert_pna_list(request):
     if pending:
         contrib_project_ids = set(
             PnaExpertContribution.objects.filter(expert=request.user, project__in=proiecte_qs)
-            .exclude(flexibilitate="", compensare="", tranzitie="")
+            .exclude(comentariu="")
             .values_list("project_id", flat=True)
         )
         proiecte_qs = proiecte_qs.exclude(id__in=contrib_project_ids)
@@ -926,7 +927,7 @@ def expert_pna_list(request):
 
 @user_passes_test(is_expert)
 def expert_pna_detail(request, pk: int):
-    """Detaliu proiect PNA (expert) + formular contribuții (3 boxe)."""
+    """Detaliu proiect PNA: comentariu unic și solicitare de prezentare în CIE."""
 
     proiect = get_object_or_404(
         PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
@@ -947,12 +948,30 @@ def expert_pna_detail(request, pk: int):
 
     contrib, _ = PnaExpertContribution.objects.get_or_create(project=proiect, expert=request.user)
 
+    presentation_request = PnaOpinionPresentationRequest.objects.filter(project=proiect, expert=request.user).first()
+    can_request_presentation = bool(
+        proiect.status_implementare in PNA_STAGE_GROUP_PARLAMENT
+        and proiect.data_coraport_cie
+        and proiect.data_coraport_cie > timezone.localdate()
+        and not presentation_request
+    )
+
     if request.method == "POST":
         form = PnaExpertContributionForm(request.POST, instance=contrib)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Comentariile au fost salvate.")
-            return redirect("expert_pna_detail", pk=proiect.pk)
+            saved = form.save()
+            if request.POST.get("action") == "request_presentation":
+                if not (saved.comentariu or "").strip():
+                    form.add_error("comentariu", "Adaugă un comentariu înainte de a solicita prezentarea opiniei.")
+                elif not can_request_presentation:
+                    messages.error(request, "Solicitarea nu mai poate fi transmisă pentru această ședință.")
+                else:
+                    PnaOpinionPresentationRequest.objects.create(project=proiect, expert=request.user)
+                    messages.success(request, "Solicitarea de prezentare a opiniei a fost transmisă staffului.")
+                    return redirect("expert_pna_detail", pk=proiect.pk)
+            else:
+                messages.success(request, "Comentariul a fost salvat.")
+                return redirect("expert_pna_detail", pk=proiect.pk)
     else:
         form = PnaExpertContributionForm(instance=contrib)
 
@@ -966,8 +985,29 @@ def expert_pna_detail(request, pk: int):
             "acts": acts,
             "form": form,
             "contrib": contrib,
+            "presentation_request": presentation_request,
+            "can_request_presentation": can_request_presentation,
         },
     )
+
+
+@user_passes_test(is_internal)
+def staff_pna_presentation_requests(request):
+    solicitari = (
+        PnaOpinionPresentationRequest.objects.select_related(
+            "project", "project__chapter", "project__criterion", "expert", "project__comisie_responsabila"
+        )
+        .order_by("project__data_coraport_cie", "-created_at")
+    )
+    comments = {
+        c.expert_id: c
+        for c in PnaExpertContribution.objects.filter(
+            project_id__in=solicitari.values_list("project_id", flat=True),
+            expert_id__in=solicitari.values_list("expert_id", flat=True),
+        )
+    }
+    rows = [{"request": s, "comment": PnaExpertContribution.objects.filter(project=s.project, expert=s.expert).first()} for s in solicitari]
+    return render(request, "portal/staff_pna_presentation_requests.html", {"rows": rows})
 
 
 # -------------------- STAFF (read-only) --------------------
@@ -2555,17 +2595,13 @@ def admin_expert_dashboard(request, pk: int):
     p_rows = []
     for p in proiecte:
         c = contrib_by_project.get(p.id)
-        flex = ((c.flexibilitate if c else "") or "").strip()
-        comp = ((c.compensare if c else "") or "").strip()
-        tran = ((c.tranzitie if c else "") or "").strip()
+        comment = ((c.comentariu if c else "") or "").strip()
         p_rows.append(
             {
                 "p": p,
                 "contrib": c,
-                "has_any": bool(flex or comp or tran),
-                "has_flex": bool(flex),
-                "has_comp": bool(comp),
-                "has_tran": bool(tran),
+                "has_any": bool(comment),
+                "has_comment": bool(comment),
                 "detail_url": reverse(
                     "admin_pna_contributii_expert",
                     kwargs={"pk": p.pk, "expert_id": expert.pk},
@@ -2882,9 +2918,9 @@ def _render_pna_dashboard(
     contrib_flags_by_project = {pid: {"f": False, "c": False, "t": False, "any": False, "contributors": 0} for pid in project_ids}
 
     if project_ids:
-        q_f = ~Q(flexibilitate="")
-        q_c = ~Q(compensare="")
-        q_t = ~Q(tranzitie="")
+        q_f = ~Q(comentariu="")
+        q_c = q_f
+        q_t = q_f
         q_any = q_f | q_c | q_t
 
         contrib_agg = (
@@ -3038,9 +3074,7 @@ def _render_pna_dashboard(
                 "expert": c.expert,
                 "profil": getattr(c.expert, "profil_expert", None),
                 "contrib": c,
-                "has_flex": bool((c.flexibilitate or "").strip()),
-                "has_comp": bool((c.compensare or "").strip()),
-                "has_tran": bool((c.tranzitie or "").strip()),
+                "has_comment": bool((c.comentariu or "").strip()),
             }
         )
         if len(latest_contribution_rows) >= 20:
@@ -3060,7 +3094,7 @@ def _render_pna_dashboard(
         },
         {
             "key": "f",
-            "label": "Flexibilitate completată",
+            "label": "Comentariu completat",
             "nr": nr_contrib_f,
             "pct": _pct(nr_contrib_f),
             "href": _filtered_list_url({"missing_flex": 1}),
@@ -3068,7 +3102,7 @@ def _render_pna_dashboard(
         },
         {
             "key": "c",
-            "label": "Compensare completată",
+            "label": "Comentariu completat",
             "nr": nr_contrib_c,
             "pct": _pct(nr_contrib_c),
             "href": _filtered_list_url({"missing_comp": 1}),
@@ -3076,7 +3110,7 @@ def _render_pna_dashboard(
         },
         {
             "key": "t",
-            "label": "Tranziție completată",
+            "label": "Comentariu completat",
             "nr": nr_contrib_t,
             "pct": _pct(nr_contrib_t),
             "href": _filtered_list_url({"missing_tran": 1}),
@@ -4331,9 +4365,7 @@ def admin_pna_detail(request, pk: int):
             "expert": c.expert,
             "profil": profil,
             "contrib": c,
-            "has_flex": bool((c.flexibilitate or "").strip()),
-            "has_comp": bool((c.compensare or "").strip()),
-            "has_tran": bool((c.tranzitie or "").strip()),
+            "has_comment": bool((c.comentariu or "").strip()),
         })
 
     return render(
@@ -4413,9 +4445,7 @@ def admin_pna_all_contributions(request):
             "expert": c.expert,
             "profil": getattr(c.expert, "profil_expert", None),
             "contrib": c,
-            "has_flex": bool((c.flexibilitate or "").strip()),
-            "has_comp": bool((c.compensare or "").strip()),
-            "has_tran": bool((c.tranzitie or "").strip()),
+            "has_comment": bool((c.comentariu or "").strip()),
         })
 
     return render(request, "portal/admin_pna_all_contributions.html", {
@@ -4428,7 +4458,7 @@ def admin_pna_all_contributions(request):
 
 @user_passes_test(is_internal)
 def admin_pna_contributii(request, pk: int):
-    """Contribuțiile experților (Flexibilitate/Compensare/Tranziție) pentru un proiect PNA."""
+    """Comentariile experților pentru un proiect PNA."""
 
     proiect = get_object_or_404(
         PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
@@ -4471,17 +4501,15 @@ def admin_pna_contributii(request, pk: int):
 
     for u in experts:
         c = contrib_by_expert.get(u.id)
-        flex = (c.flexibilitate if c else "") or ""
-        comp = (c.compensare if c else "") or ""
-        tran = (c.tranzitie if c else "") or ""
-        has_any = bool(flex.strip() or comp.strip() or tran.strip())
+        comment = (c.comentariu if c else "") or ""
+        has_any = bool(comment.strip())
         if has_any:
             nr_any += 1
-        if flex.strip():
+        if comment.strip():
             nr_flex += 1
-        if comp.strip():
+        if comment.strip():
             nr_comp += 1
-        if tran.strip():
+        if comment.strip():
             nr_tran += 1
 
         rows.append(
@@ -4490,9 +4518,7 @@ def admin_pna_contributii(request, pk: int):
                 "profil": getattr(u, "profil_expert", None),
                 "contrib": c,
                 "has_any": has_any,
-                "has_flex": bool(flex.strip()),
-                "has_comp": bool(comp.strip()),
-                "has_tran": bool(tran.strip()),
+                "has_comment": bool(comment.strip()),
             }
         )
 
@@ -4923,9 +4949,9 @@ def admin_pna_filtered_list(request):
 
     # -------------------- contribuții experți --------------------
     # Numărăm doar contribuțiile care au text în cel puțin una din cele 3 boxe.
-    q_f = ~Q(contributii_experti__flexibilitate="")
-    q_c = ~Q(contributii_experti__compensare="")
-    q_t = ~Q(contributii_experti__tranzitie="")
+    q_f = ~Q(contributii_experti__comentariu="")
+    q_c = q_f
+    q_t = q_f
     q_any = q_f | q_c | q_t
 
     if has_contrib == "1" or missing_contrib == "1":
