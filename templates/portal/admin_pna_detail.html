@@ -261,17 +261,17 @@
                 </div>
 
                 <div class="row g-3">
-                  <div class="col-lg-4">
-                    <div class="small text-muted mb-1">Flexibilitate</div>
-                    <div>{% if r.has_flex %}{{ r.contrib.flexibilitate|linebreaksbr }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                  <div class="col-12">
+                    <div class="small text-muted mb-1">Comentarii experți</div>
+                    <div>{% if r.has_comment %}{{ r.contrib.comentariu|linebreaksbr }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
                   </div>
-                  <div class="col-lg-4">
+                  <div class="d-none">
                     <div class="small text-muted mb-1">Compensare</div>
-                    <div>{% if r.has_comp %}{{ r.contrib.compensare|linebreaksbr }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                    <div class="text-muted">—</div>
                   </div>
-                  <div class="col-lg-4">
+                  <div class="d-none">
                     <div class="small text-muted mb-1">Tranziție</div>
-                    <div>{% if r.has_tran %}{{ r.contrib.tranzitie|linebreaksbr }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                    <div class="text-muted">—</div>
                   </div>
                 </div>
               </div>

@@ -93,33 +93,34 @@
   </div>
 </div>
 
-{% if pna_parliament_pending %}
 <div class="card shadow-sm gov-card mb-3">
   <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
     <strong><i class="bi bi-file-earmark-text me-1"></i>Proiecte PNA în procedură la Parlament care așteaptă contribuția ta</strong>
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'expert_pna_list' %}?stage=parlament&amp;pending=1">Vezi toate</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'expert_pna_list' %}?stage=parlament">Vezi toate</a>
   </div>
   <div class="card-body">
+    {% if pna_parliament_pending %}
     <div class="list-group list-group-flush">
       {% for p in pna_parliament_pending %}
-        <a class="list-group-item list-group-item-action" href="{% url 'expert_pna_detail' p.pk %}">
+        <div class="list-group-item">
           <div class="d-flex justify-content-between align-items-start gap-3">
             <div>
               <div class="fw-semibold">{{ p.titlu }}</div>
               <div class="text-muted small">{{ p.atasare_label }}</div>
-              <div class="small mt-1">Status: <strong>{{ p.get_status_implementare_display }}</strong></div>
+              <div class="small mt-1">Etapa: <strong>{{ p.get_status_implementare_display }}</strong></div>
+              <div class="small mt-1">Comisia sesizată în fond: {% if p.comisie_responsabila %}<i class="bi {{ p.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i><strong>{{ p.comisie_responsabila.nume }}</strong>{% else %}—{% endif %}</div>
             </div>
             <div class="text-end small text-muted">
-              <div>Guvern: {% if p.termen_guvern_efectiv %}{{ p.termen_guvern_efectiv|luna_an }}{% else %}—{% endif %}</div>
-              <div>Parlament: {% if p.termen_aprobare_parlament %}{{ p.termen_aprobare_parlament|luna_an }}{% else %}—{% endif %}</div>
+              <div>Coraport CIE: {% if p.data_coraport_cie %}<strong>{{ p.data_coraport_cie|date:"d.m.Y" }}</strong>{% else %}—{% endif %}</div>
+              <a class="btn btn-sm btn-primary mt-2" href="{% url 'expert_pna_detail' p.pk %}#comentariu-expert">Comentează / solicită prezentarea</a>
             </div>
           </div>
-        </a>
+        </div>
       {% endfor %}
     </div>
+    {% else %}<div class="text-muted">Nu există proiecte în procedură la Parlament în capitolele sau foile de parcurs alocate.</div>{% endif %}
   </div>
 </div>
-{% endif %}
 
 {% if upcoming_consultations %}
 <div class="card shadow-sm gov-card mb-3">

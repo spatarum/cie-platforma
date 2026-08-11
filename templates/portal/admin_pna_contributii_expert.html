@@ -32,32 +32,32 @@
   </div>
 </div>
 
-{% if not contrib or (not contrib.flexibilitate and not contrib.compensare and not contrib.tranzitie) %}
+{% if not contrib or not contrib.comentariu %}
   <div class="alert alert-light border">Nu există încă o contribuție pentru acest proiect.</div>
 {% endif %}
 
 <div class="row g-3">
-  <div class="col-lg-4">
+  <div class="col-12">
     <div class="card shadow-sm gov-card h-100">
-      <div class="card-header bg-white"><strong>Flexibilitate</strong></div>
+      <div class="card-header bg-white"><strong>Comentarii experți</strong></div>
       <div class="card-body">
-        <div class="small">{{ contrib.flexibilitate|default:"—"|linebreaksbr }}</div>
+        <div class="small">{{ contrib.comentariu|default:"—"|linebreaksbr }}</div>
       </div>
     </div>
   </div>
-  <div class="col-lg-4">
+  <div class="d-none">
     <div class="card shadow-sm gov-card h-100">
       <div class="card-header bg-white"><strong>Compensare</strong></div>
       <div class="card-body">
-        <div class="small">{{ contrib.compensare|default:"—"|linebreaksbr }}</div>
+        <div class="small text-muted">—</div>
       </div>
     </div>
   </div>
-  <div class="col-lg-4">
+  <div class="d-none">
     <div class="card shadow-sm gov-card h-100">
       <div class="card-header bg-white"><strong>Tranziție</strong></div>
       <div class="card-body">
-        <div class="small">{{ contrib.tranzitie|default:"—"|linebreaksbr }}</div>
+        <div class="small text-muted">—</div>
       </div>
     </div>
   </div>

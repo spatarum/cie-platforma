@@ -50,6 +50,9 @@
           <dt class="col-sm-5 text-muted">Comisia responsabilă</dt>
           <dd class="col-sm-7">{% if obj.comisie_responsabila %}<i class="bi {{ obj.comisie_responsabila.pictograma|default:'bi-building' }} me-1"></i>{{ obj.comisie_responsabila.nume }}{% else %}—{% endif %}</dd>
 
+          <dt class="col-sm-5 text-muted">Coraport în Comisia pentru integrare europeană</dt>
+          <dd class="col-sm-7">{% if obj.data_coraport_cie %}{{ obj.data_coraport_cie|date:"d.m.Y" }}{% else %}—{% endif %}</dd>
+
           <dt class="col-sm-5 text-muted">Dosar pe parlament.md</dt>
           <dd class="col-sm-7">{% if obj.link_dosar_parlament %}<a href="{{ obj.link_dosar_parlament }}" target="_blank" rel="noopener">Deschide dosarul <i class="bi bi-box-arrow-up-right"></i></a>{% else %}—{% endif %}</dd>
 
@@ -91,34 +94,28 @@
 
   <div class="col-lg-6">
     <div class="card shadow-sm gov-card">
-      <div class="card-header bg-white"><strong><i class="bi bi-chat-square-text me-1"></i>Comentariile tale</strong></div>
+      <div class="card-header bg-white"><strong><i class="bi bi-chat-square-text me-1"></i>Comentariul tău</strong></div>
       <div class="card-body">
         <form method="post" novalidate>
           {% csrf_token %}
 
-          <div class="mb-3">
-            <label class="form-label fw-semibold" for="{{ form.flexibilitate.id_for_label }}">{{ form.flexibilitate.label }}</label>
-            {{ form.flexibilitate }}
-            {{ form.flexibilitate.errors }}
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label fw-semibold" for="{{ form.compensare.id_for_label }}">{{ form.compensare.label }}</label>
-            {{ form.compensare }}
-            {{ form.compensare.errors }}
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label fw-semibold" for="{{ form.tranzitie.id_for_label }}">{{ form.tranzitie.label }}</label>
-            {{ form.tranzitie }}
-            {{ form.tranzitie.errors }}
+          <div class="mb-3" id="comentariu-expert">
+            <label class="form-label fw-semibold" for="{{ form.comentariu.id_for_label }}">{{ form.comentariu.label }}</label>
+            {{ form.comentariu }}{{ form.comentariu.errors }}
           </div>
 
           <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salvează</button>
+            <button type="submit" name="action" value="save" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salvează</button>
+            {% if presentation_request %}
+              <span class="btn btn-success disabled"><i class="bi bi-check-circle me-1"></i>Solicitare transmisă</span>
+            {% elif can_request_presentation %}
+              <button type="submit" name="action" value="request_presentation" class="btn btn-outline-primary"><i class="bi bi-person-raised-hand me-1"></i>Solicită prezentarea opiniei în ședința Comisiei</button>
+            {% else %}
+              <button type="button" class="btn btn-outline-secondary" disabled title="Disponibil numai înainte de data programată a ședinței">Solicită prezentarea opiniei în ședința Comisiei</button>
+            {% endif %}
             <a href="{% url 'expert_pna_list' %}" class="btn btn-outline-secondary">Înapoi</a>
           </div>
-          <div class="form-text mt-2">Comentariile sunt salvate și rămân disponibile și după închiderea chestionarelor / proiectelor.</div>
+          <div class="form-text mt-2">Solicitarea de prezentare poate fi transmisă doar împreună cu un comentariu și înainte de ședință.</div>
         </form>
       </div>
     </div>

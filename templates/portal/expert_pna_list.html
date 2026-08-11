@@ -49,8 +49,8 @@
 </form>
 
 <div class="alert alert-light border small">
-  <div class="fw-semibold mb-1"><i class="bi bi-chat-square-text me-1"></i>Contribuție expert (3 dimensiuni)</div>
-  <div class="text-muted">Pentru fiecare proiect poți salva comentarii la: <strong>Flexibilitate</strong>, <strong>Compensare</strong> și <strong>Tranziție</strong>.</div>
+  <div class="fw-semibold mb-1"><i class="bi bi-chat-square-text me-1"></i>Comentariul tău</div>
+  <div class="text-muted">Pentru fiecare proiect poți salva un singur comentariu integrat.</div>
 </div>
 
 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-3">
@@ -197,13 +197,13 @@
                             {% endif %}
                           </td>
                           <td class="text-center">
-                            {% if c and c.flexibilitate and c.flexibilitate|length > 0 %}<span class="badge bg-success">F</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                            {% if c and c.comentariu %}<span class="badge bg-success">Comentat</span>{% else %}<span class="text-muted">—</span>{% endif %}
                           </td>
                           <td class="text-center">
-                            {% if c and c.compensare and c.compensare|length > 0 %}<span class="badge bg-success">C</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                            <span class="text-muted">—</span>
                           </td>
                           <td class="text-center">
-                            {% if c and c.tranzitie and c.tranzitie|length > 0 %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                            <span class="text-muted">—</span>
                           </td>
                           <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                         </tr>
@@ -309,13 +309,13 @@
                                 {% endif %}
                               </td>
                               <td class="text-center">
-                                {% if c and c.flexibilitate and c.flexibilitate|length > 0 %}<span class="badge bg-success">F</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                                {% if c and c.comentariu %}<span class="badge bg-success">Comentat</span>{% else %}<span class="text-muted">—</span>{% endif %}
                               </td>
                               <td class="text-center">
-                                {% if c and c.compensare and c.compensare|length > 0 %}<span class="badge bg-success">C</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                                <span class="text-muted">—</span>
                               </td>
                               <td class="text-center">
-                                {% if c and c.tranzitie and c.tranzitie|length > 0 %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                                <span class="text-muted">—</span>
                               </td>
                               <td class="text-center">{% if p.link_dosar_parlament %}<a href="{{ p.link_dosar_parlament }}" target="_blank" rel="noopener" title="Dosar pe parlament.md"><i class="bi bi-box-arrow-up-right"></i></a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                             </tr>

@@ -26,7 +26,7 @@
       </div>
     {% endif %}
 
-    <h2 class="h6">Identificare & atașare</h2>
+    <h2 class="h6">Identificare</h2>
     <div class="row g-3 mb-3">
       <div class="col-12">
         <label class="form-label">{{ form.titlu.label }}</label>
@@ -37,16 +37,6 @@
         <label class="form-label">{{ form.descriere.label }}</label>
         {{ form.descriere }}
         {% if form.descriere.errors %}<div class="text-danger small">{{ form.descriere.errors }}</div>{% endif %}
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">{{ form.chapter.label }}</label>
-        {{ form.chapter }}
-        {% if form.chapter.errors %}<div class="text-danger small">{{ form.chapter.errors }}</div>{% endif %}
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">{{ form.criterion.label }}</label>
-        {{ form.criterion }}
-        {% if form.criterion.errors %}<div class="text-danger small">{{ form.criterion.errors }}</div>{% endif %}
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{{ form.status_implementare.label }}</label>
@@ -113,6 +103,11 @@
         <label class="form-label">{{ form.termen_actualizat_aprobare_guvern.label }}</label>
         {{ form.termen_actualizat_aprobare_guvern }}
         <div class="text-muted small">Dacă este completat, acesta este considerat termenul efectiv pentru Guvern.</div>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.data_coraport_cie.label }}</label>
+        {{ form.data_coraport_cie }}
+        {% if form.data_coraport_cie.errors %}<div class="text-danger small">{{ form.data_coraport_cie.errors }}</div>{% endif %}
       </div>
     </div>
 
@@ -249,6 +244,19 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <h2 class="h6">Capitol sau foaie de parcurs</h2>
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.chapter.label }}</label>{{ form.chapter }}
+        {% if form.chapter.errors %}<div class="text-danger small">{{ form.chapter.errors }}</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form.criterion.label }}</label>{{ form.criterion }}
+        {% if form.criterion.errors %}<div class="text-danger small">{{ form.criterion.errors }}</div>{% endif %}
+      </div>
+      <div class="col-12"><div class="form-text">Selectează exact una dintre opțiuni.</div></div>
     </div>
 
     <h2 class="h6">Acte UE relevante</h2>

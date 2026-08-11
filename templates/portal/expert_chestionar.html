@@ -8,6 +8,7 @@
   <div>
     <h1 class="h5 mb-1">{{ chestionar.titlu }}</h1>
     {% if chestionar.descriere %}<div class="text-muted">{{ chestionar.descriere }}</div>{% endif %}
+    {% if chestionar.linkuri_externe %}<div class="mt-2 d-flex flex-wrap gap-2">{% for link in chestionar.linkuri_externe.splitlines %}{% if link %}<a class="btn btn-sm btn-outline-primary" href="{{ link }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>Deschide pachetul legislativ</a>{% endif %}{% endfor %}</div>{% endif %}
     <div class="mt-2 d-flex flex-wrap gap-2">
       {% if chestionar.este_general %}
         <span class="badge text-bg-primary"><i class="bi bi-megaphone me-1"></i>General (pentru toți experții)</span>

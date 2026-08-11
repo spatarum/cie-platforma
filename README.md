@@ -201,3 +201,7 @@ Nu salvați cheile în cod sau în GitHub. Dacă variabilele R2 nu sunt definite
 aplicația folosește stocarea locală din `media/`, potrivită numai pentru
 dezvoltare. Documentele vechi pierdute de pe discul temporar Render trebuie
 reîncărcate după configurarea R2.
+
+## Actualizare PNA: coraport CIE și comentarii experți
+
+Migrarea `0027` adaugă data programată pentru coraport în CIE, solicitările de prezentare a opiniei, linkurile externe ale chestionarelor și comentariul unic per expert/proiect. La deploy, păstrează în noul câmp doar contribuțiile utilizatorului cu numele complet `Ina Spinei` din vechiul câmp „Flexibilitate”; celelalte contribuții vechi sunt eliminate conform cerinței.

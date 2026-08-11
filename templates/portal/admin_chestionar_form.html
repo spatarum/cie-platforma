@@ -69,6 +69,12 @@
             {{ form.descriere.errors }}
           </div>
           <div class="mb-3">
+            <label class="form-label fw-semibold">{{ form.linkuri_externe.label }}</label>
+            {{ form.linkuri_externe }}
+            {{ form.linkuri_externe.errors }}
+            <div class="form-text">Câte un link complet pe fiecare rând; se va deschide într-o filă nouă.</div>
+          </div>
+          <div class="mb-3">
             <label class="form-label fw-semibold">{{ form.termen_limita.label }}</label>
             {{ form.termen_limita }}
             {{ form.termen_limita.errors }}

@@ -204,19 +204,19 @@
               <div class="text-muted small">{{ r.contrib.updated_at|date:"d.m.Y H:i" }}</div>
             </div>
             <div class="row g-3">
-              {% if r.has_flex %}
+              {% if r.has_comment %}
                 <div class="col-12 col-lg-4">
-                  <div class="small text-muted fw-semibold mb-1">Flexibilitate</div>
-                  <div class="small">{{ r.contrib.flexibilitate|linebreaksbr }}</div>
+                  <div class="small text-muted fw-semibold mb-1">Comentarii experți</div>
+                  <div class="small">{{ r.contrib.comentariu|linebreaksbr }}</div>
                 </div>
               {% endif %}
-              {% if r.has_comp %}
+              {% if False %}
                 <div class="col-12 col-lg-4">
                   <div class="small text-muted fw-semibold mb-1">Compensare</div>
                   <div class="small">{{ r.contrib.compensare|linebreaksbr }}</div>
                 </div>
               {% endif %}
-              {% if r.has_tran %}
+              {% if False %}
                 <div class="col-12 col-lg-4">
                   <div class="small text-muted fw-semibold mb-1">Tranziție</div>
                   <div class="small">{{ r.contrib.tranzitie|linebreaksbr }}</div>

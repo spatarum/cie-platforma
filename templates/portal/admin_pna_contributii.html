@@ -103,13 +103,13 @@
                 {% endif %}
               </td>
               <td class="text-center">
-                {% if r.has_flex %}<span class="badge bg-success">F</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                {% if r.has_comment %}<span class="badge bg-success">Comentat</span>{% else %}<span class="text-muted">—</span>{% endif %}
               </td>
               <td class="text-center">
-                {% if r.has_comp %}<span class="badge bg-success">C</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                <span class="text-muted">—</span>
               </td>
               <td class="text-center">
-                {% if r.has_tran %}<span class="badge bg-success">T</span>{% else %}<span class="text-muted">—</span>{% endif %}
+                <span class="text-muted">—</span>
               </td>
               <td class="text-muted small">
                 {% if r.contrib %}{{ r.contrib.updated_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}
