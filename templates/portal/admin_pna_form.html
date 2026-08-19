@@ -246,17 +246,33 @@
       </div>
     </div>
 
-    <h2 class="h6">Capitol sau foaie de parcurs</h2>
+    <h2 class="h6">Capitole și foi de parcurs</h2>
     <div class="row g-3 mb-3">
       <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.chapter.label }}</label>{{ form.chapter }}
-        {% if form.chapter.errors %}<div class="text-danger small">{{ form.chapter.errors }}</div>{% endif %}
+        <label class="form-label">{{ form.chapters.label }}</label>
+        <div class="border rounded p-2" style="max-height: 320px; overflow: auto;">
+          {% for cb in form.chapters %}
+            <div class="form-check mb-1">
+              {{ cb.tag }}
+              <label class="form-check-label" for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label>
+            </div>
+          {% endfor %}
+        </div>
+        {% if form.chapters.errors %}<div class="text-danger small">{{ form.chapters.errors }}</div>{% endif %}
       </div>
       <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.criterion.label }}</label>{{ form.criterion }}
-        {% if form.criterion.errors %}<div class="text-danger small">{{ form.criterion.errors }}</div>{% endif %}
+        <label class="form-label">{{ form.criteria.label }}</label>
+        <div class="border rounded p-2" style="max-height: 320px; overflow: auto;">
+          {% for cb in form.criteria %}
+            <div class="form-check mb-1">
+              {{ cb.tag }}
+              <label class="form-check-label" for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label>
+            </div>
+          {% endfor %}
+        </div>
+        {% if form.criteria.errors %}<div class="text-danger small">{{ form.criteria.errors }}</div>{% endif %}
       </div>
-      <div class="col-12"><div class="form-text">Selectează exact una dintre opțiuni.</div></div>
+      <div class="col-12"><div class="form-text">Bifează una sau mai multe opțiuni. Același proiect poate aparține simultan mai multor capitole și foi de parcurs.</div></div>
     </div>
 
     <h2 class="h6">Acte UE relevante</h2>

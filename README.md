@@ -205,3 +205,11 @@ reîncărcate după configurarea R2.
 ## Actualizare PNA: coraport CIE și comentarii experți
 
 Migrarea `0027` adaugă data programată pentru coraport în CIE, solicitările de prezentare a opiniei, linkurile externe ale chestionarelor și comentariul unic per expert/proiect. La deploy, păstrează în noul câmp doar contribuțiile utilizatorului cu numele complet `Ina Spinei` din vechiul câmp „Flexibilitate”; celelalte contribuții vechi sunt eliminate conform cerinței.
+
+## Actualizare PNA: capitole și foi de parcurs multiple
+
+Migrarea `0028` permite asocierea aceluiași proiect PNA cu mai multe capitole și
+mai multe foi de parcurs, inclusiv simultan. Selecțiile unice existente sunt
+copiate automat în noile relații multiple. Formularul de creare/editare folosește
+bife, iar listele, dashboardurile și accesul experților iau în calcul toate
+opțiunile bifate.

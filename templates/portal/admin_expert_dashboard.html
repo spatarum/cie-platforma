@@ -163,7 +163,7 @@
               <td>
                 <div class="fw-semibold"><a href="{% url 'admin_pna_detail' r.p.pk %}">{{ r.p.titlu }}</a></div>
                 <div class="text-muted small">
-                  {% if r.p.criterion %}{{ r.p.criterion.cod }}{% elif r.p.chapter %}Cap. {{ r.p.chapter.numar }}{% endif %}
+                  {{ r.p.atasare_label }}
                 </div>
               </td>
               <td class="text-nowrap">{% if r.p.termen_aprobare_parlament %}{{ r.p.termen_aprobare_parlament|luna_an }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
