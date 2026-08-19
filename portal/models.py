@@ -708,7 +708,9 @@ class PnaProject(models.Model):
 
     titlu = models.CharField(max_length=700)
 
-    # Fiecare proiect este atașat fie la un capitol, fie la o foaie de parcurs.
+    # Câmpuri legacy: păstrăm prima selecție pentru compatibilitatea importurilor
+    # și a integrărilor mai vechi. Interfața și rapoartele folosesc relațiile
+    # multiple ``chapters`` / ``criteria`` definite mai jos.
     chapter = models.ForeignKey(
         Chapter,
         null=True,
@@ -722,6 +724,18 @@ class PnaProject(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="pna_proiecte",
+    )
+    chapters = models.ManyToManyField(
+        Chapter,
+        blank=True,
+        related_name="pna_proiecte_multiple",
+        help_text="Capitolele de negociere relevante pentru proiect.",
+    )
+    criteria = models.ManyToManyField(
+        Criterion,
+        blank=True,
+        related_name="pna_proiecte_multiple",
+        help_text="Foile de parcurs relevante pentru proiect.",
     )
 
     acte_ue = models.ManyToManyField(
@@ -865,13 +879,31 @@ class PnaProject(models.Model):
     def __str__(self) -> str:
         return self.titlu
 
+    def scope_chapters(self):
+        """Capitolele proiectului, cu fallback la vechiul câmp unic."""
+        try:
+            selected = list(self.chapters.all())
+        except (TypeError, ValueError):
+            selected = []
+        if selected:
+            return selected
+        return [self.chapter] if self.chapter_id and self.chapter else []
+
+    def scope_criteria(self):
+        """Foile de parcurs ale proiectului, cu fallback la vechiul câmp unic."""
+        try:
+            selected = list(self.criteria.all())
+        except (TypeError, ValueError):
+            selected = []
+        if selected:
+            return selected
+        return [self.criterion] if self.criterion_id and self.criterion else []
+
     @property
     def atasare_label(self) -> str:
-        if self.chapter_id:
-            return f"Cap. {self.chapter.numar} – {self.chapter.denumire}"
-        if self.criterion_id:
-            return f"{self.criterion.cod} – {self.criterion.denumire}"
-        return "(neatribuit)"
+        labels = [f"Cap. {ch.numar} – {ch.denumire}" for ch in self.scope_chapters()]
+        labels.extend(f"{cr.cod} – {cr.denumire}" for cr in self.scope_criteria())
+        return "; ".join(labels) if labels else "(neatribuit)"
 
     @property
     def termen_guvern_efectiv(self):
@@ -892,16 +924,6 @@ class PnaProject(models.Model):
             or self.termen_aprobare_parlament
             or self.termen_aprobare_guvern
         )
-
-    def clean(self):
-        # exact un scope
-        has_ch = bool(self.chapter_id)
-        has_cr = bool(self.criterion_id)
-        if has_ch and has_cr:
-            raise ValidationError("Proiectul trebuie atașat fie la un capitol, fie la o foaie de parcurs (nu ambele).")
-        if not has_ch and not has_cr:
-            raise ValidationError("Proiectul trebuie atașat la un capitol sau la o foaie de parcurs.")
-
 
 class PnaProjectEUAct(models.Model):
     """Legătura proiect PNA ↔ act UE, cu informații suplimentare per act."""

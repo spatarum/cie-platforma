@@ -183,20 +183,40 @@ def _expert_pna_accessible_qs(user: User):
     profil = _get_or_create_profile(user)
     return (
         PnaProject.objects.filter(arhivat=False)
-        .filter(Q(chapter__in=profil.capitole.all()) | Q(criterion__in=profil.criterii.all()))
+        .filter(
+            Q(chapters__in=profil.capitole.all())
+            | Q(criteria__in=profil.criterii.all())
+            | Q(chapter__in=profil.capitole.all())
+            | Q(criterion__in=profil.criterii.all())
+        )
         .distinct()
         .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("acte_ue_legaturi__eu_act")
+        .prefetch_related("chapters__cluster", "criteria", "acte_ue_legaturi__eu_act")
         .order_by("titlu")
     )
 
 
 def _pna_scope_label(proiect: PnaProject) -> str:
-    if getattr(proiect, 'chapter_id', None) and getattr(proiect, 'chapter', None):
-        return f"Cap. {proiect.chapter.numar} — {proiect.chapter.denumire}"
-    if getattr(proiect, 'criterion_id', None) and getattr(proiect, 'criterion', None):
-        return f"{proiect.criterion.cod} — {proiect.criterion.denumire}"
-    return "—"
+    return proiect.atasare_label if proiect else "—"
+
+
+def _pna_chapter_ids(proiect: PnaProject) -> set[int]:
+    return {ch.id for ch in proiect.scope_chapters() if ch and ch.id}
+
+
+def _pna_criterion_ids(proiect: PnaProject) -> set[int]:
+    return {cr.id for cr in proiect.scope_criteria() if cr and cr.id}
+
+
+def _profile_matches_pna_project(profil: ExpertProfile | None, proiect: PnaProject) -> bool:
+    if not profil:
+        return False
+    expert_chapters = set(profil.capitole.values_list("id", flat=True))
+    expert_criteria = set(profil.criterii.values_list("id", flat=True))
+    return bool(
+        expert_chapters.intersection(_pna_chapter_ids(proiect))
+        or expert_criteria.intersection(_pna_criterion_ids(proiect))
+    )
 
 
 
@@ -262,19 +282,23 @@ def _pna_bulk_update_field_meta():
 
 
 def _pna_projects_for_bulk_selection(cluster_ids, chapter_ids, criterion_ids):
-    qs = PnaProject.objects.filter(arhivat=False).select_related("chapter", "chapter__cluster", "criterion", "institutie_principala_ref")
+    qs = (
+        PnaProject.objects.filter(arhivat=False)
+        .select_related("chapter", "chapter__cluster", "criterion", "institutie_principala_ref")
+        .prefetch_related("chapters__cluster", "criteria")
+    )
     q = Q()
     if cluster_ids:
-        q |= Q(chapter__cluster_id__in=cluster_ids)
+        q |= Q(chapters__cluster_id__in=cluster_ids) | Q(chapter__cluster_id__in=cluster_ids)
     if chapter_ids:
-        q |= Q(chapter_id__in=chapter_ids)
+        q |= Q(chapters__id__in=chapter_ids) | Q(chapter_id__in=chapter_ids)
     if criterion_ids:
-        q |= Q(criterion_id__in=criterion_ids)
+        q |= Q(criteria__id__in=criterion_ids) | Q(criterion_id__in=criterion_ids)
     if q:
         qs = qs.filter(q)
     else:
         qs = qs.none()
-    return qs.order_by("chapter__cluster__ordonare", "chapter__numar", "criterion__cod", "titlu").distinct()
+    return qs.order_by("titlu").distinct()
 
 
 def _user_role_label(user: User) -> str:
@@ -776,6 +800,7 @@ def admin_pna_consultari(request):
     proiecte = list(
         PnaProject.objects.filter(arhivat=False, consultari_publice_parlament__isnull=False)
         .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
+        .prefetch_related("chapters__cluster", "criteria")
         .order_by("consultari_publice_parlament", "titlu")
     )
     try:
@@ -874,14 +899,14 @@ def expert_pna_list(request):
         )
     }
 
-    # Grupare pe foi de parcurs + capitole (ca în admin), dar cu afișare limitată.
+    # Un proiect apare în fiecare capitol/foaie de parcurs bifată.
     by_criterion = {}
     by_chapter = {}
     for p in proiecte:
-        if p.criterion_id:
-            by_criterion.setdefault(p.criterion_id, []).append(p)
-        elif p.chapter_id:
-            by_chapter.setdefault(p.chapter_id, []).append(p)
+        for criterion_id in _pna_criterion_ids(p):
+            by_criterion.setdefault(criterion_id, []).append(p)
+        for chapter_id in _pna_chapter_ids(p):
+            by_chapter.setdefault(chapter_id, []).append(p)
 
     criterii = list(Criterion.objects.all().order_by("cod"))
     criterii_groups = []
@@ -931,19 +956,14 @@ def expert_pna_detail(request, pk: int):
 
     proiect = get_object_or_404(
         PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("acte_ue_legaturi__eu_act"),
+        .prefetch_related("chapters__cluster", "criteria", "acte_ue_legaturi__eu_act"),
         pk=pk,
         arhivat=False,
     )
 
     # control acces: doar pe capitole/foi de parcurs alocate expertului
     profil = _get_or_create_profile(request.user)
-    ok = False
-    if proiect.chapter_id and profil.capitole.filter(id=proiect.chapter_id).exists():
-        ok = True
-    if proiect.criterion_id and profil.criterii.filter(id=proiect.criterion_id).exists():
-        ok = True
-    if not ok:
+    if not _profile_matches_pna_project(profil, proiect):
         raise Http404("Proiect indisponibil")
 
     contrib, _ = PnaExpertContribution.objects.get_or_create(project=proiect, expert=request.user)
@@ -2660,6 +2680,7 @@ def admin_pna_list(request):
     proiecte_qs = (
         PnaProject.objects.filter(arhivat=False)
         .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
+        .prefetch_related("chapters__cluster", "criteria")
         .prefetch_related("acte_ue_legaturi__eu_act")
         .prefetch_related("institutii_responsabile")
         .order_by("titlu")
@@ -2720,14 +2741,14 @@ def admin_pna_list(request):
     proiecte_qs = _apply_pna_stage_filter_to_qs(proiecte_qs, stage)
     proiecte = list(proiecte_qs)
 
-    # Grupare pe criterii (foi de parcurs)
+    # Un proiect apare în fiecare capitol/foaie de parcurs bifată.
     by_criterion = {}
     by_chapter = {}
     for p in proiecte:
-        if p.criterion_id:
-            by_criterion.setdefault(p.criterion_id, []).append(p)
-        elif p.chapter_id:
-            by_chapter.setdefault(p.chapter_id, []).append(p)
+        for criterion_id in _pna_criterion_ids(p):
+            by_criterion.setdefault(criterion_id, []).append(p)
+        for chapter_id in _pna_chapter_ids(p):
+            by_chapter.setdefault(chapter_id, []).append(p)
 
     criterii = list(Criterion.objects.all().order_by("cod"))
     criterii_groups = []
@@ -2846,7 +2867,10 @@ def admin_pna_dashboard_institution(request, pk: int):
 @user_passes_test(is_internal)
 def admin_pna_dashboard_chapter(request, pk: int):
     ch = get_object_or_404(Chapter, pk=pk)
-    proiecte_qs = PnaProject.objects.filter(arhivat=False, chapter=ch)
+    proiecte_qs = PnaProject.objects.filter(
+        Q(chapters=ch) | Q(chapter=ch),
+        arhivat=False,
+    ).distinct()
     return _render_pna_dashboard(
         request,
         proiecte_qs=proiecte_qs,
@@ -2862,7 +2886,10 @@ def admin_pna_dashboard_chapter(request, pk: int):
 @user_passes_test(is_internal)
 def admin_pna_dashboard_criterion(request, pk: int):
     cr = get_object_or_404(Criterion, pk=pk)
-    proiecte_qs = PnaProject.objects.filter(arhivat=False, criterion=cr)
+    proiecte_qs = PnaProject.objects.filter(
+        Q(criteria=cr) | Q(criterion=cr),
+        arhivat=False,
+    ).distinct()
     return _render_pna_dashboard(
         request,
         proiecte_qs=proiecte_qs,
@@ -2899,14 +2926,14 @@ def _render_pna_dashboard(
     base_qs = proiecte_qs
     all_projects = list(
         base_qs.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("institutii_responsabile", "acte_ue_legaturi__eu_act")
+        .prefetch_related("chapters__cluster", "criteria", "institutii_responsabile", "acte_ue_legaturi__eu_act")
         .order_by("-actualizat_la")
     )
 
     proiecte_qs = _apply_pna_stage_filter_to_qs(proiecte_qs, stage)
     proiecte = list(
         proiecte_qs.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("institutii_responsabile", "acte_ue_legaturi__eu_act")
+        .prefetch_related("chapters__cluster", "criteria", "institutii_responsabile", "acte_ue_legaturi__eu_act")
         .order_by("-actualizat_la")
     )
 
@@ -2952,33 +2979,38 @@ def _render_pna_dashboard(
             }
 
     # "Eligibili" = experți (nu staff/admin) alocați capitolului/foii de parcurs a proiectului.
-    chapter_ids = sorted({p.chapter_id for p in proiecte if p.chapter_id})
-    criterion_ids = sorted({p.criterion_id for p in proiecte if p.criterion_id})
+    chapter_ids = sorted({scope_id for p in proiecte for scope_id in _pna_chapter_ids(p)})
+    criterion_ids = sorted({scope_id for p in proiecte for scope_id in _pna_criterion_ids(p)})
 
     eligible_experts_by_chapter = {}
     eligible_experts_by_criterion = {}
     experts_base_qs = User.objects.filter(is_active=True, is_staff=False, is_superuser=False).filter(profil_expert__arhivat=False)
     if chapter_ids:
-        rows = (
+        rows = list(
             experts_base_qs.filter(profil_expert__capitole__id__in=chapter_ids)
-            .values("profil_expert__capitole")
-            .annotate(nr=Count("id", distinct=True))
+            .values("id", "profil_expert__capitole")
         )
-        eligible_experts_by_chapter = {int(r["profil_expert__capitole"]): int(r["nr"]) for r in rows if r.get("profil_expert__capitole")}
+        for row in rows:
+            scope_id = row.get("profil_expert__capitole")
+            if scope_id:
+                eligible_experts_by_chapter.setdefault(int(scope_id), set()).add(int(row["id"]))
     if criterion_ids:
-        rows = (
+        rows = list(
             experts_base_qs.filter(profil_expert__criterii__id__in=criterion_ids)
-            .values("profil_expert__criterii")
-            .annotate(nr=Count("id", distinct=True))
+            .values("id", "profil_expert__criterii")
         )
-        eligible_experts_by_criterion = {int(r["profil_expert__criterii"]): int(r["nr"]) for r in rows if r.get("profil_expert__criterii")}
+        for row in rows:
+            scope_id = row.get("profil_expert__criterii")
+            if scope_id:
+                eligible_experts_by_criterion.setdefault(int(scope_id), set()).add(int(row["id"]))
 
     def _eligible_experts_for_project(p: PnaProject) -> int:
-        if p.chapter_id:
-            return int(eligible_experts_by_chapter.get(p.chapter_id, 0))
-        if p.criterion_id:
-            return int(eligible_experts_by_criterion.get(p.criterion_id, 0))
-        return 0
+        expert_ids = set()
+        for scope_id in _pna_chapter_ids(p):
+            expert_ids.update(eligible_experts_by_chapter.get(scope_id, set()))
+        for scope_id in _pna_criterion_ids(p):
+            expert_ids.update(eligible_experts_by_criterion.get(scope_id, set()))
+        return len(expert_ids)
 
     # Parametri de scope (păstrați pe drill-down-uri)
     scope_filters = scope_filters or {}
@@ -3171,22 +3203,27 @@ def _render_pna_dashboard(
         has_any = bool(flags.get("any"))
         has_all = bool(has_f and has_c and has_t)
 
-        # capitol/foaie
-        if p.chapter_id:
-            s = cs_chapters.setdefault(p.chapter_id, _init_cs())
-        else:
-            s = cs_criterii.setdefault(p.criterion_id, _init_cs())
-        s["total"] += 1
-        if has_any:
-            s["any"] += 1
-        if has_f:
-            s["f"] += 1
-        if has_c:
-            s["c"] += 1
-        if has_t:
-            s["t"] += 1
-        if has_all:
-            s["all"] += 1
+        # Proiectul contribuie la fiecare capitol și foaie de parcurs bifată.
+        project_scope_stats = [
+            cs_chapters.setdefault(scope_id, _init_cs())
+            for scope_id in _pna_chapter_ids(p)
+        ]
+        project_scope_stats.extend(
+            cs_criterii.setdefault(scope_id, _init_cs())
+            for scope_id in _pna_criterion_ids(p)
+        )
+        for s in project_scope_stats:
+            s["total"] += 1
+            if has_any:
+                s["any"] += 1
+            if has_f:
+                s["f"] += 1
+            if has_c:
+                s["c"] += 1
+            if has_t:
+                s["t"] += 1
+            if has_all:
+                s["all"] += 1
 
         # instituție principală
         inst_id = int(p.institutie_principala_ref_id or 0)
@@ -3583,16 +3620,13 @@ def _render_pna_dashboard(
         d = p.termen_deadline
         if not d or d.year != selected_year:
             continue
-        if p.criterion_id:
-            key = ("CR", p.criterion_id)
-        else:
-            key = ("CH", p.chapter_id)
-        if not key[1]:
-            continue
-        if mode == "days":
-            matrix[key][d.month] += int(p.volum_munca_zile or 0)
-        else:
-            matrix[key][d.month] += 1
+        keys = [("CH", scope_id) for scope_id in _pna_chapter_ids(p)]
+        keys.extend(("CR", scope_id) for scope_id in _pna_criterion_ids(p))
+        for key in keys:
+            if mode == "days":
+                matrix[key][d.month] += int(p.volum_munca_zile or 0)
+            else:
+                matrix[key][d.month] += 1
 
     criterii_rows = []
     criterii = list(Criterion.objects.all().order_by("cod"))
@@ -3712,39 +3746,41 @@ def _render_pna_dashboard(
     if scope_kind == "institution":
         scope_agg = {}
         for p in proiecte:
-            if p.criterion_id and p.criterion:
-                kind = "CR"
-                sid = p.criterion_id
-                label = f"{p.criterion.cod} — {p.criterion.denumire}"
-                dashboard_url = reverse("admin_pna_dashboard_criterion", kwargs={"pk": p.criterion_id})
-            elif p.chapter_id and p.chapter:
-                kind = "CH"
-                sid = p.chapter_id
-                label = f"Cap. {p.chapter.numar} — {p.chapter.denumire}"
-                dashboard_url = reverse("admin_pna_dashboard_chapter", kwargs={"pk": p.chapter_id})
-            else:
-                continue
-
-            key = (kind, sid)
-            row = scope_agg.setdefault(
-                key,
-                {
-                    "kind": kind,
-                    "id": sid,
-                    "label": label,
-                    "dashboard_url": dashboard_url,
-                    "filter_url": _filtered_list_url({"chapter": sid}) if kind == "CH" else _filtered_list_url({"criterion": sid}),
-                    **_empty_resource_row(
-                        label,
-                        filter_url=_filtered_list_url({"chapter": sid}) if kind == "CH" else _filtered_list_url({"criterion": sid}),
-                        dashboard_url=dashboard_url,
-                    ),
-                    "kind": kind,
-                    "id": sid,
-                    "label": label,
-                },
+            project_scopes = [
+                (
+                    "CH",
+                    ch.id,
+                    f"Cap. {ch.numar} — {ch.denumire}",
+                    reverse("admin_pna_dashboard_chapter", kwargs={"pk": ch.id}),
+                )
+                for ch in p.scope_chapters()
+            ]
+            project_scopes.extend(
+                (
+                    "CR",
+                    cr.id,
+                    f"{cr.cod} — {cr.denumire}",
+                    reverse("admin_pna_dashboard_criterion", kwargs={"pk": cr.id}),
+                )
+                for cr in p.scope_criteria()
             )
-            _update_resource_row(row, p)
+            for kind, sid, label, dashboard_url in project_scopes:
+                filter_args = {"chapter": sid} if kind == "CH" else {"criterion": sid}
+                key = (kind, sid)
+                row = scope_agg.setdefault(
+                    key,
+                    {
+                        **_empty_resource_row(
+                            label,
+                            filter_url=_filtered_list_url(filter_args),
+                            dashboard_url=dashboard_url,
+                        ),
+                        "kind": kind,
+                        "id": sid,
+                        "label": label,
+                    },
+                )
+                _update_resource_row(row, p)
 
         rows = list(scope_agg.values())
         rows.sort(key=lambda r: (r["total"], r["zile"]), reverse=True)
@@ -3755,7 +3791,7 @@ def _render_pna_dashboard(
     for cl, chapters in grouped_chapters:
         rows = []
         for ch in chapters:
-            projects_for_ch = [p for p in proiecte if p.chapter_id == ch.id]
+            projects_for_ch = [p for p in proiecte if ch.id in _pna_chapter_ids(p)]
             if not projects_for_ch:
                 continue
             row = _empty_resource_row(
@@ -3772,7 +3808,7 @@ def _render_pna_dashboard(
 
     resource_criteria_rows = []
     for cr in Criterion.objects.all().order_by("cod"):
-        projects_for_cr = [p for p in proiecte if p.criterion_id == cr.id]
+        projects_for_cr = [p for p in proiecte if cr.id in _pna_criterion_ids(p)]
         if not projects_for_cr:
             continue
         row = _empty_resource_row(
@@ -4335,7 +4371,7 @@ def admin_pna_detail(request, pk: int):
 
     obj = get_object_or_404(
         PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("acte_ue_legaturi__eu_act")
+        .prefetch_related("chapters__cluster", "criteria", "acte_ue_legaturi__eu_act")
         .prefetch_related("institutii_responsabile"),
         pk=pk,
     )
@@ -4414,7 +4450,7 @@ def admin_pna_all_contributions(request):
     elif chapter_id:
         try:
             ch = get_object_or_404(Chapter, pk=int(chapter_id))
-            qs = qs.filter(chapter=ch)
+            qs = qs.filter(Q(chapters=ch) | Q(chapter=ch)).distinct()
             scope_title = f"Cap. {ch.numar} — {ch.denumire}"
             back_url = reverse("admin_pna_dashboard_chapter", kwargs={"pk": ch.pk})
             back_label = "Înapoi la dashboard capitol"
@@ -4423,7 +4459,7 @@ def admin_pna_all_contributions(request):
     elif criterion_id:
         try:
             cr = get_object_or_404(Criterion, pk=int(criterion_id))
-            qs = qs.filter(criterion=cr)
+            qs = qs.filter(Q(criteria=cr) | Q(criterion=cr)).distinct()
             scope_title = f"{cr.cod} — {cr.denumire}"
             back_url = reverse("admin_pna_dashboard_criterion", kwargs={"pk": cr.pk})
             back_label = "Înapoi la dashboard foaie de parcurs"
@@ -4462,7 +4498,7 @@ def admin_pna_contributii(request, pk: int):
 
     proiect = get_object_or_404(
         PnaProject.objects.select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("acte_ue_legaturi__eu_act"),
+        .prefetch_related("chapters__cluster", "criteria", "acte_ue_legaturi__eu_act"),
         pk=pk,
     )
 
@@ -4473,15 +4509,12 @@ def admin_pna_contributii(request, pk: int):
         user__is_staff=False,
     )
 
-    scope_label = ""
-    if proiect.chapter_id:
-        exp_profiles = exp_profiles.filter(capitole=proiect.chapter_id)
-        if proiect.chapter:
-            scope_label = f"Cap. {proiect.chapter.numar} — {proiect.chapter.denumire}"
-    elif proiect.criterion_id:
-        exp_profiles = exp_profiles.filter(criterii=proiect.criterion_id)
-        if proiect.criterion:
-            scope_label = f"{proiect.criterion.cod} — {proiect.criterion.denumire}"
+    chapter_ids = _pna_chapter_ids(proiect)
+    criterion_ids = _pna_criterion_ids(proiect)
+    exp_profiles = exp_profiles.filter(
+        Q(capitole__id__in=chapter_ids) | Q(criterii__id__in=criterion_ids)
+    ).distinct()
+    scope_label = _pna_scope_label(proiect)
 
     experts = [p.user for p in exp_profiles.order_by("user__last_name", "user__first_name")]
     expert_ids = [u.id for u in experts]
@@ -4548,17 +4581,15 @@ def admin_pna_contributii(request, pk: int):
 def admin_pna_contributii_expert(request, pk: int, expert_id: int):
     """Detaliu contribuție expert pentru un proiect PNA (read-only)."""
 
-    proiect = get_object_or_404(PnaProject, pk=pk)
+    proiect = get_object_or_404(
+        PnaProject.objects.select_related("chapter", "criterion").prefetch_related("chapters", "criteria"),
+        pk=pk,
+    )
     expert = get_object_or_404(User, pk=expert_id, is_staff=False)
 
     # Siguranță: proiectul trebuie să fie în scope-ul expertului.
     profil = getattr(expert, "profil_expert", None)
-    ok = False
-    if proiect.chapter_id and profil and profil.capitole.filter(id=proiect.chapter_id).exists():
-        ok = True
-    if proiect.criterion_id and profil and profil.criterii.filter(id=proiect.criterion_id).exists():
-        ok = True
-    if not ok:
+    if not _profile_matches_pna_project(profil, proiect):
         raise Http404("Expertul nu este alocat pe acest capitol/foaie de parcurs.")
 
     contrib = PnaExpertContribution.objects.filter(project=proiect, expert=expert).first()
@@ -4687,7 +4718,7 @@ def admin_pna_scope_list(request):
     qs = (
         PnaProject.objects.filter(arhivat=False)
         .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("institutii_responsabile")
+        .prefetch_related("chapters__cluster", "criteria", "institutii_responsabile")
     )
 
     inst_obj = None
@@ -4705,11 +4736,11 @@ def admin_pna_scope_list(request):
     scope_label = ""
     if chapter_id:
         ch = get_object_or_404(Chapter, pk=int(chapter_id))
-        qs = qs.filter(chapter=ch)
+        qs = qs.filter(Q(chapters=ch) | Q(chapter=ch)).distinct()
         scope_label = f"Cap. {ch.numar} — {ch.denumire}"
     else:
         cr = get_object_or_404(Criterion, pk=int(criterion_id))
-        qs = qs.filter(criterion=cr)
+        qs = qs.filter(Q(criteria=cr) | Q(criterion=cr)).distinct()
         scope_label = f"{cr.cod} — {cr.denumire}"
 
     if inst_obj:
@@ -4784,7 +4815,7 @@ def admin_pna_filtered_list(request):
     qs = (
         PnaProject.objects.filter(arhivat=False)
         .select_related("chapter", "criterion", "institutie_principala_ref", "comisie_responsabila")
-        .prefetch_related("institutii_responsabile")
+        .prefetch_related("chapters__cluster", "criteria", "institutii_responsabile")
     )
 
     deadline_expr = Coalesce(
@@ -4895,12 +4926,14 @@ def admin_pna_filtered_list(request):
 
     if chapter_id:
         try:
-            qs = qs.filter(chapter_id=int(chapter_id))
+            scope_id = int(chapter_id)
+            qs = qs.filter(Q(chapters__id=scope_id) | Q(chapter_id=scope_id)).distinct()
         except Exception:
             pass
     if criterion_id:
         try:
-            qs = qs.filter(criterion_id=int(criterion_id))
+            scope_id = int(criterion_id)
+            qs = qs.filter(Q(criteria__id=scope_id) | Q(criterion_id=scope_id)).distinct()
         except Exception:
             pass
 

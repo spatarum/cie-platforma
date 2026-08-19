@@ -16,6 +16,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.db.models import Q
 
 from .models import (
     Chapter,
@@ -60,9 +61,9 @@ _TEMPLATE_PROJECT_COLUMNS = [
     ("Denumire proiect", 48, "Obligatoriu. Titlul proiectului / acțiunii normative."),
     ("Descriere", 42, "Descriere scurtă a proiectului."),
     ("Cluster PNA", 24, "Clusterul PNA, dacă este cazul."),
-    ("Capitol (număr)", 16, "Completează fie numărul capitolului (ex. 1), fie codul foii de parcurs."),
+    ("Capitol (număr)", 16, "Numărul capitolului (ex. 1). Poate fi completat împreună cu foaia de parcurs."),
     ("Capitol (denumire)", 30, "Opțional. Dacă lipsește capitolul în sistem, poate fi creat cu această denumire."),
-    ("Foaie de parcurs (cod)", 22, "Completează fie codul foii de parcurs (ex. CR, PAR, RoL), fie capitolul."),
+    ("Foaie de parcurs (cod)", 22, "Codul foii de parcurs (ex. CR, PAR, RoL). Poate fi completat împreună cu capitolul."),
     ("Foaie de parcurs (denumire)", 32, "Opțional. Dacă lipsește foaia de parcurs în sistem, poate fi creată cu această denumire."),
     ("Status implementare", 30, "Alege una dintre etapele disponibile din lista de validare."),
     ("Instituția principală", 36, "Instituția principală responsabilă. Dacă nu există în listă, va fi creată automat."),
@@ -606,7 +607,6 @@ def _resolve_scope_from_values(
     foaie_cod: Any = None,
     foaie_denumire: Any = None,
     existing: PnaProject | None = None,
-    prefer_chapter_when_both: bool = False,
 ) -> tuple[Chapter | None, Criterion | None, str | None]:
     ch_num = _parse_chapter_from_label(capitol_numar)
     if ch_num is None and capitol_numar not in (None, ""):
@@ -614,28 +614,26 @@ def _resolve_scope_from_values(
 
     criterion_code = _parse_primary_criterion_code(foaie_cod)
 
-    if ch_num and criterion_code:
-        if not prefer_chapter_when_both:
-            return None, None, "Completează fie capitolul, fie foaia de parcurs, nu ambele."
-        criterion_code = None
-
     if not ch_num and not criterion_code:
         if existing:
             return existing.chapter, existing.criterion, None
         return None, None, "Lipsește capitolul / foaia de parcurs."
 
+    chapter = None
     if ch_num:
         chapter = Chapter.objects.filter(numar=ch_num).first()
         if not chapter:
             den = _norm_text(capitol_denumire) or f"Capitol {ch_num}"
             chapter = Chapter.objects.create(numar=ch_num, denumire=den[:255])
-        return chapter, None, None
 
-    criterion = Criterion.objects.filter(cod__iexact=criterion_code).first()
-    if not criterion:
-        den = _norm_text(foaie_denumire) or criterion_code
-        criterion = Criterion.objects.create(cod=criterion_code[:20], denumire=den[:255])
-    return None, criterion, None
+    criterion = None
+    if criterion_code:
+        criterion = Criterion.objects.filter(cod__iexact=criterion_code).first()
+        if not criterion:
+            den = _norm_text(foaie_denumire) or criterion_code
+            criterion = Criterion.objects.create(cod=criterion_code[:20], denumire=den[:255])
+
+    return chapter, criterion, None
 
 
 class _ImportContext:
@@ -693,7 +691,12 @@ def _lookup_existing_project(
         key = ("nr", _norm_text(nr_actiune).lower(), scope_key)
         if cache and key in cache:
             return cache[key]
-        obj = PnaProject.objects.filter(pna_nr_actiune__iexact=nr_actiune, chapter=chapter, criterion=criterion).first()
+        scope_qs = PnaProject.objects.filter(pna_nr_actiune__iexact=nr_actiune)
+        if chapter:
+            scope_qs = scope_qs.filter(Q(chapters=chapter) | Q(chapter=chapter))
+        if criterion:
+            scope_qs = scope_qs.filter(Q(criteria=criterion) | Q(criterion=criterion))
+        obj = scope_qs.distinct().first()
         if obj:
             return obj
 
@@ -701,7 +704,12 @@ def _lookup_existing_project(
         key = ("title", _norm_text(titlu).lower(), scope_key)
         if cache and key in cache:
             return cache[key]
-        obj = PnaProject.objects.filter(titlu__iexact=titlu, chapter=chapter, criterion=criterion).first()
+        scope_qs = PnaProject.objects.filter(titlu__iexact=titlu)
+        if chapter:
+            scope_qs = scope_qs.filter(Q(chapters=chapter) | Q(chapter=chapter))
+        if criterion:
+            scope_qs = scope_qs.filter(Q(criteria=criterion) | Q(criterion=criterion))
+        obj = scope_qs.distinct().first()
         if obj:
             return obj
 
@@ -872,8 +880,15 @@ def _upsert_project(
         obj.arhivat_la = None
         changed = True
 
-    obj.full_clean(exclude=["acte_ue", "institutii_responsabile"])
+    obj.full_clean(exclude=["acte_ue", "institutii_responsabile", "chapters", "criteria"])
     obj.save()
+
+    # Importul poate furniza simultan capitol și foaie de parcurs. Le adăugăm
+    # în relațiile multiple fără a șterge selecțiile suplimentare făcute în UI.
+    if chapter:
+        obj.chapters.add(chapter)
+    if criterion:
+        obj.criteria.add(criterion)
 
     # -------------------- istoric (etapa 2) --------------------
     if create_new:
@@ -1169,11 +1184,6 @@ def _import_source_pna_workbook(wb, *, user: User, ctx: _ImportContext) -> None:
             data["acte_normative_transpunere_existente"] = "\n".join(transp_existing)
 
         try:
-            # Fișierul sursă PNA poate avea atât capitol, cât și foaie de parcurs completate pe același rând.
-            # În sistem, proiectul rămâne atașat unui singur scope, iar regula existentă este să preferăm capitolul.
-            if data.get("capitol_numar") not in (None, "") and data.get("foaie_cod") not in (None, ""):
-                data["foaie_cod"] = None
-                data["foaie_denumire"] = None
             with transaction.atomic():
                 project, status, message = _upsert_project(data, user=user, ctx=ctx, clear_missing=False, get_inst=get_inst)
             ctx.report(f"{sheet.title}!{row_idx}", identifier, status, message)

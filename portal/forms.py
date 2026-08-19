@@ -699,6 +699,19 @@ class NewsletterForm(forms.ModelForm):
 
 
 class PnaProjectForm(forms.ModelForm):
+    chapters = forms.ModelMultipleChoiceField(
+        queryset=Chapter.objects.all().order_by("numar"),
+        required=False,
+        label="Capitole relevante",
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+    )
+    criteria = forms.ModelMultipleChoiceField(
+        queryset=Criterion.objects.all().order_by("cod"),
+        required=False,
+        label="Foi de parcurs relevante",
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+    )
+
     # Termene la nivel de lună (input type="month" → YYYY-MM). Ziua este fixată implicit la 1.
     termen_aprobare_guvern = forms.DateField(
         required=False,
@@ -733,8 +746,8 @@ class PnaProjectForm(forms.ModelForm):
         fields = [
             "titlu",
             "descriere",
-            "chapter",
-            "criterion",
+            "chapters",
+            "criteria",
             "status_implementare",
             "comisie_responsabila",
             "link_dosar_parlament",
@@ -775,8 +788,6 @@ class PnaProjectForm(forms.ModelForm):
         widgets = {
             "titlu": forms.TextInput(attrs={"class": "form-control"}),
             "descriere": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-            "chapter": forms.Select(attrs={"class": "form-select"}),
-            "criterion": forms.Select(attrs={"class": "form-select"}),
             "status_implementare": forms.Select(attrs={"class": "form-select"}),
             "comisie_responsabila": forms.Select(attrs={"class": "form-select"}),
             "link_dosar_parlament": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://www.parlament.md/..."}),
@@ -814,8 +825,8 @@ class PnaProjectForm(forms.ModelForm):
         labels = {
             "titlu": "Denumire proiect",
             "descriere": "Descriere",
-            "chapter": "Capitol (dacă este cazul)",
-            "criterion": "Foaie de parcurs (dacă este cazul)",
+            "chapters": "Capitole relevante",
+            "criteria": "Foi de parcurs relevante",
             "status_implementare": "Status implementare",
             "comisie_responsabila": "Comisia parlamentară responsabilă",
             "link_dosar_parlament": "Link dosar proiect pe parlament.md",
@@ -852,13 +863,19 @@ class PnaProjectForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        ch = cleaned.get("chapter")
-        cr = cleaned.get("criterion")
-        if ch and cr:
-            self.add_error("criterion", "Alege fie un capitol, fie o foaie de parcurs (nu ambele).")
-        if not ch and not cr:
-            self.add_error("chapter", "Alege un capitol sau o foaie de parcurs.")
+        chapters = cleaned.get("chapters")
+        criteria = cleaned.get("criteria")
+        if not chapters and not criteria:
+            self.add_error("chapters", "Bifează cel puțin un capitol sau o foaie de parcurs.")
         return cleaned
+
+    def save(self, commit=True):
+        """Păstrează și câmpurile unice legacy sincronizate cu prima bifă."""
+        chapters = list(self.cleaned_data.get("chapters") or [])
+        criteria = list(self.cleaned_data.get("criteria") or [])
+        self.instance.chapter = chapters[0] if chapters else None
+        self.instance.criterion = criteria[0] if criteria else None
+        return super().save(commit=commit)
 
     def sync_institution_legacy_fields(self, obj: PnaProject):
         """Sincronizează câmpurile text legacy cu selecțiile din liste."""
